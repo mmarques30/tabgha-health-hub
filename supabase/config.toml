@@ -1,1 +1,13 @@
 project_id = "vdnxhvvkxfzuqludpmna"
+
+[functions.whatsapp-inbound]
+verify_jwt = false
+
+[functions.webhook_whatsapp]
+verify_jwt = false
+
+[functions.webhook_meta_lead]
+verify_jwt = false
+
+[functions.sync_ads_metrics]
+verify_jwt = false

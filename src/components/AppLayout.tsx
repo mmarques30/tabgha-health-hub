@@ -1,4 +1,5 @@
-import { type ReactNode } from "react";
+import { type ReactNode, Suspense, lazy } from "react";
+const AssistantBubble = lazy(() => import("./AssistantBubble").then((m) => ({ default: m.AssistantBubble })));
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
@@ -100,6 +101,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <main className="flex-1 min-w-0">{children}</main>
+      {process.env.ANTHROPIC_API_KEY && (
+        <Suspense fallback={null}><AssistantBubble /></Suspense>
+      )}
     </div>
   );
 }

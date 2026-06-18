@@ -2,7 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import type { Json } from "@/integrations/supabase/types";
-import type { AuthContext } from "@/lib/auth.server";
+import {
+  assertClienteAccess,
+  requireRoleAuth,
+  type AuthContext,
+} from "@/integrations/supabase/role-middleware";
 
 const sendWhatsappInput = z.object({
   conversation_id: z.string().uuid(),

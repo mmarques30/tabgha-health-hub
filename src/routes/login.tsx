@@ -37,7 +37,16 @@ function LoginPage() {
       setError("Sessão não criada.");
       return;
     }
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+    const { data: roles, error: rolesError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+
+    if (rolesError) {
+      setError("Login realizado, mas não foi possível carregar seu perfil. Tente novamente.");
+      return;
+    }
+
     const isAdmin = roles?.some((r) => r.role === "admin");
     navigate({ to: isAdmin ? "/admin/dashboard" : "/cliente/dashboard", replace: true });
   }

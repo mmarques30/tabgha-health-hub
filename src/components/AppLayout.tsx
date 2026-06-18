@@ -5,40 +5,22 @@ import { hasPermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
-  Users,
-  ClipboardList,
-  Calendar,
-  LineChart,
-  Workflow,
-  Settings,
-  FileText,
-  Megaphone,
   LogOut,
 } from "lucide-react";
 
-type NavItem = { to: string; label: string; icon: React.ComponentType<{ className?: string }>; perm: string };
+type NavItem = {
+  to: "/admin/dashboard" | "/cliente/dashboard";
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  perm: string;
+};
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "admin.dashboard" },
-  { to: "/admin/clientes", label: "Clientes", icon: Users, perm: "admin.clientes" },
-  { to: "/admin/diagnosticos", label: "Diagnósticos", icon: ClipboardList, perm: "admin.diagnosticos" },
-  { to: "/admin/estrategia", label: "Estratégia", icon: FileText, perm: "admin.estrategia" },
-  { to: "/admin/calendario", label: "Calendário", icon: Calendar, perm: "admin.calendario" },
-  { to: "/admin/automacoes-leads", label: "Leads", icon: Megaphone, perm: "admin.leads" },
-  { to: "/admin/roi", label: "ROI", icon: LineChart, perm: "admin.roi" },
-  { to: "/admin/usuarios", label: "Usuários", icon: Users, perm: "admin.usuarios" },
-  { to: "/admin/automacoes", label: "Automações", icon: Workflow, perm: "admin.automacoes" },
 ];
 
 const CLIENTE_NAV: NavItem[] = [
   { to: "/cliente/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "cliente.dashboard" },
-  { to: "/cliente/leads", label: "Leads", icon: Megaphone, perm: "cliente.leads" },
-  { to: "/cliente/clientes", label: "Pacientes", icon: Users, perm: "cliente.pacientes" },
-  { to: "/cliente/roi", label: "ROI", icon: LineChart, perm: "cliente.roi" },
-  { to: "/cliente/conteudo", label: "Conteúdo", icon: FileText, perm: "cliente.conteudo" },
-  { to: "/cliente/diagnostico", label: "Diagnóstico", icon: ClipboardList, perm: "cliente.diagnostico" },
-  { to: "/cliente/conexoes", label: "Conexões", icon: Settings, perm: "cliente.conexoes" },
-  { to: "/cliente/calendario", label: "Calendário", icon: Calendar, perm: "cliente.calendario" },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {

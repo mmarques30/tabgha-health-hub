@@ -178,7 +178,7 @@ function RoiAdminPage() {
                       }
                     />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar yAxisId="left" dataKey="investimento" name="Investimento" fill="#1E5CC8" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="investimento" name="Investimento" fill="#1A5FAD" radius={[4, 4, 0, 0]} />
                     <Bar yAxisId="right" dataKey="leads" name="Leads" fill="#F6A623" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

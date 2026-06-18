@@ -2,7 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import type { Json } from "@/integrations/supabase/types";
-import { assertClienteAccess, requireAuth } from "@/server/auth";
+import {
+  assertClienteAccess,
+  requireRoleAuth,
+  type AuthContext,
+} from "@/integrations/supabase/role-middleware";
 
 const sendWhatsappInput = z.object({
   conversation_id: z.string().uuid(),
@@ -33,7 +37,7 @@ function extractZapiConfig(dadosExtras: Json | null): ZapiConfig {
 }
 
 async function ensurePhoneExists(
-  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  supabase: AuthContext["supabase"],
   phone: string,
   zapi: ZapiConfig,
 ) {
@@ -84,10 +88,11 @@ type SendOutput = { ok: true; message_id: string; zapi_message_id: string | null
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sendWhatsappMessage = ((createServerFn({ method: "POST" }) as any)
+  .middleware([requireRoleAuth])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   .handler(async (ctx: any) => {
     const data = sendWhatsappInput.parse(ctx.data);
-    const auth = await requireAuth();
+    const auth = ctx.context.auth as AuthContext;
 
     const { data: conversation, error: conversationError } = await auth.supabase
       .from("whatsapp_conversations")

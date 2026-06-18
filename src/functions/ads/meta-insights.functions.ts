@@ -2,7 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import type { Json } from "@/integrations/supabase/types";
-import { assertClienteAccess, requireAuth } from "@/server/auth";
+import {
+  assertClienteAccess,
+  requireRoleAuth,
+  type AuthContext,
+} from "@/integrations/supabase/role-middleware";
 
 const META_API_VERSION = "v20.0";
 const INSIGHT_FIELDS =
@@ -47,7 +51,7 @@ async function metaGet(accessToken: string, path: string, params: Record<string,
 }
 
 async function loadCreds(
-  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  supabase: AuthContext["supabase"],
   clienteId: string,
 ): Promise<MetaCreds> {
   const { data, error } = await supabase
@@ -74,10 +78,11 @@ type MetaInput = z.infer<typeof metaInsightsInput>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getMetaInsights = ((createServerFn({ method: "POST" }) as any)
+  .middleware([requireRoleAuth])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   .handler(async (ctx: any): Promise<any> => {
     const data = metaInsightsInput.parse(ctx.data);
-    const auth = await requireAuth();
+    const auth = ctx.context.auth as AuthContext;
     assertClienteAccess(auth, data.cliente_id);
 
     const creds = await loadCreds(auth.supabase, data.cliente_id);

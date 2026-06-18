@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { buildSystemPrompt } from "@/server/ai/prompts";
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -25,6 +24,7 @@ export const chatWithAI = (createServerFn() as any)
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY não configurada.");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { buildSystemPrompt } = await import("@/lib/ai-prompts");
 
     let clienteContext: { especialidade?: string | null; nome?: string | null } = {};
     if (data.cliente_id) {

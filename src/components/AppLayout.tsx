@@ -60,7 +60,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const items = role === "admin" ? ADMIN_NAV : CLIENTE_NAV;
-  const allowed = items.filter((i) => hasPermission(profile?.permissoes, i.perm));
+  // Admin sempre tem acesso total; cliente filtra por permissoes
+  const allowed = role === "admin" ? items : items.filter((i) => hasPermission(profile?.permissoes, i.perm));
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">

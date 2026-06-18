@@ -77,6 +77,7 @@ export const getMetaInsights = ((createServerFn({ method: "POST" }) as any)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   .handler(async (ctx: any): Promise<any> => {
     const data = metaInsightsInput.parse(ctx.data);
+    const { requireAuth, assertClienteAccess } = await import("@/server/auth");
     const auth = await requireAuth();
     assertClienteAccess(auth, data.cliente_id);
 

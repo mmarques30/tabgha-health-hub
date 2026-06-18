@@ -156,21 +156,17 @@ function Nav() {
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         scrolled
-          ? "bg-[#0B1628]/95 backdrop-blur-md shadow-lg shadow-black/20"
+          ? "bg-[#0D1B3E]/95 backdrop-blur-md shadow-lg shadow-black/20"
           : "bg-transparent",
       )}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold text-white shadow-lg"
-            style={{ background: "linear-gradient(135deg, #10b981, #06b6d4)" }}
-          >
-            T
-          </div>
-          <span className="text-base font-bold tracking-tight text-white">
-            Tabgha <span className="font-light" style={{ color: "rgba(255,255,255,0.5)" }}>Health</span>
-          </span>
+        <div className="flex items-center">
+          <img
+            src="https://tabghamkt.com.br/wp-content/uploads/2025/05/logo_tabgha_health_mkt_caixa_alta-04-scaled-e1747895382243.png"
+            alt="Tabgha Health Marketing"
+            className="h-10 w-auto brightness-0 invert"
+          />
         </div>
 
         <nav className="hidden items-center gap-8 md:flex">
@@ -192,8 +188,8 @@ function Nav() {
             href="#diagnostico"
             className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-semibold text-white shadow-lg transition-all"
             style={{
-              background: "linear-gradient(135deg, #10b981, #06b6d4)",
-              boxShadow: "0 4px 20px rgba(16,185,129,0.3)",
+              background: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
+              boxShadow: "0 4px 20px rgba(26,95,173,0.3)",
             }}
           >
             Diagnóstico gratuito <ArrowRight className="h-3.5 w-3.5" />
@@ -206,7 +202,7 @@ function Nav() {
       </div>
 
       {open && (
-        <div className="border-t px-6 py-4 md:hidden" style={{ background: "#0B1628", borderColor: "rgba(255,255,255,0.1)" }}>
+        <div className="border-t px-6 py-4 md:hidden" style={{ background: "#0D1B3E", borderColor: "rgba(255,255,255,0.1)" }}>
           <nav className="flex flex-col gap-4">
             {[["#solucao", "Solução"], ["#resultados", "Resultados"], ["#depoimentos", "Depoimentos"], ["#faq", "FAQ"]].map(([href, label]) => (
               <a key={href} href={href} className="text-sm" style={{ color: "rgba(255,255,255,0.7)" }} onClick={() => setOpen(false)}>{label}</a>
@@ -216,7 +212,7 @@ function Nav() {
               <a
                 href="#diagnostico"
                 className="inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-white"
-                style={{ background: "linear-gradient(135deg, #10b981, #06b6d4)" }}
+                style={{ background: "linear-gradient(135deg, #1A5FAD, #40ADDB)" }}
               >
                 Diagnóstico gratuito <ArrowRight className="h-3.5 w-3.5" />
               </a>
@@ -232,7 +228,7 @@ function Nav() {
 
 function Hero() {
   return (
-    <section style={{ background: "#0B1628", position: "relative", minHeight: "100vh", overflow: "hidden" }}>
+    <section style={{ background: "#0D1B3E", position: "relative", minHeight: "100vh", overflow: "hidden" }}>
       {/* grid bg */}
       <div
         style={{
@@ -242,23 +238,23 @@ function Hero() {
         }}
       />
       {/* glow blobs */}
-      <div style={{ position: "absolute", top: -160, left: "35%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", top: "33%", right: -80, width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(6,182,212,0.14) 0%, transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: -160, left: "35%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(26,95,173,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: "33%", right: -80, width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(64,173,219,0.14) 0%, transparent 70%)", pointerEvents: "none" }} />
 
       <div className="relative mx-auto flex max-w-6xl flex-col items-center px-6 text-center" style={{ paddingTop: 160, paddingBottom: 128 }}>
         {/* badge */}
         <div
           className="mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-widest"
-          style={{ border: "1px solid rgba(16,185,129,0.35)", background: "rgba(16,185,129,0.1)", color: "#34d399" }}
+          style={{ border: "1px solid rgba(26,95,173,0.35)", background: "rgba(26,95,173,0.15)", color: "#60C3E8" }}
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" style={{ background: "#34d399" }} />
+          <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: "#60C3E8" }} />
           Agência especializada em marketing médico
         </div>
 
         {/* headline */}
         <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-white md:text-6xl lg:text-7xl" style={{ lineHeight: 1.08 }}>
           Mais pacientes para{" "}
-          <span style={{ backgroundImage: "linear-gradient(135deg, #34d399, #22d3ee)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+          <span style={{ backgroundImage: "linear-gradient(135deg, #60C3E8, #40ADDB)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
             sua clínica.
           </span>
           <br />
@@ -276,8 +272,8 @@ function Hero() {
             href="#diagnostico"
             className="inline-flex items-center gap-2 rounded-full px-8 py-3.5 text-sm font-bold text-white transition-all"
             style={{
-              background: "linear-gradient(135deg, #10b981, #06b6d4)",
-              boxShadow: "0 8px 32px rgba(16,185,129,0.35)",
+              background: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
+              boxShadow: "0 8px 32px rgba(26,95,173,0.35)",
             }}
           >
             Solicitar diagnóstico gratuito
@@ -351,7 +347,7 @@ function ProblemSection() {
   ];
 
   return (
-    <section style={{ background: "#0B1628", position: "relative", paddingTop: 96, paddingBottom: 96 }}>
+    <section style={{ background: "#0D1B3E", position: "relative", paddingTop: 96, paddingBottom: 96 }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, transform: "translateY(-1px)" }}>
         <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block", transform: "rotate(180deg)" }} preserveAspectRatio="none">
           <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
@@ -360,7 +356,7 @@ function ProblemSection() {
 
       <div className="mx-auto max-w-6xl px-6">
         <div className="mb-14 text-center">
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#34d399" }}>O problema</span>
+          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#60C3E8" }}>O problema</span>
           <h2 className="mt-3 text-3xl font-extrabold text-white md:text-4xl">
             Marketing médico sem estratégia <br className="hidden md:block" />
             <span style={{ color: "rgba(255,255,255,0.35)" }}>custa mais do que você imagina</span>
@@ -398,7 +394,7 @@ function SolutionSection() {
     <section id="solucao" style={{ background: "#f8fafc", paddingTop: 112, paddingBottom: 112 }}>
       <div className="mx-auto max-w-6xl px-6">
         <div className="mb-16 text-center">
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#10b981" }}>Nossa solução</span>
+          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#1A5FAD" }}>Nossa solução</span>
           <h2 className="mt-3 text-3xl font-extrabold text-slate-900 md:text-4xl">
             Tudo que uma clínica precisa <br className="hidden md:block" />
             para crescer com consistência
@@ -424,7 +420,7 @@ function SolutionSection() {
               >
                 <div
                   className="inline-flex h-12 w-12 items-center justify-center rounded-2xl"
-                  style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.12), rgba(6,182,212,0.12))", color: "#059669" }}
+                  style={{ background: "linear-gradient(135deg, rgba(26,95,173,0.1), rgba(64,173,219,0.1))", color: "#1A5FAD" }}
                 >
                   <Icon className="h-6 w-6" />
                 </div>
@@ -433,7 +429,7 @@ function SolutionSection() {
                 <ul className="mt-6 space-y-2">
                   {f.items.map((item) => (
                     <li key={item} className="flex items-center gap-2 text-sm" style={{ color: "#475569" }}>
-                      <CheckCircle className="h-4 w-4 shrink-0" style={{ color: "#10b981" }} />
+                      <CheckCircle className="h-4 w-4 shrink-0" style={{ color: "#1A5FAD" }} />
                       {item}
                     </li>
                   ))}
@@ -451,7 +447,7 @@ function SolutionSection() {
 
 function HowItWorks() {
   return (
-    <section style={{ background: "#0B1628", position: "relative", paddingTop: 112, paddingBottom: 112 }}>
+    <section style={{ background: "#0D1B3E", position: "relative", paddingTop: 112, paddingBottom: 112 }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, transform: "translateY(-1px)" }}>
         <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block", transform: "rotate(180deg)" }} preserveAspectRatio="none">
           <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
@@ -460,7 +456,7 @@ function HowItWorks() {
 
       <div className="mx-auto max-w-6xl px-6">
         <div className="mb-16 text-center">
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#34d399" }}>Como funciona</span>
+          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#60C3E8" }}>Como funciona</span>
           <h2 className="mt-3 text-3xl font-extrabold text-white md:text-4xl">Do diagnóstico à agenda cheia</h2>
         </div>
 
@@ -469,7 +465,7 @@ function HowItWorks() {
           <div
             style={{
               position: "absolute", top: 32, left: "calc(16.666% + 1rem)", right: "calc(16.666% + 1rem)",
-              height: 1, background: "linear-gradient(90deg, rgba(16,185,129,0.15), rgba(16,185,129,0.6), rgba(16,185,129,0.15))",
+              height: 1, background: "linear-gradient(90deg, rgba(26,95,173,0.15), rgba(26,95,173,0.6), rgba(26,95,173,0.15))",
               display: "none",
             }}
             className="md:block"
@@ -479,7 +475,7 @@ function HowItWorks() {
             <div key={s.n} className="flex flex-col items-center text-center">
               <div
                 className="relative flex h-16 w-16 items-center justify-center rounded-2xl text-2xl font-extrabold"
-                style={{ border: "1px solid rgba(16,185,129,0.35)", background: "rgba(16,185,129,0.1)", color: "#34d399" }}
+                style={{ border: "1px solid rgba(26,95,173,0.35)", background: "rgba(26,95,173,0.15)", color: "#60C3E8" }}
               >
                 {s.n}
               </div>
@@ -508,15 +504,15 @@ function ResultsSection() {
         <div
           className="overflow-hidden rounded-3xl p-12 shadow-2xl md:p-16"
           style={{
-            background: "linear-gradient(135deg, #0B1628 0%, #0f2040 50%, #0a2535 100%)",
+            background: "linear-gradient(135deg, #0D1B3E 0%, #0f2040 50%, #0a2535 100%)",
             boxShadow: "0 24px 80px rgba(0,0,0,0.25)",
           }}
         >
           <div className="mb-12 text-center">
-            <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#34d399" }}>Resultados reais</span>
+            <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#60C3E8" }}>Resultados reais</span>
             <h2 className="mt-3 text-3xl font-extrabold text-white md:text-4xl">
               Números que a sua clínica{" "}
-              <span style={{ backgroundImage: "linear-gradient(135deg, #34d399, #22d3ee)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+              <span style={{ backgroundImage: "linear-gradient(135deg, #60C3E8, #40ADDB)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                 merece ter
               </span>
             </h2>
@@ -527,7 +523,7 @@ function ResultsSection() {
               const Icon = s.icon;
               return (
                 <div key={s.label} className="flex flex-col items-center text-center">
-                  <Icon className="mb-3 h-6 w-6" style={{ color: "rgba(52,211,153,0.6)" }} />
+                  <Icon className="mb-3 h-6 w-6" style={{ color: "rgba(96,195,232,0.6)" }} />
                   <span className="text-4xl font-extrabold text-white md:text-5xl">{s.value}</span>
                   <span className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>{s.label}</span>
                 </div>
@@ -547,7 +543,7 @@ function Testimonials() {
     <section id="depoimentos" style={{ background: "#f8fafc", paddingBottom: 112 }}>
       <div className="mx-auto max-w-6xl px-6">
         <div className="mb-12 text-center">
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#10b981" }}>Depoimentos</span>
+          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#1A5FAD" }}>Depoimentos</span>
           <h2 className="mt-3 text-3xl font-extrabold text-slate-900 md:text-4xl">
             Quem já tem agenda cheia fala por nós
           </h2>
@@ -584,7 +580,7 @@ function FAQ() {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <section id="faq" style={{ background: "#0B1628", position: "relative", paddingTop: 112, paddingBottom: 112 }}>
+    <section id="faq" style={{ background: "#0D1B3E", position: "relative", paddingTop: 112, paddingBottom: 112 }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, transform: "translateY(-1px)" }}>
         <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block", transform: "rotate(180deg)" }} preserveAspectRatio="none">
           <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
@@ -593,7 +589,7 @@ function FAQ() {
 
       <div className="mx-auto max-w-2xl px-6">
         <div className="mb-12 text-center">
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#34d399" }}>FAQ</span>
+          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#60C3E8" }}>FAQ</span>
           <h2 className="mt-3 text-3xl font-extrabold text-white md:text-4xl">Perguntas frequentes</h2>
         </div>
 
@@ -602,7 +598,7 @@ function FAQ() {
             <div
               key={i}
               className="overflow-hidden rounded-2xl transition-all"
-              style={{ border: `1px solid ${open === i ? "rgba(16,185,129,0.35)" : "rgba(255,255,255,0.1)"}`, background: "rgba(255,255,255,0.05)" }}
+              style={{ border: `1px solid ${open === i ? "rgba(26,95,173,0.35)" : "rgba(255,255,255,0.1)"}`, background: "rgba(255,255,255,0.05)" }}
             >
               <button
                 onClick={() => setOpen(open === i ? null : i)}
@@ -644,8 +640,8 @@ function CTASection() {
         <div
           className="relative overflow-hidden rounded-3xl p-12 text-center shadow-2xl md:p-20"
           style={{
-            background: "linear-gradient(135deg, #059669 0%, #0891b2 100%)",
-            boxShadow: "0 24px 80px rgba(16,185,129,0.25)",
+            background: "linear-gradient(135deg, #1A5FAD 0%, #40ADDB 100%)",
+            boxShadow: "0 24px 80px rgba(26,95,173,0.25)",
           }}
         >
           {/* blobs */}
@@ -682,7 +678,7 @@ function CTASection() {
               <button
                 type="submit"
                 className="inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 text-sm font-bold transition-all"
-                style={{ background: "#fff", color: "#059669", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
+                style={{ background: "#fff", color: "#1A5FAD", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
               >
                 Quero o diagnóstico <ArrowRight className="h-4 w-4" />
               </button>
@@ -702,20 +698,16 @@ function CTASection() {
 
 function Footer() {
   return (
-    <footer style={{ background: "#0B1628", paddingTop: 64, paddingBottom: 40 }}>
+    <footer style={{ background: "#0D1B3E", paddingTop: 64, paddingBottom: 40 }}>
       <div className="mx-auto max-w-6xl px-6">
         <div className="grid gap-10 md:grid-cols-4">
           <div className="md:col-span-2">
-            <div className="flex items-center gap-2.5">
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold text-white"
-                style={{ background: "linear-gradient(135deg, #10b981, #06b6d4)" }}
-              >
-                T
-              </div>
-              <span className="text-base font-bold text-white">
-                Tabgha <span style={{ fontWeight: 300, color: "rgba(255,255,255,0.4)" }}>Health Marketing</span>
-              </span>
+            <div className="flex items-center">
+              <img
+                src="https://tabghamkt.com.br/wp-content/uploads/2025/05/logo_tabgha_health_mkt_caixa_alta-04-scaled-e1747895382243.png"
+                alt="Tabgha Health Marketing"
+                className="h-8 w-auto brightness-0 invert opacity-60"
+              />
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.4)" }}>
               Estratégia, conteúdo e tecnologia integrados para clínicas e consultórios que querem crescer com previsibilidade.

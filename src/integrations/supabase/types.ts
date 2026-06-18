@@ -14,16 +14,419 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agendamentos: {
+        Row: {
+          cliente_id: string
+          criado_em: string
+          descricao: string | null
+          fim: string | null
+          id: string
+          inicio: string | null
+          tipo: string | null
+          titulo: string | null
+          visivel_cliente: boolean
+        }
+        Insert: {
+          cliente_id: string
+          criado_em?: string
+          descricao?: string | null
+          fim?: string | null
+          id?: string
+          inicio?: string | null
+          tipo?: string | null
+          titulo?: string | null
+          visivel_cliente?: boolean
+        }
+        Update: {
+          cliente_id?: string
+          criado_em?: string
+          descricao?: string | null
+          fim?: string | null
+          id?: string
+          inicio?: string | null
+          tipo?: string | null
+          titulo?: string | null
+          visivel_cliente?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_config: {
+        Row: {
+          atualizado_em: string
+          chave: string
+          valor: Json
+        }
+        Insert: {
+          atualizado_em?: string
+          chave: string
+          valor: Json
+        }
+        Update: {
+          atualizado_em?: string
+          chave?: string
+          valor?: Json
+        }
+        Relationships: []
+      }
+      clientes: {
+        Row: {
+          atualizado_em: string
+          cnpj: string | null
+          criado_em: string
+          dados_extras: Json | null
+          diagnostico: Json | null
+          email: string | null
+          especialidade: string | null
+          id: string
+          nome: string
+          razao_social: string | null
+          status: string
+          telefone: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          cnpj?: string | null
+          criado_em?: string
+          dados_extras?: Json | null
+          diagnostico?: Json | null
+          email?: string | null
+          especialidade?: string | null
+          id?: string
+          nome: string
+          razao_social?: string | null
+          status?: string
+          telefone?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          cnpj?: string | null
+          criado_em?: string
+          dados_extras?: Json | null
+          diagnostico?: Json | null
+          email?: string | null
+          especialidade?: string | null
+          id?: string
+          nome?: string
+          razao_social?: string | null
+          status?: string
+          telefone?: string | null
+        }
+        Relationships: []
+      }
+      conteudos: {
+        Row: {
+          atualizado_em: string
+          cliente_id: string
+          criado_em: string
+          data_postagem: string | null
+          id: string
+          rede: string | null
+          roteiro: string | null
+          status: string
+          tipo: string | null
+          titulo: string | null
+          url_arquivo: string | null
+          url_briefing: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          cliente_id: string
+          criado_em?: string
+          data_postagem?: string | null
+          id?: string
+          rede?: string | null
+          roteiro?: string | null
+          status?: string
+          tipo?: string | null
+          titulo?: string | null
+          url_arquivo?: string | null
+          url_briefing?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          cliente_id?: string
+          criado_em?: string
+          data_postagem?: string | null
+          id?: string
+          rede?: string | null
+          roteiro?: string | null
+          status?: string
+          tipo?: string | null
+          titulo?: string | null
+          url_arquivo?: string | null
+          url_briefing?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conteudos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entregas: {
+        Row: {
+          atualizado_em: string
+          cliente_id: string
+          criado_em: string
+          id: string
+          resposta_cliente: string | null
+          status: string
+          tipo: string | null
+          titulo: string | null
+          url_arquivo: string | null
+          url_arquivo_bruto: string | null
+          url_arquivo_final: string | null
+          url_briefing: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          cliente_id: string
+          criado_em?: string
+          id?: string
+          resposta_cliente?: string | null
+          status?: string
+          tipo?: string | null
+          titulo?: string | null
+          url_arquivo?: string | null
+          url_arquivo_bruto?: string | null
+          url_arquivo_final?: string | null
+          url_briefing?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          cliente_id?: string
+          criado_em?: string
+          id?: string
+          resposta_cliente?: string | null
+          status?: string
+          tipo?: string | null
+          titulo?: string | null
+          url_arquivo?: string | null
+          url_arquivo_bruto?: string | null
+          url_arquivo_final?: string | null
+          url_briefing?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entregas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          atualizado_em: string
+          canal: string | null
+          cliente_id: string
+          criado_em: string
+          email: string | null
+          icp: string | null
+          id: string
+          nome: string | null
+          observacoes: string | null
+          status: string
+          telefone: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          canal?: string | null
+          cliente_id: string
+          criado_em?: string
+          email?: string | null
+          icp?: string | null
+          id?: string
+          nome?: string | null
+          observacoes?: string | null
+          status?: string
+          telefone?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          canal?: string | null
+          cliente_id?: string
+          criado_em?: string
+          email?: string | null
+          icp?: string | null
+          id?: string
+          nome?: string | null
+          observacoes?: string | null
+          status?: string
+          telefone?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      metricas_ads: {
+        Row: {
+          campanha: string | null
+          cliente_id: string
+          conversoes: number
+          cpa: number | null
+          cpl: number | null
+          criado_em: string
+          data: string
+          id: string
+          investimento: number
+          leads: number
+          plataforma: string
+          roas: number | null
+        }
+        Insert: {
+          campanha?: string | null
+          cliente_id: string
+          conversoes?: number
+          cpa?: number | null
+          cpl?: number | null
+          criado_em?: string
+          data: string
+          id?: string
+          investimento?: number
+          leads?: number
+          plataforma: string
+          roas?: number | null
+        }
+        Update: {
+          campanha?: string | null
+          cliente_id?: string
+          conversoes?: number
+          cpa?: number | null
+          cpl?: number | null
+          criado_em?: string
+          data?: string
+          id?: string
+          investimento?: number
+          leads?: number
+          plataforma?: string
+          roas?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metricas_ads_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          atualizado_em: string
+          cliente_id: string | null
+          criado_em: string
+          email: string | null
+          id: string
+          nome: string | null
+          permissoes: string[] | null
+        }
+        Insert: {
+          atualizado_em?: string
+          cliente_id?: string | null
+          criado_em?: string
+          email?: string | null
+          id: string
+          nome?: string | null
+          permissoes?: string[] | null
+        }
+        Update: {
+          atualizado_em?: string
+          cliente_id?: string | null
+          criado_em?: string
+          email?: string | null
+          id?: string
+          nome?: string | null
+          permissoes?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      admin_create_cliente: {
+        Args: { _cnpj?: string; _email: string; _nome: string }
+        Returns: string
+      }
+      admin_upsert_profile_role: {
+        Args: {
+          _cliente_id?: string
+          _permissoes?: string[]
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: undefined
+      }
+      assert_current_admin: { Args: never; Returns: undefined }
+      bootstrap_admin: { Args: { _email: string }; Returns: string }
+      current_cliente_id: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      responder_entrega: {
+        Args: { _aprovada: boolean; _id: string; _resposta: string }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "cliente"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +553,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "cliente"],
+    },
   },
 } as const

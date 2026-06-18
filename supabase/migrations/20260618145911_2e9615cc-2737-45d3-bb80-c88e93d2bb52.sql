@@ -1,0 +1,1 @@
+SELECT public.bootstrap_admin('mariana@iaplicada.com');

@@ -88,11 +88,11 @@ type SendOutput = { ok: true; message_id: string; zapi_message_id: string | null
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sendWhatsappMessage = ((createServerFn({ method: "POST" }) as any)
+  .middleware([requireRoleAuth])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   .handler(async (ctx: any) => {
     const data = sendWhatsappInput.parse(ctx.data);
-    const { requireAuth, assertClienteAccess } = await import("@/lib/auth.server");
-    const auth = await requireAuth();
+    const auth = ctx.context.auth as AuthContext;
 
     const { data: conversation, error: conversationError } = await auth.supabase
       .from("whatsapp_conversations")

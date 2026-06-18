@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import type { Json } from "@/integrations/supabase/types";
-import { assertClienteAccess, requireAuth } from "@/server/auth";
+import type { AuthContext } from "@/server/auth";
 
 const META_API_VERSION = "v20.0";
 const INSIGHT_FIELDS =

@@ -19,9 +19,6 @@ export const Route = createFileRoute("/_authenticated/cliente/conteudo")({
   head: () => ({ meta: [{ title: "Conteúdo — Portal" }] }),
 });
 
-type Conteudo = Tables<"conteudo"> & { entregas: { id: string; status: string }[] | null };
-
-// @ts-expect-error table name from schema
 type ConteudoRow = Tables<"conteudos">;
 
 const STATUS_LABELS: Record<string, string> = {

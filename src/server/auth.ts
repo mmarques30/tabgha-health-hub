@@ -10,7 +10,7 @@ export type AuthContext = {
   clienteId: string | null;
   permissoes: string[] | null;
   accessToken: string;
-  supabase: ReturnType<typeof createSupabaseAdminClient>;
+  supabase: any;
 };
 
 export async function requireAuth(): Promise<AuthContext> {

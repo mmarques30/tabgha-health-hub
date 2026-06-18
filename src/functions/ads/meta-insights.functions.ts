@@ -72,16 +72,16 @@ async function loadCreds(
 
 export const getMetaInsights = createServerFn({ method: "POST" })
   .validator((data: unknown) => metaInsightsInput.parse(data))
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<any> => {
     const auth = await requireAuth();
     assertClienteAccess(auth, data.cliente_id);
 
     const creds = await loadCreds(auth.supabase, data.cliente_id);
     const timeRange =
       data.since && data.until ? JSON.stringify({ since: data.since, until: data.until }) : undefined;
-    const timeParams = timeRange ? { time_range: timeRange } : {};
+    const timeParams: Record<string, string> = timeRange ? { time_range: timeRange } : {};
 
-    let result: unknown;
+    let result: any = {};
 
     switch (data.action) {
       case "campaigns": {

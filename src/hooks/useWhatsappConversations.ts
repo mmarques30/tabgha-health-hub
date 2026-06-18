@@ -50,7 +50,7 @@ export function useWhatsappConversations(filters: ConversationFilters) {
         throw error;
       }
 
-      return (data ?? []) as WhatsappConversation[];
+      return (data ?? []) as unknown as WhatsappConversation[];
     },
   });
 

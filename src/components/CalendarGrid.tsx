@@ -14,7 +14,7 @@ export type CalEvent = {
 };
 
 const TYPE_COLOR: Record<string, string> = {
-  conteudo:    "bg-accent text-accent-foreground",
+  conteudo:    "bg-blue-100 text-blue-700",
   agendamento: "bg-yellow-100 text-yellow-700",
   gravacao:    "bg-green-100 text-green-700",
 };
@@ -110,7 +110,7 @@ export function CalendarGrid({ events, filters, onMonthChange }: Props) {
                 key={day.toISOString()}
                 className={cn(
                   "min-h-[80px] p-1.5 border-b border-r border-border",
-                  today && "bg-blue-50/60",
+                  today && "bg-primary/[0.07]",
                   isLast && "border-r-0",
                 )}
               >

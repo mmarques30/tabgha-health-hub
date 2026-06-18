@@ -172,14 +172,14 @@ function RoiAdminPage() {
                     <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
                     <Tooltip
-                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--color-border)" }}
+                      contentStyle={{ fontSize: 12, borderRadius: 8, background: "var(--color-card)", border: "1px solid var(--color-border)", color: "var(--color-foreground)" }}
                       formatter={(v: number, name: string) =>
                         name === "Investimento" ? [fmt(v), name] : [v, name]
                       }
                     />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar yAxisId="left" dataKey="investimento" name="Investimento" fill="#1A5FAD" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="right" dataKey="leads" name="Leads" fill="#60C3E8" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="investimento" name="Investimento" fill="#1E5CC8" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="right" dataKey="leads" name="Leads" fill="#F6A623" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

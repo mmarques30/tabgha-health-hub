@@ -46,11 +46,11 @@ function DiagnosticosPage() {
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Preenchidos</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-green-600">{comDiagnostico.length}</p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-green-700">{comDiagnostico.length}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Pendentes</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-amber-600">{semDiagnostico.length}</p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-yellow-700">{semDiagnostico.length}</p>
         </div>
       </div>
 

@@ -135,7 +135,7 @@ function SidebarNav({
         <img
           src="https://tabghamkt.com.br/wp-content/uploads/2025/05/logo_tabgha_health_mkt_caixa_alta-04-scaled-e1747895382243.png"
           alt="Tabgha Health Marketing"
-          className="h-6 w-auto brightness-0"
+          className="h-6 w-auto brightness-0 invert"
         />
       </div>
 
@@ -155,10 +155,10 @@ function SidebarNav({
                 onClick={() => toggle(key)}
                 className={cn(
                   "flex w-[calc(100%-16px)] items-center justify-between mx-2 px-2.5 py-1.5 rounded-md border-0 bg-transparent cursor-pointer transition-colors",
-                  "text-[9.5px] font-bold tracking-[0.14em] uppercase",
+                  "text-[9.5px] font-semibold tracking-[0.14em] uppercase",
                   hasActive
-                    ? "text-sidebar-accent-foreground"
-                    : "text-muted-foreground/55 hover:bg-border/50 hover:text-foreground/80",
+                    ? "text-sidebar-primary"
+                    : "text-sidebar-foreground/35 hover:text-sidebar-foreground/60",
                 )}
               >
                 <span>{key}</span>
@@ -183,16 +183,16 @@ function SidebarNav({
                         to={it.to as any}
                         onClick={onNavigate}
                         className={cn(
-                          "mx-2 mb-px flex items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-[12.5px] transition-colors",
+                          "mx-2 mb-px flex items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-[12.5px] transition-all duration-150",
                           active
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
-                            : "text-foreground/72 hover:bg-accent hover:text-accent-foreground",
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-[inset_3px_0_0_0_var(--color-sidebar-primary)]"
+                            : "text-sidebar-foreground/55 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
                         )}
                       >
                         <Icon
                           className={cn(
                             "h-3.5 w-3.5 shrink-0",
-                            active ? "opacity-100" : "opacity-70",
+                            active ? "text-sidebar-primary opacity-100" : "opacity-50",
                           )}
                         />
                         {it.label}
@@ -264,7 +264,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <img
             src="https://tabghamkt.com.br/wp-content/uploads/2025/05/logo_tabgha_health_mkt_caixa_alta-04-scaled-e1747895382243.png"
             alt="Tabgha Health Marketing"
-            className="h-6 w-auto brightness-0"
+            className="h-6 w-auto brightness-0 invert"
           />
         </header>
 

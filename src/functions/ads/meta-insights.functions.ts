@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import type { Json } from "@/integrations/supabase/types";
-import type { AuthContext } from "@/server/auth";
+import type { AuthContext } from "@/lib/auth.server";
 
 const META_API_VERSION = "v20.0";
 const INSIGHT_FIELDS =
@@ -77,7 +77,7 @@ export const getMetaInsights = ((createServerFn({ method: "POST" }) as any)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   .handler(async (ctx: any): Promise<any> => {
     const data = metaInsightsInput.parse(ctx.data);
-    const { requireAuth, assertClienteAccess } = await import("@/server/auth");
+    const { requireAuth, assertClienteAccess } = await import("@/lib/auth.server");
     const auth = await requireAuth();
     assertClienteAccess(auth, data.cliente_id);
 

@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import type { Json } from "@/integrations/supabase/types";
-import type { AuthContext } from "@/server/auth";
+import type { AuthContext } from "@/lib/auth.server";
 
 const sendWhatsappInput = z.object({
   conversation_id: z.string().uuid(),
@@ -87,7 +87,7 @@ export const sendWhatsappMessage = ((createServerFn({ method: "POST" }) as any)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   .handler(async (ctx: any) => {
     const data = sendWhatsappInput.parse(ctx.data);
-    const { requireAuth, assertClienteAccess } = await import("@/server/auth");
+    const { requireAuth, assertClienteAccess } = await import("@/lib/auth.server");
     const auth = await requireAuth();
 
     const { data: conversation, error: conversationError } = await auth.supabase

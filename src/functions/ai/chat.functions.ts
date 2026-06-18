@@ -24,7 +24,7 @@ export const chatWithAI = (createServerFn() as any)
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY não configurada.");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { buildSystemPrompt } = await import("@/server/ai/prompts");
+    const { buildSystemPrompt } = await import("@/lib/ai-prompts.server");
 
     let clienteContext: { especialidade?: string | null; nome?: string | null } = {};
     if (data.cliente_id) {

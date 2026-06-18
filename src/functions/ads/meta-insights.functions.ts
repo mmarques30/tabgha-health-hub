@@ -47,7 +47,7 @@ async function metaGet(accessToken: string, path: string, params: Record<string,
 }
 
 async function loadCreds(
-  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  supabase: AuthContext["supabase"],
   clienteId: string,
 ): Promise<MetaCreds> {
   const { data, error } = await supabase

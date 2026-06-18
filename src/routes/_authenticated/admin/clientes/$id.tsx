@@ -62,6 +62,25 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
     },
   });
 
+  const { data: quickStats } = useQuery({
+    queryKey: ["admin", "cliente", cliente.id, "quick-stats"],
+    staleTime: 120_000,
+    queryFn: async () => {
+      const [leadsTotal, leadsConv, conteudosTotal, conteudosAprov] = await Promise.all([
+        supabase.from("leads").select("id", { count: "exact", head: true }).eq("cliente_id", cliente.id),
+        supabase.from("leads").select("id", { count: "exact", head: true }).eq("cliente_id", cliente.id).eq("status", "convertido"),
+        supabase.from("conteudos").select("id", { count: "exact", head: true }).eq("cliente_id", cliente.id),
+        supabase.from("conteudos").select("id", { count: "exact", head: true }).eq("cliente_id", cliente.id).eq("status", "aprovacao"),
+      ]);
+      return {
+        leads: leadsTotal.count ?? 0,
+        convertidos: leadsConv.count ?? 0,
+        conteudos: conteudosTotal.count ?? 0,
+        aprovacao: conteudosAprov.count ?? 0,
+      };
+    },
+  });
+
   const save = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("clientes").update(form.getValues()).eq("id", cliente.id);
@@ -74,43 +93,106 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
     onError: () => toast.error("Erro ao salvar."),
   });
 
+  const extras = (cliente.dados_extras ?? {}) as Record<string, unknown>;
+  const redesData = extras.redes as Record<string, string> | undefined;
+  const redesConectadas = redesData ? Object.values(redesData).filter(Boolean).length : 0;
+
   return (
     <form onSubmit={form.handleSubmit(() => save.mutate())} className="py-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Field label="Nome">
-          <Input {...form.register("nome")} />
-        </Field>
-        <Field label="Email">
-          <Input type="email" {...form.register("email")} />
-        </Field>
-        <Field label="Telefone">
-          <Input {...form.register("telefone")} />
-        </Field>
-        <Field label="Especialidade">
-          <Input {...form.register("especialidade")} />
-        </Field>
-        <Field label="CNPJ">
-          <Input {...form.register("cnpj")} />
-        </Field>
-        <Field label="Razão Social">
-          <Input {...form.register("razao_social")} />
-        </Field>
-        <Field label="Status">
-          <Select value={form.watch("status")} onValueChange={(v) => form.setValue("status", v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {["onboarding", "ativo", "pausa", "inativo"].map((s) => (
-                <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      </div>
-      <div className="mt-6">
-        <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Salvar
-        </Button>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_268px]">
+        {/* ── Campos ── */}
+        <div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Nome">
+              <Input {...form.register("nome")} />
+            </Field>
+            <Field label="Email">
+              <Input type="email" {...form.register("email")} />
+            </Field>
+            <Field label="Telefone">
+              <Input {...form.register("telefone")} />
+            </Field>
+            <Field label="Especialidade">
+              <Input {...form.register("especialidade")} />
+            </Field>
+            <Field label="CNPJ">
+              <Input {...form.register("cnpj")} />
+            </Field>
+            <Field label="Razão Social">
+              <Input {...form.register("razao_social")} />
+            </Field>
+            <Field label="Status">
+              <Select value={form.watch("status")} onValueChange={(v) => form.setValue("status", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["onboarding", "ativo", "pausa", "inativo"].map((s) => (
+                    <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <div className="mt-6">
+            <Button type="submit" disabled={save.isPending}>
+              {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Salvar
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Sidebar de resumo ── */}
+        <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Resumo da conta</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-secondary/60 p-3 text-center">
+                <p className="text-2xl font-extrabold tracking-tight">{quickStats?.leads ?? "—"}</p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">leads total</p>
+              </div>
+              <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-center">
+                <p className="text-2xl font-extrabold tracking-tight text-emerald-600">{quickStats?.convertidos ?? "—"}</p>
+                <p className="mt-0.5 text-[10px] text-emerald-700">convertidos</p>
+              </div>
+              <div className="rounded-xl bg-secondary/60 p-3 text-center">
+                <p className="text-2xl font-extrabold tracking-tight">{quickStats?.conteudos ?? "—"}</p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground">conteúdos</p>
+              </div>
+              {(quickStats?.aprovacao ?? 0) > 0 ? (
+                <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center">
+                  <p className="text-2xl font-extrabold tracking-tight text-amber-600">{quickStats!.aprovacao}</p>
+                  <p className="mt-0.5 text-[10px] text-amber-700">aguard. aprovação</p>
+                </div>
+              ) : (
+                <div className="rounded-xl bg-secondary/60 p-3 text-center">
+                  <p className="text-2xl font-extrabold tracking-tight text-emerald-500">✓</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">sem pendências</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Informações</p>
+            <div className="space-y-2.5 text-xs">
+              {cliente.criado_em && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Cadastro</span>
+                  <span className="font-medium">{format(new Date(cliente.criado_em), "dd MMM yyyy", { locale: ptBR })}</span>
+                </div>
+              )}
+              {redesConectadas > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Redes conectadas</span>
+                  <span className="font-medium text-emerald-600">{redesConectadas}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">ID</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{cliente.id.slice(0, 8)}…</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </form>
   );
@@ -313,6 +395,8 @@ const STATUS_BADGE: Record<string, string> = {
   perdido: "bg-slate-100 text-slate-600",
 };
 
+const LEADS_PIPELINE = ["novo", "em_conversa", "interessado", "agendado", "atendido", "convertido", "perdido"] as const;
+
 function TabLeads({ clienteId }: { clienteId: string }) {
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["admin", "cliente", clienteId, "leads"],
@@ -328,11 +412,27 @@ function TabLeads({ clienteId }: { clienteId: string }) {
   if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (leads.length === 0) return <div className="py-8"><EmptyState title="Nenhum lead" description="Leads chegam via Meta Ads e WhatsApp." /></div>;
 
+  const funnelStats = LEADS_PIPELINE
+    .map((s) => ({ s, label: STATUS_LABELS[s], count: leads.filter((l) => l.status === s).length, color: STATUS_BADGE[s] }))
+    .filter(({ count }) => count > 0);
+
   return (
     <div className="py-5">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="text-sm font-semibold">{leads.length} leads</span>
-        <span className="text-xs text-muted-foreground">— {leads.filter((l) => l.status === "convertido").length} convertidos</span>
+      <div className="mb-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">{leads.length} leads</span>
+          <span className="text-xs text-muted-foreground">— {leads.filter((l) => l.status === "convertido").length} convertidos</span>
+        </div>
+        {funnelStats.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {funnelStats.map(({ s, label, count, color }) => (
+              <div key={s} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 shadow-[0_1px_2px_rgba(15,27,53,0.04)]">
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", color)}>{label}</span>
+                <span className="text-sm font-bold">{count}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
@@ -373,6 +473,13 @@ const CONTEUDO_STATUS_BADGE: Record<string, string> = {
   agendado: "bg-indigo-100 text-indigo-700", postado: "bg-green-100 text-green-700",
 };
 
+const CONTEUDO_PIPELINE = ["briefing", "roteiro", "producao", "aprovacao", "agendado", "postado"] as const;
+
+const CONTEUDO_STATUS_LABEL: Record<string, string> = {
+  briefing: "Briefing", roteiro: "Roteiro", producao: "Produção",
+  aprovacao: "Aprovação", agendado: "Agendado", postado: "Postado",
+};
+
 function TabConteudo({ clienteId }: { clienteId: string }) {
   const { data: conteudos = [], isLoading } = useQuery({
     queryKey: ["admin", "cliente", clienteId, "conteudos"],
@@ -388,9 +495,25 @@ function TabConteudo({ clienteId }: { clienteId: string }) {
   if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (conteudos.length === 0) return <div className="py-8"><EmptyState title="Nenhum conteúdo" description="Crie conteúdos em Estratégia > Calendário." /></div>;
 
+  const pipelineStats = CONTEUDO_PIPELINE
+    .map((s) => ({ s, label: CONTEUDO_STATUS_LABEL[s], count: conteudos.filter((c) => c.status === s).length, color: CONTEUDO_STATUS_BADGE[s] }))
+    .filter(({ count }) => count > 0);
+
   return (
     <div className="py-5">
-      <div className="mb-3 text-sm font-semibold">{conteudos.length} conteúdos</div>
+      <div className="mb-4 space-y-3">
+        <span className="text-sm font-semibold">{conteudos.length} conteúdos</span>
+        {pipelineStats.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {pipelineStats.map(({ s, label, count, color }) => (
+              <div key={s} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 shadow-[0_1px_2px_rgba(15,27,53,0.04)]">
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", color)}>{label}</span>
+                <span className="text-sm font-bold">{count}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -408,7 +531,7 @@ function TabConteudo({ clienteId }: { clienteId: string }) {
                 <td className="px-4 py-2.5 text-muted-foreground text-xs capitalize">{c.tipo ?? "—"}</td>
                 <td className="px-4 py-2.5">
                   <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium capitalize", CONTEUDO_STATUS_BADGE[c.status] ?? "bg-slate-100 text-slate-600")}>
-                    {c.status}
+                    {CONTEUDO_STATUS_LABEL[c.status] ?? c.status}
                   </span>
                 </td>
                 <td className="px-4 py-2.5 text-muted-foreground text-xs">

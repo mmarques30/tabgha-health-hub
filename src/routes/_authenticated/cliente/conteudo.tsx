@@ -119,6 +119,11 @@ function ConteudoPage() {
 
   const pendentes = conteudos.filter((c) => c.status === "aprovacao");
 
+  const STATUS_PIPELINE_ORDER = ["briefing", "roteiro", "producao", "aprovacao", "agendado", "postado"] as const;
+  const pipelineCounts = STATUS_PIPELINE_ORDER
+    .map((s) => ({ s, label: STATUS_LABELS[s], count: conteudos.filter((c) => c.status === s).length, color: STATUS_COLORS[s] }))
+    .filter(({ count }) => count > 0);
+
   return (
     <div className="px-6 py-6 space-y-6">
       <div>
@@ -137,27 +142,39 @@ function ConteudoPage() {
         <EmptyState icon={<FileText className="h-6 w-6" />} title="Nenhum conteúdo ainda"
           description="Os conteúdos aparecem aqui conforme a equipe produzir." />
       ) : (
-        <div className="divide-y divide-border rounded-xl border border-border">
-          {conteudos.map((c) => (
-            <div key={c.id} className="flex items-center gap-4 px-5 py-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{c.titulo ?? "Sem título"}</p>
-                <p className="text-xs text-muted-foreground">
-                  {c.rede ?? "—"} · {c.tipo ?? "—"}
-                  {c.data_postagem && ` · ${format(new Date(c.data_postagem), "dd MMM", { locale: ptBR })}`}
-                </p>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_COLORS[c.status] ?? "bg-muted text-muted-foreground"}`}>
-                  {STATUS_LABELS[c.status] ?? c.status}
-                </span>
-                {c.status === "aprovacao" && (
-                  <Button size="sm" onClick={() => setSelected(c)}>Revisar</Button>
-                )}
-              </div>
+        <>
+          {pipelineCounts.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {pipelineCounts.map(({ s, label, count, color }) => (
+                <div key={s} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2 shadow-[0_1px_2px_rgba(15,27,53,0.04)]">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${color}`}>{label}</span>
+                  <span className="text-sm font-bold">{count}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+          <div className="divide-y divide-border rounded-xl border border-border">
+            {conteudos.map((c) => (
+              <div key={c.id} className="flex items-center gap-4 px-5 py-4 hover:bg-secondary/30 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{c.titulo ?? "Sem título"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {c.rede ?? "—"} · {c.tipo ?? "—"}
+                    {c.data_postagem && ` · ${format(new Date(c.data_postagem), "dd MMM", { locale: ptBR })}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_COLORS[c.status] ?? "bg-muted text-muted-foreground"}`}>
+                    {STATUS_LABELS[c.status] ?? c.status}
+                  </span>
+                  {c.status === "aprovacao" && (
+                    <Button size="sm" onClick={() => setSelected(c)}>Revisar</Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {selected && <AprovacaoModal conteudo={selected} onClose={() => setSelected(null)} />}

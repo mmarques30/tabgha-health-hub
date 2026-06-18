@@ -55,6 +55,7 @@ async function fetchTeam(): Promise<TeamMember[]> {
     id: p.id,
     nome: p.nome,
     email: p.email,
+    // user_roles is a joined array — cast needed because Supabase types don't infer nested joins
     role: (p.user_roles as unknown as { role: string }[] | null)?.[0]?.role ?? null,
     permissoes: p.permissoes ?? [],
   }));
@@ -84,6 +85,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
   const queryClient = useQueryClient();
 
   const form = useForm<AddUserForm>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(addUserSchema) as any,
     defaultValues: { nome: "", email: "", role: "admin", cliente_id: null },
   });

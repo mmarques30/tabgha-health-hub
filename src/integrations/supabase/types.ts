@@ -450,7 +450,22 @@ export type Database = {
           criado_em?: string
           atualizado_em?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversations_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       whatsapp_messages: {
         Row: {
@@ -492,7 +507,22 @@ export type Database = {
           metadata?: Json
           sent_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {

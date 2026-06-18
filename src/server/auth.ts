@@ -3,6 +3,7 @@ import { getRequestHeader } from "@tanstack/react-start/server";
 
 import type { Database } from "@/integrations/supabase/types";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AuthContext = {
   userId: string;
   email: string | undefined;
@@ -10,6 +11,7 @@ export type AuthContext = {
   clienteId: string | null;
   permissoes: string[] | null;
   accessToken: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any;
 };
 

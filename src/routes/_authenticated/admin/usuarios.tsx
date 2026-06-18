@@ -178,14 +178,12 @@ function UsuariosPage() {
   });
 
   return (
-    <div className="px-8 py-8">
-      <div className="mb-8 flex items-start justify-between">
+    <div className="px-6 py-6 space-y-6">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Configurações</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Equipe</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gerencie os membros e suas permissões de acesso.
-          </p>
+          <span className="eyebrow-pill">Configurações</span>
+          <h1 className="mt-2 text-xl font-bold tracking-tight">Equipe</h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">Gerencie os membros e suas permissões de acesso.</p>
         </div>
         <Button onClick={() => setShowAdd(true)}>
           <UserPlus className="mr-2 h-4 w-4" />

@@ -27,19 +27,14 @@ function DiagnosticosPage() {
   const semDiagnostico = clientes.filter((c) => !c.diagnostico);
 
   return (
-    <div className="px-8 py-8">
-      <header className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Estratégia
-        </p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Diagnósticos</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Diagnósticos estratégicos por cliente. Edite via ficha do cliente.
-        </p>
-      </header>
+    <div className="px-6 py-6 space-y-6">
+      <div>
+        <span className="eyebrow-pill">Estratégia</span>
+        <h1 className="mt-2 text-xl font-bold tracking-tight">Diagnósticos</h1>
+        <p className="mt-0.5 text-xs text-muted-foreground">Diagnósticos estratégicos por cliente. Edite via ficha do cliente.</p>
+      </div>
 
-      {/* Summary */}
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Total</p>
           <p className="mt-2 text-3xl font-bold tracking-tight">{clientes.length}</p>
@@ -85,7 +80,7 @@ function DiagnosticosPage() {
                   className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                     c.diagnostico
                       ? "bg-green-100 text-green-700"
-                      : "bg-amber-100 text-amber-700"
+                      : "bg-yellow-100 text-yellow-700"
                   }`}
                 >
                   {c.diagnostico ? "Preenchido" : "Pendente"}

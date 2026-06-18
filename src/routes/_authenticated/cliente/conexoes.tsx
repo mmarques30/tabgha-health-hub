@@ -92,12 +92,12 @@ function ConexoesPage() {
   );
 
   return (
-    <div className="px-8 py-8">
-      <header className="mb-8">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Configurações</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Conexões</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Links e redes sociais do seu consultório.</p>
-      </header>
+    <div className="px-6 py-6 space-y-6">
+      <div>
+        <span className="eyebrow-pill">Configurações</span>
+        <h1 className="mt-2 text-xl font-bold tracking-tight">Conexões</h1>
+        <p className="mt-0.5 text-xs text-muted-foreground">Links e redes sociais do seu consultório.</p>
+      </div>
 
       <form onSubmit={form.handleSubmit((v) => save.mutate(v))} className="max-w-lg space-y-5">
         {CAMPOS.map(({ name, label, placeholder }) => (

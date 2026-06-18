@@ -117,24 +117,24 @@ function ClientesAdminPage() {
   });
 
   return (
-    <div className="px-8 py-8">
-      <div className="mb-6 flex items-start justify-between">
+    <div className="px-6 py-6 space-y-6">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">CRM</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Clientes</h1>
+          <span className="eyebrow-pill">CRM</span>
+          <h1 className="mt-2 text-xl font-bold tracking-tight">Clientes</h1>
         </div>
         <Button onClick={() => setShowNew(true)}><Plus className="mr-2 h-4 w-4" />Novo cliente</Button>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative max-w-xs flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input className="pl-9" placeholder="Buscar…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {["todos", "onboarding", "ativo", "pausa", "inativo"].map((s) => (
             <button key={s} onClick={() => setFiltroStatus(s)}
-              className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${filtroStatus === s ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+              className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${filtroStatus === s ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
               {s === "todos" ? "Todos" : STATUS_LABELS[s]}
             </button>
           ))}

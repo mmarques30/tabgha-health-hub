@@ -41,14 +41,14 @@ function ClientesPage() {
   });
 
   return (
-    <div className="px-8 py-8">
-      <header className="mb-6">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Carteira</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Pacientes</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Leads convertidos em pacientes do consultório.</p>
-      </header>
+    <div className="px-6 py-6 space-y-6">
+      <div>
+        <span className="eyebrow-pill">Carteira</span>
+        <h1 className="mt-2 text-xl font-bold tracking-tight">Pacientes</h1>
+        <p className="mt-0.5 text-xs text-muted-foreground">Leads convertidos em pacientes do consultório.</p>
+      </div>
 
-      <div className="relative mb-4 max-w-sm">
+      <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input className="pl-9" placeholder="Buscar por nome, telefone…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>

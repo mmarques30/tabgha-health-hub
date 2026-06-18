@@ -26,8 +26,8 @@ const STATUS_LABELS: Record<string, string> = {
   aprovacao: "Aguardando aprovação", agendado: "Agendado", postado: "Postado",
 };
 const STATUS_COLORS: Record<string, string> = {
-  briefing: "bg-slate-100 text-slate-600", roteiro: "bg-purple-100 text-purple-700",
-  producao: "bg-yellow-100 text-yellow-700", aprovacao: "bg-orange-100 text-orange-700 font-semibold",
+  briefing: "bg-slate-100 text-slate-600", roteiro: "bg-blue-100 text-blue-700",
+  producao: "bg-yellow-100 text-yellow-700", aprovacao: "bg-yellow-100 text-yellow-700 font-semibold",
   agendado: "bg-blue-100 text-blue-700", postado: "bg-green-100 text-green-700",
 };
 
@@ -120,16 +120,16 @@ function ConteudoPage() {
   const pendentes = conteudos.filter((c) => c.status === "aprovacao");
 
   return (
-    <div className="px-8 py-8">
-      <header className="mb-6">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Editorial</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Conteúdo</h1>
+    <div className="px-6 py-6 space-y-6">
+      <div>
+        <span className="eyebrow-pill">Editorial</span>
+        <h1 className="mt-2 text-xl font-bold tracking-tight">Conteúdo</h1>
         {pendentes.length > 0 && (
-          <p className="mt-1 text-sm font-medium text-orange-600">
+          <p className="mt-0.5 text-xs font-medium text-yellow-700">
             {pendentes.length} {pendentes.length === 1 ? "conteúdo aguarda" : "conteúdos aguardam"} sua aprovação
           </p>
         )}
-      </header>
+      </div>
 
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>

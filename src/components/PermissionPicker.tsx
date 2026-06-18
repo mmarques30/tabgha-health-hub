@@ -8,6 +8,8 @@ const GROUP_LABELS: Record<AdminPermissionGroup, string> = {
   clientes:     "Clientes",
   estrategia:   "Estratégia",
   operacao:     "Automações & Operação",
+  atendimento:  "Atendimento WhatsApp",
+  meta_ads:     "Meta Ads",
   roi:          "ROI",
   usuarios:     "Usuários",
   diagnosticos: "Diagnósticos",

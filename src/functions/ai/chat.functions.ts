@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { buildSystemPrompt } from "./prompts";
+import { buildSystemPrompt } from "@/server/ai/prompts";
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -24,13 +24,15 @@ export const chatWithAI = createServerFn()
     let clienteContext: { especialidade?: string | null; nome?: string | null } = {};
     if (data.cliente_id) {
       const { data: cliente } = await supabaseAdmin
-        .from("clientes").select("nome, especialidade").eq("id", data.cliente_id).single();
+        .from("clientes")
+        .select("nome, especialidade")
+        .eq("id", data.cliente_id)
+        .single();
       clienteContext = { especialidade: cliente?.especialidade, nome: cliente?.nome };
     }
 
     const systemPrompt = buildSystemPrompt(data.role, clienteContext);
 
-    // Usar fetch nativo para evitar depender do SDK durante o build
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -51,7 +53,7 @@ export const chatWithAI = createServerFn()
       throw new Error(`Anthropic API error: ${err}`);
     }
 
-    const result = await response.json() as {
+    const result = (await response.json()) as {
       content: { type: string; text: string }[];
       usage: { input_tokens: number; output_tokens: number };
     };

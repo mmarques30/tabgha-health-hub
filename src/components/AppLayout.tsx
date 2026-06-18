@@ -17,6 +17,8 @@ import {
   UserCheck,
   Link2,
   LogOut,
+  MessageSquare,
+  Megaphone,
 } from "lucide-react";
 
 type NavItem = {
@@ -32,6 +34,8 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/admin/estrategia",       label: "Estratégia",        icon: BarChart3,       perm: "admin.estrategia" },
   { to: "/admin/calendario",       label: "Calendário",        icon: Calendar,        perm: "admin.operacao" },
   { to: "/admin/automacoes-leads", label: "Automações Leads",  icon: Zap,             perm: "admin.operacao" },
+  { to: "/admin/atendimento",      label: "Atendimento",       icon: MessageSquare,   perm: "admin.atendimento" },
+  { to: "/admin/meta-ads",         label: "Meta Ads",          icon: Megaphone,       perm: "admin.meta_ads" },
   { to: "/admin/roi",              label: "ROI",               icon: TrendingUp,      perm: "admin.roi" },
   { to: "/admin/usuarios",         label: "Usuários",          icon: UserCog,         perm: "admin.usuarios" },
   { to: "/admin/diagnosticos",     label: "Diagnósticos",      icon: Stethoscope,     perm: "admin.diagnosticos" },
@@ -39,6 +43,8 @@ const ADMIN_NAV: NavItem[] = [
 
 const CLIENTE_NAV: NavItem[] = [
   { to: "/cliente/dashboard",  label: "Dashboard",   icon: LayoutDashboard, perm: "cliente.dashboard" },
+  { to: "/cliente/atendimento",label: "Atendimento", icon: MessageSquare,   perm: "cliente.atendimento" },
+  { to: "/cliente/meta-ads",   label: "Meta Ads",    icon: Megaphone,       perm: "cliente.meta_ads" },
   { to: "/cliente/leads",      label: "Leads",       icon: Users,           perm: "cliente.leads" },
   { to: "/cliente/clientes",   label: "Clientes",    icon: UserCheck,       perm: "cliente.clientes" },
   { to: "/cliente/roi",        label: "ROI",         icon: TrendingUp,      perm: "cliente.roi" },

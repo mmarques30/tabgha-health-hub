@@ -17,8 +17,14 @@ interface AuthState {
   user: User | null;
   profile: Profile | null;
   role: AppRole | null;
+  realRole: AppRole | null;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
+  isSimulating: boolean;
+  simulatedClientId: string | null;
+  simulatedClientNome: string | null;
+  startSimulation: (id: string, nome: string) => void;
+  stopSimulation: () => void;
 }
 
 const AuthCtx = createContext<AuthState | undefined>(undefined);
@@ -51,6 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [simulatedClientId, setSimulatedClientId] = useState<string | null>(null);
+  const [simulatedClientNome, setSimulatedClientNome] = useState<string | null>(null);
 
   const hydrate = async (u: User | null) => {
     setUser(u);
@@ -81,17 +89,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const isSimulating = !!simulatedClientId && role === "admin";
+
   const value: AuthState = {
     loading,
     user,
-    profile,
-    role,
+    profile: isSimulating && profile
+      ? { ...profile, cliente_id: simulatedClientId }
+      : profile,
+    role: isSimulating ? "cliente" : role,
+    realRole: role,
     signOut: async () => {
       await supabase.auth.signOut();
     },
     refresh: async () => {
       const { data } = await supabase.auth.getUser();
       await hydrate(data.user);
+    },
+    isSimulating,
+    simulatedClientId,
+    simulatedClientNome,
+    startSimulation: (id, nome) => {
+      setSimulatedClientId(id);
+      setSimulatedClientNome(nome);
+    },
+    stopSimulation: () => {
+      setSimulatedClientId(null);
+      setSimulatedClientNome(null);
     },
   };
 

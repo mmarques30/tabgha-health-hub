@@ -63,6 +63,17 @@
   --color-brand-navy: var(--brand-navy);
   --color-brand-blue: var(--brand-blue);
   --color-brand-sky: var(--brand-sky);
+  /* Status / badge colors */
+  --color-green-100: var(--green-100);
+  --color-green-700: var(--green-700);
+  --color-yellow-100: var(--yellow-100);
+  --color-yellow-700: var(--yellow-700);
+  --color-blue-100: var(--blue-100);
+  --color-blue-700: var(--blue-700);
+  --color-slate-100: var(--slate-100);
+  --color-slate-600: var(--slate-600);
+  --color-red-100: var(--red-100);
+  --color-red-700: var(--red-700);
 }
 
 :root {
@@ -86,9 +97,9 @@
   --muted: oklch(0.963 0.006 80);
   --muted-foreground: oklch(0.515 0.022 255);    /* medium blue-gray ~#677089 */
 
-  /* ── Accent — sky Tabgha para hover/focus ── */
-  --accent: oklch(0.765 0.090 220);              /* brand sky ~#60C3E8 */
-  --accent-foreground: oklch(0.152 0.068 265);   /* navy sobre sky */
+  /* ── Accent — tint azul pálido para hover/focus (o sky vivo fica em --brand-sky) ── */
+  --accent: oklch(0.952 0.022 248);              /* light blue tint — hover states */
+  --accent-foreground: oklch(0.28 0.09 248);     /* dark brand blue sobre tint */
 
   /* ── Destructive ── */
   --destructive: oklch(0.577 0.245 27.325);
@@ -120,6 +131,18 @@
   --brand-navy: oklch(0.152 0.068 265);          /* #0D1B3E */
   --brand-blue: oklch(0.42 0.13 248);            /* #1A5FAD */
   --brand-sky: oklch(0.765 0.090 220);           /* #60C3E8 */
+
+  /* ── Status / badge colors ── */
+  --green-100: oklch(0.94 0.06 145);
+  --green-700: oklch(0.45 0.13 145);
+  --yellow-100: oklch(0.96 0.08 90);
+  --yellow-700: oklch(0.50 0.13 80);
+  --blue-100: oklch(0.94 0.04 240);
+  --blue-700: oklch(0.42 0.13 248);
+  --slate-100: oklch(0.95 0.005 250);
+  --slate-600: oklch(0.50 0.02 255);
+  --red-100: oklch(0.93 0.05 25);
+  --red-700: oklch(0.50 0.20 27);
 }
 
 .dark {

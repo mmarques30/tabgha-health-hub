@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Megaphone,
   Menu,
+  ChevronRight,
 } from "lucide-react";
 
 type NavItem = {
@@ -28,36 +29,82 @@ type NavItem = {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   perm: string;
+  sub?: boolean;
 };
 
-const ADMIN_NAV: NavItem[] = [
-  { to: "/admin/dashboard",        label: "Dashboard",         icon: LayoutDashboard, perm: "admin.dashboard" },
-  { to: "/admin/clientes",         label: "Clientes",          icon: Users,           perm: "admin.clientes" },
-  { to: "/admin/estrategia",       label: "Estratégia",        icon: BarChart3,       perm: "admin.estrategia" },
-  { to: "/admin/calendario",       label: "Calendário",        icon: Calendar,        perm: "admin.operacao" },
-  { to: "/admin/automacoes-leads", label: "Automações Leads",  icon: Zap,             perm: "admin.operacao" },
-  { to: "/admin/atendimento",      label: "Atendimento",       icon: MessageSquare,   perm: "admin.atendimento" },
-  { to: "/admin/meta-ads",         label: "Meta Ads",          icon: Megaphone,       perm: "admin.meta_ads" },
-  { to: "/admin/roi",              label: "ROI",               icon: TrendingUp,      perm: "admin.roi" },
-  { to: "/admin/usuarios",         label: "Usuários",          icon: UserCog,         perm: "admin.usuarios" },
-  { to: "/admin/diagnosticos",     label: "Diagnósticos",      icon: Stethoscope,     perm: "admin.diagnosticos" },
+type NavGroup = {
+  group: string;
+  items: NavItem[];
+};
+
+const ADMIN_NAV: NavGroup[] = [
+  {
+    group: "Visão",
+    items: [
+      { to: "/admin/dashboard",        label: "Dashboard",          icon: LayoutDashboard, perm: "admin.dashboard" },
+      { to: "/admin/roi",              label: "ROI da operação",    icon: TrendingUp,      perm: "admin.roi" },
+    ],
+  },
+  {
+    group: "Carteira",
+    items: [
+      { to: "/admin/clientes",         label: "Clientes",           icon: Users,           perm: "admin.clientes" },
+      { to: "/admin/diagnosticos",     label: "Diagnósticos",       icon: Stethoscope,     perm: "admin.diagnosticos" },
+      { to: "/admin/usuarios",         label: "Usuários & acessos", icon: UserCog,         perm: "admin.usuarios" },
+    ],
+  },
+  {
+    group: "Operação diária",
+    items: [
+      { to: "/admin/atendimento",      label: "Atendimento",        icon: MessageSquare,   perm: "admin.atendimento" },
+      { to: "/admin/estrategia",       label: "Estratégia editorial",icon: FileText,       perm: "admin.estrategia" },
+      { to: "/admin/calendario",       label: "Calendário",         icon: Calendar,        perm: "admin.operacao" },
+    ],
+  },
+  {
+    group: "Aquisição",
+    items: [
+      { to: "/admin/automacoes-leads", label: "Automações de leads", icon: Zap,            perm: "admin.operacao" },
+      { to: "/admin/meta-ads",         label: "Meta Ads",           icon: Megaphone,       perm: "admin.meta_ads" },
+    ],
+  },
 ];
 
-const CLIENTE_NAV: NavItem[] = [
-  { to: "/cliente/dashboard",  label: "Dashboard",   icon: LayoutDashboard, perm: "cliente.dashboard" },
-  { to: "/cliente/atendimento",label: "Atendimento", icon: MessageSquare,   perm: "cliente.atendimento" },
-  { to: "/cliente/meta-ads",   label: "Meta Ads",    icon: Megaphone,       perm: "cliente.meta_ads" },
-  { to: "/cliente/leads",      label: "Leads",       icon: Users,           perm: "cliente.leads" },
-  { to: "/cliente/clientes",   label: "Clientes",    icon: UserCheck,       perm: "cliente.clientes" },
-  { to: "/cliente/roi",        label: "ROI",         icon: TrendingUp,      perm: "cliente.roi" },
-  { to: "/cliente/conteudo",   label: "Conteúdo",    icon: FileText,        perm: "cliente.conteudo" },
-  { to: "/cliente/diagnostico",label: "Diagnóstico", icon: Stethoscope,     perm: "cliente.diagnostico" },
-  { to: "/cliente/conexoes",   label: "Conexões",    icon: Link2,           perm: "cliente.conexoes" },
-  { to: "/cliente/calendario", label: "Calendário",  icon: Calendar,        perm: "cliente.calendario" },
+const CLIENTE_NAV: NavGroup[] = [
+  {
+    group: "Visão",
+    items: [
+      { to: "/cliente/dashboard",  label: "Dashboard",   icon: LayoutDashboard, perm: "cliente.dashboard" },
+      { to: "/cliente/roi",        label: "ROI",         icon: TrendingUp,      perm: "cliente.roi" },
+    ],
+  },
+  {
+    group: "Relacionamento",
+    items: [
+      { to: "/cliente/atendimento",label: "Atendimento", icon: MessageSquare,   perm: "cliente.atendimento" },
+      { to: "/cliente/leads",      label: "Leads",       icon: Users,           perm: "cliente.leads" },
+      { to: "/cliente/clientes",   label: "Pacientes",   icon: UserCheck,       perm: "cliente.clientes" },
+    ],
+  },
+  {
+    group: "Marketing",
+    items: [
+      { to: "/cliente/conteudo",   label: "Conteúdo",    icon: FileText,        perm: "cliente.conteudo" },
+      { to: "/cliente/meta-ads",   label: "Meta Ads",    icon: Megaphone,       perm: "cliente.meta_ads" },
+      { to: "/cliente/calendario", label: "Calendário",  icon: Calendar,        perm: "cliente.calendario" },
+    ],
+  },
+  {
+    group: "Estratégia",
+    items: [
+      { to: "/cliente/diagnostico",label: "Diagnóstico", icon: Stethoscope,     perm: "cliente.diagnostico" },
+      { to: "/cliente/conexoes",   label: "Conexões",    icon: Link2,           perm: "cliente.conexoes" },
+    ],
+  },
 ];
 
 function SidebarNav({
-  allowed,
+  groups,
   pathname,
   profile,
   user,
@@ -66,7 +113,7 @@ function SidebarNav({
   signOut,
   navigate,
 }: {
-  allowed: NavItem[];
+  groups: NavGroup[];
   pathname: string;
   profile: ReturnType<typeof useAuth>["profile"];
   user: ReturnType<typeof useAuth>["user"];
@@ -75,52 +122,93 @@ function SidebarNav({
   signOut: ReturnType<typeof useAuth>["signOut"];
   navigate: ReturnType<typeof useNavigate>;
 }) {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  function toggle(group: string) {
+    setCollapsed((prev) => ({ ...prev, [group]: !prev[group] }));
+  }
+
   return (
     <>
       {/* Logo */}
-      <div className="flex h-14 items-center border-b border-sidebar-border px-4 shrink-0">
+      <div className="flex h-12 items-center border-b border-sidebar-border px-3.5 shrink-0">
         <img
           src="https://tabghamkt.com.br/wp-content/uploads/2025/05/logo_tabgha_health_mkt_caixa_alta-04-scaled-e1747895382243.png"
           alt="Tabgha Health Marketing"
-          className="h-7 w-auto brightness-0"
+          className="h-6 w-auto brightness-0"
         />
       </div>
 
-      {/* Role label */}
-      <div className="px-4 pt-4 pb-1 shrink-0">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
-          {role === "admin" ? "Admin" : "Portal do Cliente"}
-        </p>
-      </div>
+      {/* Nav groups */}
+      <nav className="flex-1 overflow-y-auto py-1.5">
+        {groups.map((g) => {
+          const key = g.group;
+          const isOpen = collapsed[key] !== true;
+          const hasActive = g.items.some(
+            (i) => pathname === i.to || pathname.startsWith(i.to + "/"),
+          );
 
-      {/* Nav items */}
-      <nav className="flex-1 overflow-y-auto py-1">
-        {allowed.map((it) => {
-          const active = pathname === it.to || pathname.startsWith(it.to + "/");
-          const Icon = it.icon;
           return (
-            <Link
-              key={it.to}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              to={it.to as any}
-              onClick={onNavigate}
-              className={cn(
-                "mx-2 mb-0.5 flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-                active
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+            <div key={key} className="mb-0.5">
+              {/* Group header */}
+              <button
+                onClick={() => toggle(key)}
+                className={cn(
+                  "flex w-[calc(100%-16px)] items-center justify-between mx-2 px-2.5 py-1.5 rounded-md border-0 bg-transparent cursor-pointer transition-colors",
+                  "text-[9.5px] font-bold tracking-[0.14em] uppercase",
+                  hasActive
+                    ? "text-sidebar-accent-foreground"
+                    : "text-muted-foreground/55 hover:bg-border/50 hover:text-foreground/80",
+                )}
+              >
+                <span>{key}</span>
+                <ChevronRight
+                  className={cn(
+                    "h-3 w-3 opacity-55 transition-transform duration-200",
+                    isOpen && "rotate-90",
+                  )}
+                />
+              </button>
+
+              {/* Group items */}
+              {isOpen && (
+                <div>
+                  {g.items.map((it) => {
+                    const active = pathname === it.to || pathname.startsWith(it.to + "/");
+                    const Icon = it.icon;
+                    return (
+                      <Link
+                        key={it.to}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        to={it.to as any}
+                        onClick={onNavigate}
+                        className={cn(
+                          "mx-2 mb-px flex items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-[12.5px] transition-colors",
+                          active
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+                            : "text-foreground/72 hover:bg-accent hover:text-accent-foreground",
+                        )}
+                      >
+                        <Icon
+                          className={cn(
+                            "h-3.5 w-3.5 shrink-0",
+                            active ? "opacity-100" : "opacity-70",
+                          )}
+                        />
+                        {it.label}
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            >
-              <Icon className={cn("h-4 w-4 shrink-0", active ? "opacity-100" : "opacity-60")} />
-              {it.label}
-            </Link>
+            </div>
           );
         })}
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-sidebar-border p-3 shrink-0">
-        <div className="mb-2 truncate text-xs font-medium text-sidebar-foreground/80">
+      <div className="border-t border-sidebar-border px-3.5 py-2.5 shrink-0">
+        <div className="mb-1 truncate text-[11px] font-medium text-sidebar-foreground/80">
           {profile?.nome ?? user?.email}
         </div>
         <button
@@ -128,9 +216,9 @@ function SidebarNav({
             await signOut();
             navigate({ to: "/login", replace: true });
           }}
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-1 text-[10.5px] text-muted-foreground hover:text-foreground transition-colors"
         >
-          <LogOut className="h-3.5 w-3.5" /> Sair
+          <LogOut className="h-3 w-3" /> Sair
         </button>
       </div>
     </>
@@ -143,23 +231,29 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const items = role === "admin" ? ADMIN_NAV : CLIENTE_NAV;
-  // Admin sempre tem acesso total; cliente filtra por permissoes
-  const allowed = role === "admin" ? items : items.filter((i) => hasPermission(profile?.permissoes, i.perm));
+  const allGroups = role === "admin" ? ADMIN_NAV : CLIENTE_NAV;
 
-  const navProps = { allowed, pathname, profile, user, role, signOut, navigate };
+  const groups: NavGroup[] = allGroups.map((g) => ({
+    ...g,
+    items:
+      role === "admin"
+        ? g.items
+        : g.items.filter((i) => hasPermission(profile?.permissoes, i.perm)),
+  })).filter((g) => g.items.length > 0);
+
+  const navProps = { groups, pathname, profile, user, role, signOut, navigate };
 
   return (
     <div className="flex min-h-screen w-full bg-background text-foreground">
-      {/* ── Desktop sidebar ── */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
+      {/* ── Desktop sidebar (224px conforme design system) ── */}
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
         <SidebarNav {...navProps} />
       </aside>
 
       {/* ── Mobile: header bar + Sheet drawer ── */}
       <div className="flex flex-1 min-w-0 flex-col md:contents">
         {/* Mobile top bar */}
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 md:hidden">
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 md:hidden">
           <button
             aria-label="Abrir menu"
             onClick={() => setMobileOpen(true)}
@@ -176,7 +270,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
         {/* Mobile drawer */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetContent side="left" className="w-60 p-0 flex flex-col bg-sidebar border-sidebar-border">
+          <SheetContent side="left" className="w-56 p-0 flex flex-col bg-sidebar border-sidebar-border">
             <SheetTitle className="sr-only">Menu de navegação</SheetTitle>
             <SidebarNav {...navProps} onNavigate={() => setMobileOpen(false)} />
           </SheetContent>

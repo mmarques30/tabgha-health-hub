@@ -78,11 +78,11 @@ type MetaInput = z.infer<typeof metaInsightsInput>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getMetaInsights = ((createServerFn({ method: "POST" }) as any)
+  .middleware([requireRoleAuth])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   .handler(async (ctx: any): Promise<any> => {
     const data = metaInsightsInput.parse(ctx.data);
-    const { requireAuth, assertClienteAccess } = await import("@/lib/auth.server");
-    const auth = await requireAuth();
+    const auth = ctx.context.auth as AuthContext;
     assertClienteAccess(auth, data.cliente_id);
 
     const creds = await loadCreds(auth.supabase, data.cliente_id);

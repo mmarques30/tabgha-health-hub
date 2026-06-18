@@ -392,6 +392,138 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_conversations: {
+        Row: {
+          id: string
+          cliente_id: string
+          lead_id: string | null
+          contact_phone: string
+          contact_name: string | null
+          origem: string
+          state: string
+          step_count: number
+          bot_score: number | null
+          bot_notes: Json
+          owner_state: string | null
+          last_inbound_at: string | null
+          last_outbound_at: string | null
+          closed_at: string | null
+          closed_reason: string | null
+          criado_em: string
+          atualizado_em: string
+        }
+        Insert: {
+          id?: string
+          cliente_id: string
+          lead_id?: string | null
+          contact_phone: string
+          contact_name?: string | null
+          origem?: string
+          state?: string
+          step_count?: number
+          bot_score?: number | null
+          bot_notes?: Json
+          owner_state?: string | null
+          last_inbound_at?: string | null
+          last_outbound_at?: string | null
+          closed_at?: string | null
+          closed_reason?: string | null
+          criado_em?: string
+          atualizado_em?: string
+        }
+        Update: {
+          id?: string
+          cliente_id?: string
+          lead_id?: string | null
+          contact_phone?: string
+          contact_name?: string | null
+          origem?: string
+          state?: string
+          step_count?: number
+          bot_score?: number | null
+          bot_notes?: Json
+          owner_state?: string | null
+          last_inbound_at?: string | null
+          last_outbound_at?: string | null
+          closed_at?: string | null
+          closed_reason?: string | null
+          criado_em?: string
+          atualizado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversations_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      whatsapp_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          cliente_id: string
+          direction: string
+          sender_type: string
+          sender_user_id: string | null
+          body: string
+          zapi_message_id: string | null
+          delivery_status: string | null
+          metadata: Json
+          sent_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          cliente_id: string
+          direction: string
+          sender_type: string
+          sender_user_id?: string | null
+          body: string
+          zapi_message_id?: string | null
+          delivery_status?: string | null
+          metadata?: Json
+          sent_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          cliente_id?: string
+          direction?: string
+          sender_type?: string
+          sender_user_id?: string | null
+          body?: string
+          zapi_message_id?: string | null
+          delivery_status?: string | null
+          metadata?: Json
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

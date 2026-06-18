@@ -79,9 +79,10 @@ export const getMetaInsights = createServerFn({ method: "POST" })
     const creds = await loadCreds(auth.supabase, data.cliente_id);
     const timeRange =
       data.since && data.until ? JSON.stringify({ since: data.since, until: data.until }) : undefined;
-    const timeParams = timeRange ? { time_range: timeRange } : {};
+    const timeParams: Record<string, string> = timeRange ? { time_range: timeRange } : {};
 
-    let result: unknown;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let result: any = {};
 
     switch (data.action) {
       case "campaigns": {
@@ -186,7 +187,8 @@ export const getMetaInsights = createServerFn({ method: "POST" })
       }
     }
 
-    await auth.supabase.from("automation_logs").insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (auth.supabase as any).from("automation_logs").insert({
       cliente_id: data.cliente_id,
       action: "meta_insights",
       tokens_in: 1,

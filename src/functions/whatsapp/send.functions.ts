@@ -87,6 +87,7 @@ export const sendWhatsappMessage = ((createServerFn({ method: "POST" }) as any)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   .handler(async (ctx: any) => {
     const data = sendWhatsappInput.parse(ctx.data);
+    const { requireAuth, assertClienteAccess } = await import("@/server/auth");
     const auth = await requireAuth();
 
     const { data: conversation, error: conversationError } = await auth.supabase

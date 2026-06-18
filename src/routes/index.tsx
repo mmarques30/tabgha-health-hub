@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Users,
   TrendingUp,
   Zap,
   CheckCircle,
   ArrowRight,
+  ArrowUpRight,
   ChevronDown,
   Menu,
   X,
@@ -14,6 +15,7 @@ import {
   Target,
   Rocket,
   Instagram,
+  BarChart2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -133,11 +135,133 @@ const SPECIALTIES = [
 ];
 
 const STATS = [
-  { value: "+180", label: "Clínicas atendidas", icon: Users },
-  { value: "+14k", label: "Leads gerados", icon: Target },
-  { value: "4.1x", label: "ROAS médio", icon: TrendingUp },
-  { value: "92%", label: "Retenção em 6 meses", icon: Rocket },
+  { value: "+180", numericValue: 180, prefix: "+", label: "Clínicas atendidas", icon: Users },
+  { value: "+14k", numericValue: 14, prefix: "+", suffix: "k", label: "Leads gerados", icon: Target },
+  { value: "4.1x", numericValue: 4.1, prefix: "", suffix: "x", label: "ROAS médio", icon: TrendingUp },
+  { value: "92%", numericValue: 92, prefix: "", suffix: "%", label: "Retenção em 6 meses", icon: Rocket },
 ];
+
+// ─── CountUp hook ──────────────────────────────────────────────────────────────
+
+function useCountUp(end: number, duration = 1500, decimals = 0) {
+  const [count, setCount] = useState(0);
+  const [started, setStarted] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !started) {
+          setStarted(true);
+        }
+      },
+      { threshold: 0.15 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [started]);
+
+  useEffect(() => {
+    if (!started) return;
+    const startTime = performance.now();
+    const easeOutExpo = (t: number) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      setCount(parseFloat((easeOutExpo(progress) * end).toFixed(decimals)));
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [started, end, duration, decimals]);
+
+  return { count, ref };
+}
+
+// ─── Scroll reveal hook ────────────────────────────────────────────────────────
+
+function useScrollReveal() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.15 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return { ref, visible };
+}
+
+// ─── CSS (injected once) ───────────────────────────────────────────────────────
+
+const GLOBAL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+
+  @keyframes logo-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse-down {
+    0%, 100% { transform: translateY(0); opacity: 0.6; }
+    50%       { transform: translateY(6px); opacity: 1; }
+  }
+
+  .scroll-reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.55s ease, transform 0.55s ease;
+  }
+  .scroll-reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .icon-box-arrow {
+    transition: transform 200ms ease;
+  }
+  .cta-btn:hover .icon-box-arrow {
+    transform: translate(2px, -2px);
+  }
+
+  .segment-card:hover .segment-overlay {
+    background: linear-gradient(to bottom, rgba(13,27,62,0.92), rgba(13,27,62,0.3) 60%) !important;
+  }
+  .segment-card:hover .segment-arrow {
+    transform: translate(2px, -2px);
+    border-color: rgba(255,255,255,0.2) !important;
+  }
+`;
+
+function GlobalStyles() {
+  useEffect(() => {
+    const id = "tabgha-lp-styles";
+    if (!document.getElementById(id)) {
+      const style = document.createElement("style");
+      style.id = id;
+      style.textContent = GLOBAL_CSS;
+      document.head.appendChild(style);
+    }
+  }, []);
+  return null;
+}
 
 // ─── Nav ──────────────────────────────────────────────────────────────────────
 
@@ -151,70 +275,178 @@ function Nav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const navLinks: [string, string][] = [
+    ["#solucao", "Solução"],
+    ["#resultados", "Resultados"],
+    ["#depoimentos", "Depoimentos"],
+    ["#faq", "FAQ"],
+  ];
+
   return (
     <header
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        scrolled
-          ? "bg-[#0D1B3E]/95 backdrop-blur-md shadow-lg shadow-black/20"
-          : "bg-transparent",
-      )}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        transition: "all 0.3s",
+        background: scrolled ? "rgba(13,27,62,0.95)" : "transparent",
+        backdropFilter: scrolled ? "blur(12px)" : undefined,
+        boxShadow: scrolled ? "0 4px 24px rgba(0,0,0,0.2)" : undefined,
+      }}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <div className="flex items-center">
+      <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px" }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center" }}>
           <img
             src="https://tabghamkt.com.br/wp-content/uploads/2025/05/logo_tabgha_health_mkt_caixa_alta-04-scaled-e1747895382243.png"
             alt="Tabgha Health Marketing"
-            className="h-10 w-auto brightness-0 invert"
+            style={{ height: 40, width: "auto", filter: "brightness(0) invert(1)" }}
           />
         </div>
 
-        <nav className="hidden items-center gap-8 md:flex">
-          {[["#solucao", "Solução"], ["#resultados", "Resultados"], ["#depoimentos", "Depoimentos"], ["#faq", "FAQ"]].map(([href, label]) => (
-            <a key={href} href={href} className="text-sm transition-colors" style={{ color: "rgba(255,255,255,0.65)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#fff")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.65)")}
+        {/* Desktop nav pill */}
+        <nav
+          className="hidden md:flex"
+          style={{
+            alignItems: "center",
+            gap: 4,
+            background: "rgba(255,255,255,0.08)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            borderRadius: 40,
+            padding: "6px 8px",
+          }}
+        >
+          {navLinks.map(([href, label]) => (
+            <a
+              key={href}
+              href={href}
+              style={{
+                color: "rgba(255,255,255,0.7)",
+                fontSize: 14,
+                padding: "8px 16px",
+                borderRadius: 32,
+                textDecoration: "none",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "#fff";
+                e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+                e.currentTarget.style.background = "transparent";
+              }}
             >
               {label}
             </a>
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
-          <Link to="/login" className="text-sm transition-colors" style={{ color: "rgba(255,255,255,0.65)" }}>
+        {/* Desktop CTAs */}
+        <div className="hidden md:flex" style={{ alignItems: "center", gap: 8 }}>
+          <Link
+            to="/login"
+            style={{
+              color: "#fff",
+              fontSize: 14,
+              textDecoration: "none",
+              background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              borderRadius: 8,
+              padding: "10px 20px",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.14)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.08)"; }}
+          >
             Entrar
           </Link>
           <a
             href="#diagnostico"
-            className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-semibold text-white shadow-lg transition-all"
+            className="cta-btn"
             style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
               background: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
+              borderRadius: 8,
+              padding: "12px 24px",
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: "none",
               boxShadow: "0 4px 20px rgba(26,95,173,0.3)",
+              transition: "all 0.2s",
             }}
           >
-            Diagnóstico gratuito <ArrowRight className="h-3.5 w-3.5" />
+            Diagnóstico gratuito
+            <div
+              className="icon-box-arrow"
+              style={{
+                width: 36,
+                height: 36,
+                background: "rgba(255,255,255,0.15)",
+                borderRadius: 6,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <ArrowUpRight style={{ width: 16, height: 16 }} />
+            </div>
           </a>
         </div>
 
-        <button className="text-white md:hidden" onClick={() => setOpen((o) => !o)}>
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        {/* Mobile hamburger */}
+        <button
+          className="md:hidden"
+          style={{ color: "#fff", background: "none", border: "none", cursor: "pointer", padding: 4 }}
+          onClick={() => setOpen((o) => !o)}
+        >
+          {open ? <X style={{ width: 20, height: 20 }} /> : <Menu style={{ width: 20, height: 20 }} />}
         </button>
       </div>
 
+      {/* Mobile menu */}
       {open && (
-        <div className="border-t px-6 py-4 md:hidden" style={{ background: "#0D1B3E", borderColor: "rgba(255,255,255,0.1)" }}>
-          <nav className="flex flex-col gap-4">
-            {[["#solucao", "Solução"], ["#resultados", "Resultados"], ["#depoimentos", "Depoimentos"], ["#faq", "FAQ"]].map(([href, label]) => (
-              <a key={href} href={href} className="text-sm" style={{ color: "rgba(255,255,255,0.7)" }} onClick={() => setOpen(false)}>{label}</a>
+        <div
+          className="md:hidden"
+          style={{ background: "#0D1B3E", borderTop: "1px solid rgba(255,255,255,0.1)", padding: "16px 24px" }}
+        >
+          <nav style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {navLinks.map(([href, label]) => (
+              <a
+                key={href}
+                href={href}
+                style={{ color: "rgba(255,255,255,0.7)", fontSize: 14, textDecoration: "none" }}
+                onClick={() => setOpen(false)}
+              >
+                {label}
+              </a>
             ))}
-            <div className="mt-2 flex flex-col gap-2 border-t pt-4" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-              <Link to="/login" className="text-sm" style={{ color: "rgba(255,255,255,0.7)" }}>Entrar</Link>
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+              <Link to="/login" style={{ color: "rgba(255,255,255,0.7)", fontSize: 14, textDecoration: "none" }}>
+                Entrar
+              </Link>
               <a
                 href="#diagnostico"
-                className="inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-white"
-                style={{ background: "linear-gradient(135deg, #1A5FAD, #40ADDB)" }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  background: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
+                  borderRadius: 8,
+                  padding: "12px 20px",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}
               >
-                Diagnóstico gratuito <ArrowRight className="h-3.5 w-3.5" />
+                Diagnóstico gratuito <ArrowRight style={{ width: 14, height: 14 }} />
               </a>
             </div>
           </nav>
@@ -224,90 +456,431 @@ function Nav() {
   );
 }
 
+// ─── Hero product cards ────────────────────────────────────────────────────────
+
+function ProductCard1() {
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.96)",
+      borderRadius: 16,
+      padding: "20px 24px",
+      boxShadow: "0 16px 40px rgba(0,0,0,0.25)",
+      width: 220,
+      backdropFilter: "blur(12px)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #1A5FAD, #40ADDB)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Users style={{ width: 14, height: 14, color: "#fff" }} />
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#0D1B3E" }}>Novos leads</span>
+        </div>
+        <span style={{ fontSize: 10, fontWeight: 600, color: "#16a34a", background: "#dcfce7", borderRadius: 20, padding: "2px 8px" }}>hoje</span>
+      </div>
+      <div style={{ fontSize: 28, fontWeight: 700, color: "#0D1B3E", lineHeight: 1 }}>12</div>
+      <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>↑ 3 vs. ontem</div>
+    </div>
+  );
+}
+
+function ProductCard2() {
+  const bars = [55, 70, 45, 80, 65, 90, 75];
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.96)",
+      borderRadius: 16,
+      padding: "20px 24px",
+      boxShadow: "0 16px 40px rgba(0,0,0,0.25)",
+      width: 220,
+      backdropFilter: "blur(12px)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #1A5FAD, #40ADDB)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <BarChart2 style={{ width: 14, height: 14, color: "#fff" }} />
+        </div>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#0D1B3E" }}>ROAS</span>
+      </div>
+      <div style={{ fontSize: 28, fontWeight: 700, color: "#0D1B3E", lineHeight: 1 }}>4.1x</div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 3, marginTop: 10, height: 36 }}>
+        {bars.map((h, i) => (
+          <div
+            key={i}
+            style={{
+              flex: 1,
+              height: `${h}%`,
+              borderRadius: 3,
+              background: i === bars.length - 1
+                ? "linear-gradient(135deg, #1A5FAD, #40ADDB)"
+                : "rgba(26,95,173,0.2)",
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProductCard3() {
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.96)",
+      borderRadius: 16,
+      padding: "20px 24px",
+      boxShadow: "0 16px 40px rgba(0,0,0,0.25)",
+      width: 220,
+      backdropFilter: "blur(12px)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <div style={{
+          width: 32,
+          height: 32,
+          borderRadius: "50%",
+          background: "linear-gradient(135deg, #60C3E8, #1A5FAD)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 13,
+          fontWeight: 700,
+          color: "#fff",
+        }}>
+          AC
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#0D1B3E" }}>Conteúdo aprovado</div>
+          <div style={{ fontSize: 10, color: "#94a3b8" }}>Dra. Ana Claudia</div>
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "#f0fdf4", borderRadius: 10 }}>
+        <CheckCircle style={{ width: 16, height: 16, color: "#16a34a" }} />
+        <span style={{ fontSize: 11, fontWeight: 600, color: "#16a34a" }}>3 posts aprovados</span>
+      </div>
+      <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 8 }}>Próxima publicação: amanhã</div>
+    </div>
+  );
+}
+
 // ─── Hero ──────────────────────────────────────────────────────────────────────
 
 function Hero() {
   return (
-    <section style={{ background: "#0D1B3E", position: "relative", minHeight: "100vh", overflow: "hidden" }}>
-      {/* grid bg */}
+    <section
+      style={{
+        background: "#0D1B3E",
+        position: "relative",
+        minHeight: "100vh",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "stretch",
+      }}
+    >
+      {/* Left 55% */}
       <div
         style={{
-          position: "absolute", inset: 0, opacity: 0.04, pointerEvents: "none",
-          backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
+          width: "55%",
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "120px 64px 80px",
+          zIndex: 2,
         }}
-      />
-      {/* glow blobs */}
-      <div style={{ position: "absolute", top: -160, left: "35%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(26,95,173,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", top: "33%", right: -80, width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(64,173,219,0.14) 0%, transparent 70%)", pointerEvents: "none" }} />
-
-      <div className="relative mx-auto flex max-w-6xl flex-col items-center px-6 text-center" style={{ paddingTop: 160, paddingBottom: 128 }}>
-        {/* badge */}
+        className="hero-left"
+      >
+        {/* subtle grid */}
         <div
-          className="mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-widest"
-          style={{ border: "1px solid rgba(26,95,173,0.35)", background: "rgba(26,95,173,0.15)", color: "#60C3E8" }}
-        >
-          <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: "#60C3E8" }} />
-          Agência especializada em marketing médico
-        </div>
+          style={{
+            position: "absolute",
+            inset: 0,
+            opacity: 0.04,
+            pointerEvents: "none",
+            backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+          }}
+        />
 
-        {/* headline */}
-        <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-white md:text-6xl lg:text-7xl" style={{ lineHeight: 1.08 }}>
-          Mais pacientes para{" "}
-          <span style={{ backgroundImage: "linear-gradient(135deg, #60C3E8, #40ADDB)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-            sua clínica.
-          </span>
-          <br />
-          Todo mês.
-        </h1>
-
-        <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed md:text-lg" style={{ color: "rgba(255,255,255,0.6)" }}>
-          A Tabgha conecta estratégia, conteúdo médico e tecnologia para transformar
-          sua presença digital em agenda cheia — com previsibilidade e sem achismo.
-        </p>
-
-        {/* CTAs */}
-        <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
-          <a
-            href="#diagnostico"
-            className="inline-flex items-center gap-2 rounded-full px-8 py-3.5 text-sm font-bold text-white transition-all"
+        <div style={{ position: "relative" }}>
+          {/* Badge */}
+          <div
             style={{
-              background: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
-              boxShadow: "0 8px 32px rgba(26,95,173,0.35)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              borderRadius: 20,
+              padding: "6px 16px",
+              border: "1px solid rgba(26,95,173,0.35)",
+              background: "rgba(26,95,173,0.15)",
+              color: "#60C3E8",
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: 32,
             }}
           >
-            Solicitar diagnóstico gratuito
-            <ArrowRight className="h-4 w-4" />
-          </a>
-          <a
-            href="#solucao"
-            className="inline-flex items-center gap-2 rounded-full px-8 py-3.5 text-sm font-semibold transition-all"
-            style={{ border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.8)" }}
-          >
-            Ver como funciona
-          </a>
-        </div>
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "#60C3E8",
+                animation: "pulse-down 2s ease-in-out infinite",
+              }}
+            />
+            Agência especializada em marketing médico
+          </div>
 
-        {/* Stats bar */}
+          {/* H1 */}
+          <h1
+            style={{
+              fontSize: "clamp(48px, 5.5vw, 80px)",
+              fontWeight: 500,
+              lineHeight: 1.0,
+              letterSpacing: "-0.01em",
+              color: "#fff",
+              margin: 0,
+            }}
+          >
+            Mais pacientes para{" "}
+            <span
+              style={{
+                backgroundImage: "linear-gradient(135deg, #60C3E8, #40ADDB)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              sua clínica.
+            </span>
+            <br />
+            Todo mês.
+          </h1>
+
+          {/* Sub-headline */}
+          <p
+            style={{
+              fontSize: "clamp(18px, 1.5vw, 20px)",
+              fontWeight: 400,
+              lineHeight: 1.4,
+              color: "rgba(255,255,255,0.8)",
+              marginTop: 24,
+              maxWidth: 480,
+            }}
+          >
+            A Tabgha conecta estratégia, conteúdo médico e tecnologia para transformar
+            sua presença digital em agenda cheia — com previsibilidade e sem achismo.
+          </p>
+
+          {/* CTAs */}
+          <div style={{ marginTop: 40, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+            <a
+              href="#diagnostico"
+              className="cta-btn"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 10,
+                background: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
+                borderRadius: 8,
+                padding: "14px 24px",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: 600,
+                textDecoration: "none",
+                boxShadow: "0 8px 32px rgba(26,95,173,0.35)",
+              }}
+            >
+              Solicitar diagnóstico gratuito
+              <div
+                className="icon-box-arrow"
+                style={{
+                  width: 36,
+                  height: 36,
+                  background: "rgba(255,255,255,0.15)",
+                  borderRadius: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <ArrowUpRight style={{ width: 16, height: 16 }} />
+              </div>
+            </a>
+            <a
+              href="#solucao"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: 8,
+                padding: "14px 24px",
+                color: "rgba(255,255,255,0.8)",
+                fontSize: 15,
+                fontWeight: 500,
+                textDecoration: "none",
+                transition: "all 0.2s",
+              }}
+            >
+              Ver como funciona
+            </a>
+          </div>
+
+          {/* Specialty logo strip */}
+          <div style={{ marginTop: 48, display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {SPECIALTIES.slice(0, 5).map((s) => (
+              <span
+                key={s}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: "rgba(255,255,255,0.45)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 20,
+                  padding: "4px 10px",
+                }}
+              >
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Right 45% — diagonal gradient + floating cards */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          width: "48%",
+          height: "100%",
+          background: "linear-gradient(135deg, #1A5FAD 0%, #40ADDB 100%)",
+          clipPath: "polygon(8% 0, 100% 0, 100% 100%, 0% 100%)",
+          zIndex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 24,
+          padding: "120px 48px 80px 80px",
+        }}
+        className="hero-right"
+      >
+        {/* subtle overlay pattern */}
         <div
-          className="mt-20 grid w-full max-w-3xl grid-cols-2 md:grid-cols-4 overflow-hidden rounded-2xl"
-          style={{ border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)" }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            opacity: 0.06,
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+            pointerEvents: "none",
+          }}
+        />
+        <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 260 }}>
+          <div style={{ alignSelf: "flex-end" }}>
+            <ProductCard1 />
+          </div>
+          <div style={{ alignSelf: "flex-start" }}>
+            <ProductCard2 />
+          </div>
+          <div style={{ alignSelf: "flex-end" }}>
+            <ProductCard3 />
+          </div>
+        </div>
+      </div>
+
+      {/* Stats bar */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 48,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 10,
+          width: "calc(55% - 64px)",
+          maxWidth: 640,
+        }}
+        className="hero-stats"
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            backdropFilter: "blur(12px)",
+            borderRadius: 16,
+            overflow: "hidden",
+          }}
         >
           {STATS.map((s, i) => (
-            <div key={s.label} className="flex flex-col items-center px-6 py-6" style={{ borderLeft: i > 0 ? "1px solid rgba(255,255,255,0.08)" : undefined }}>
-              <span className="text-3xl font-extrabold text-white md:text-4xl">{s.value}</span>
-              <span className="mt-1 text-center text-xs" style={{ color: "rgba(255,255,255,0.45)" }}>{s.label}</span>
+            <div
+              key={s.label}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                padding: "20px 16px",
+                borderLeft: i > 0 ? "1px solid rgba(255,255,255,0.08)" : undefined,
+              }}
+            >
+              <span style={{ fontSize: 24, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{s.value}</span>
+              <span style={{ marginTop: 4, fontSize: 10, color: "rgba(255,255,255,0.45)", textAlign: "center" }}>{s.label}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* wave divider */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}>
-        <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block" }} preserveAspectRatio="none">
-          <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
-        </svg>
+      {/* Scroll indicator */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 20,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 10,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
+        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>scroll</span>
+        <ChevronDown
+          style={{
+            width: 16,
+            height: 16,
+            color: "rgba(255,255,255,0.4)",
+            animation: "pulse-down 1.8s ease-in-out infinite",
+          }}
+        />
       </div>
+
+      {/* Inline mobile styles */}
+      <style>{`
+        @media (max-width: 768px) {
+          .hero-left {
+            width: 100% !important;
+            padding: 100px 24px 60px !important;
+          }
+          .hero-right {
+            position: relative !important;
+            width: 100% !important;
+            height: 50vw !important;
+            clip-path: none !important;
+            padding: 32px 24px !important;
+          }
+          .hero-stats {
+            position: relative !important;
+            bottom: auto !important;
+            left: auto !important;
+            transform: none !important;
+            width: calc(100% - 48px) !important;
+            margin: 0 24px 32px !important;
+          }
+        }
+      `}</style>
     </section>
   );
 }
@@ -317,16 +890,50 @@ function Hero() {
 function TrustBar() {
   return (
     <section style={{ background: "#f8fafc", paddingTop: 56, paddingBottom: 56 }}>
-      <div className="mx-auto max-w-6xl px-6">
-        <p className="mb-8 text-center text-xs font-semibold uppercase tracking-widest" style={{ color: "#94a3b8" }}>
-          Especialidades que confiam na Tabgha
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-3">
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
+          <span
+            style={{
+              background: "rgba(26,95,173,0.08)",
+              border: "1px solid rgba(26,95,173,0.12)",
+              borderRadius: 4,
+              padding: "4px 10px",
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase" as const,
+              color: "#1A5FAD",
+            }}
+          >
+            Especialidades que confiam na Tabgha
+          </span>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 10 }}>
           {SPECIALTIES.map((s) => (
             <span
               key={s}
-              className="rounded-full px-4 py-1.5 text-sm font-medium"
-              style={{ border: "1px solid #e2e8f0", background: "#fff", color: "#475569", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
+              style={{
+                border: "1px solid #e2e8f0",
+                background: "#fff",
+                color: "#475569",
+                borderRadius: 20,
+                padding: "6px 16px",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "default",
+                transition: "all 0.2s",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#1A5FAD";
+                e.currentTarget.style.color = "#fff";
+                e.currentTarget.style.borderColor = "#1A5FAD";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#fff";
+                e.currentTarget.style.color = "#475569";
+                e.currentTarget.style.borderColor = "#e2e8f0";
+              }}
             >
               {s}
             </span>
@@ -337,47 +944,158 @@ function TrustBar() {
   );
 }
 
-// ─── Problem ──────────────────────────────────────────────────────────────────
+// ─── Problem / Segmentation ───────────────────────────────────────────────────
 
 function ProblemSection() {
-  const pains = [
-    { icon: "📉", title: "Agenda com buracos todo mês", desc: "Sem estratégia, cada mês começa do zero. Você depende de indicação e torce para o telefone tocar." },
-    { icon: "🌀", title: "Agência que não entende saúde", desc: "Posts genéricos, copy que viola o CFM, métricas de vaidade. Dinheiro gasto sem retorno mensurável." },
-    { icon: "🔍", title: "Zero visibilidade sobre o que funciona", desc: "Não sabe quantos leads vieram de cada canal, qual campanha converteu, nem quanto custa um paciente novo." },
+  const segments = [
+    {
+      emoji: "📉",
+      label: "Médicos & Consultórios",
+      title: "Agenda com buracos todo mês",
+      desc: "Sem estratégia, cada mês começa do zero. Você depende de indicação e torce para o telefone tocar.",
+    },
+    {
+      emoji: "🌀",
+      label: "Clínicas Especializadas",
+      title: "Agência que não entende saúde",
+      desc: "Posts genéricos, copy que viola o CFM, métricas de vaidade. Dinheiro gasto sem retorno mensurável.",
+    },
+    {
+      emoji: "🔍",
+      label: "Redes de Clínicas",
+      title: "Zero visibilidade sobre o que funciona",
+      desc: "Não sabe quantos leads vieram de cada canal, qual campanha converteu, nem quanto custa um paciente novo.",
+    },
   ];
 
   return (
     <section style={{ background: "#0D1B3E", position: "relative", paddingTop: 96, paddingBottom: 96 }}>
+      {/* top wave */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, transform: "translateY(-1px)" }}>
         <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block", transform: "rotate(180deg)" }} preserveAspectRatio="none">
           <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
         </svg>
       </div>
 
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="mb-14 text-center">
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#60C3E8" }}>O problema</span>
-          <h2 className="mt-3 text-3xl font-extrabold text-white md:text-4xl">
-            Marketing médico sem estratégia <br className="hidden md:block" />
-            <span style={{ color: "rgba(255,255,255,0.35)" }}>custa mais do que você imagina</span>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
+        <div style={{ marginBottom: 56, textAlign: "center" }}>
+          <span
+            style={{
+              background: "rgba(26,95,173,0.08)",
+              border: "1px solid rgba(26,95,173,0.15)",
+              borderRadius: 4,
+              padding: "4px 10px",
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase" as const,
+              color: "#60C3E8",
+            }}
+          >
+            ● O problema
+          </span>
+          <h2
+            style={{
+              fontSize: "clamp(36px, 4vw, 64px)",
+              fontWeight: 500,
+              lineHeight: 1.05,
+              letterSpacing: "-0.01em",
+              color: "#fff",
+              marginTop: 16,
+            }}
+          >
+            Marketing médico sem estratégia{" "}
+            <span
+              style={{
+                backgroundImage: "linear-gradient(135deg, #60C3E8, #40ADDB)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              custa mais
+            </span>{" "}
+            do que você imagina
           </h2>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          {pains.map((p) => (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: 16,
+          }}
+        >
+          {segments.map((seg) => (
             <div
-              key={p.title}
-              className="rounded-2xl p-8 transition-all"
-              style={{ border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)" }}
+              key={seg.title}
+              className="segment-card"
+              style={{
+                position: "relative",
+                aspectRatio: "16/9",
+                borderRadius: 16,
+                overflow: "hidden",
+                cursor: "pointer",
+                border: "1px solid rgba(255,255,255,0.08)",
+                transition: "border-color 0.25s",
+                background: "linear-gradient(135deg, rgba(26,95,173,0.25), rgba(64,173,219,0.15))",
+              }}
             >
-              <span className="text-4xl">{p.icon}</span>
-              <h3 className="mt-5 text-lg font-bold text-white">{p.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>{p.desc}</p>
+              {/* overlay */}
+              <div
+                className="segment-overlay"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "linear-gradient(to bottom, rgba(13,27,62,0.85), transparent 60%)",
+                  transition: "background 0.25s",
+                  zIndex: 1,
+                }}
+              />
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "24px 28px", zIndex: 2 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <div>
+                    <span style={{ fontSize: 24 }}>{seg.emoji}</span>
+                    <div
+                      style={{
+                        marginTop: 8,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        color: "#60C3E8",
+                      }}
+                    >
+                      {seg.label}
+                    </div>
+                  </div>
+                  <div
+                    className="segment-arrow"
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      transition: "transform 0.2s, border-color 0.2s",
+                    }}
+                  >
+                    <ArrowUpRight style={{ width: 14, height: 14, color: "#fff" }} />
+                  </div>
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 600, color: "#fff", margin: 0 }}>{seg.title}</h3>
+                  <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 6, lineHeight: 1.5 }}>{seg.desc}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
+      {/* bottom wave */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}>
         <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block" }} preserveAspectRatio="none">
           <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
@@ -387,106 +1105,408 @@ function ProblemSection() {
   );
 }
 
-// ─── Solution ─────────────────────────────────────────────────────────────────
+// ─── Solution — 50/50 sticky ──────────────────────────────────────────────────
 
 function SolutionSection() {
   return (
     <section id="solucao" style={{ background: "#f8fafc", paddingTop: 112, paddingBottom: 112 }}>
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="mb-16 text-center">
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#1A5FAD" }}>Nossa solução</span>
-          <h2 className="mt-3 text-3xl font-extrabold text-slate-900 md:text-4xl">
-            Tudo que uma clínica precisa <br className="hidden md:block" />
-            para crescer com consistência
+      <div
+        style={{
+          maxWidth: 1200,
+          margin: "0 auto",
+          padding: "0 24px",
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 80,
+          alignItems: "start",
+        }}
+        className="solution-grid"
+      >
+        {/* Left sticky */}
+        <div style={{ position: "sticky", top: 88 }}>
+          <span
+            style={{
+              background: "rgba(26,95,173,0.08)",
+              border: "1px solid rgba(26,95,173,0.12)",
+              borderRadius: 4,
+              padding: "4px 10px",
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase" as const,
+              color: "#1A5FAD",
+            }}
+          >
+            ● Nossa solução
+          </span>
+          <h2
+            style={{
+              fontSize: "clamp(36px, 4vw, 48px)",
+              fontWeight: 500,
+              lineHeight: 1.05,
+              letterSpacing: "-0.01em",
+              color: "#0D1B3E",
+              marginTop: 16,
+              marginBottom: 0,
+            }}
+          >
+            Tudo que uma clínica precisa para{" "}
+            <span
+              style={{
+                backgroundImage: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              crescer com consistência
+            </span>
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-base" style={{ color: "#64748b" }}>
+          <p style={{ fontSize: 16, lineHeight: 1.6, color: "#64748b", marginTop: 20, marginBottom: 32 }}>
             Não vendemos peças isoladas. Entregamos um sistema integrado de crescimento —
             estratégia, conteúdo e tecnologia funcionando juntos.
           </p>
+          <a
+            href="#diagnostico"
+            className="cta-btn"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
+              background: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
+              borderRadius: 8,
+              padding: "14px 24px",
+              color: "#fff",
+              fontSize: 15,
+              fontWeight: 600,
+              textDecoration: "none",
+              boxShadow: "0 4px 20px rgba(26,95,173,0.25)",
+            }}
+          >
+            Ver a solução completa
+            <div
+              className="icon-box-arrow"
+              style={{
+                width: 36,
+                height: 36,
+                background: "rgba(255,255,255,0.2)",
+                borderRadius: 6,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <ArrowUpRight style={{ width: 16, height: 16 }} />
+            </div>
+          </a>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-3">
-          {FEATURES.map((f) => {
+        {/* Right scroll */}
+        <div>
+          {FEATURES.map((f, i) => {
             const Icon = f.icon;
             return (
               <div
                 key={f.label}
-                className="group relative overflow-hidden rounded-3xl p-8 transition-all"
                 style={{
-                  border: "1px solid #e2e8f0",
-                  background: "#fff",
-                  boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                  borderBottom: i < FEATURES.length - 1 ? "1px solid rgba(0,0,0,0.06)" : undefined,
+                  padding: "32px 0",
+                  display: "flex",
+                  gap: 20,
+                  alignItems: "flex-start",
                 }}
               >
                 <div
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-2xl"
-                  style={{ background: "linear-gradient(135deg, rgba(26,95,173,0.1), rgba(64,173,219,0.1))", color: "#1A5FAD" }}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 12,
+                    background: "linear-gradient(135deg, rgba(26,95,173,0.1), rgba(64,173,219,0.1))",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    color: "#1A5FAD",
+                  }}
                 >
-                  <Icon className="h-6 w-6" />
+                  <Icon style={{ width: 22, height: 22 }} />
                 </div>
-                <h3 className="mt-5 text-lg font-bold text-slate-900">{f.label}</h3>
-                <p className="mt-2 text-sm leading-relaxed" style={{ color: "#64748b" }}>{f.desc}</p>
-                <ul className="mt-6 space-y-2">
-                  {f.items.map((item) => (
-                    <li key={item} className="flex items-center gap-2 text-sm" style={{ color: "#475569" }}>
-                      <CheckCircle className="h-4 w-4 shrink-0" style={{ color: "#1A5FAD" }} />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+                <div>
+                  <h3 style={{ fontSize: 17, fontWeight: 600, color: "#0D1B3E", margin: 0 }}>{f.label}</h3>
+                  <p style={{ fontSize: 14, lineHeight: 1.6, color: "#64748b", marginTop: 6, marginBottom: 0 }}>{f.desc}</p>
+                  <ul style={{ marginTop: 12, paddingLeft: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+                    {f.items.map((item) => (
+                      <li key={item} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#475569" }}>
+                        <CheckCircle style={{ width: 14, height: 14, flexShrink: 0, color: "#1A5FAD" }} />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             );
           })}
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 768px) {
+          .solution-grid {
+            grid-template-columns: 1fr !important;
+            gap: 40px !important;
+          }
+          .solution-grid > div:first-child {
+            position: static !important;
+          }
+        }
+      `}</style>
     </section>
   );
 }
 
-// ─── How it works ─────────────────────────────────────────────────────────────
+// ─── How it works — Product Demo (sticky scroll) ───────────────────────────────
 
 function HowItWorks() {
+  const [activeStep, setActiveStep] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
+  useEffect(() => {
+    if (isMobile) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const rect = container.getBoundingClientRect();
+      const totalHeight = container.offsetHeight;
+      const scrolled = -rect.top;
+      const progress = Math.max(0, Math.min(1, scrolled / (totalHeight - window.innerHeight)));
+      const step = Math.min(2, Math.floor(progress * 3));
+      setActiveStep(step);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isMobile]);
+
+  const mockups = [
+    {
+      label: "Diagnóstico",
+      color: "linear-gradient(135deg, #1A5FAD, #0D1B3E)",
+      content: (
+        <div style={{ padding: 24 }}>
+          <div style={{ fontSize: 12, color: "#60C3E8", fontWeight: 600, marginBottom: 16, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+            Relatório de diagnóstico
+          </div>
+          {["Posicionamento", "Concorrência", "Oportunidades"].map((item, i) => (
+            <div key={item} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: i === 0 ? "#60C3E8" : i === 1 ? "#40ADDB" : "#1A5FAD" }} />
+              <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
+                <div style={{ width: `${[75, 60, 88][i]}%`, height: "100%", background: "linear-gradient(90deg, #60C3E8, #40ADDB)", borderRadius: 4 }} />
+              </div>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", minWidth: 30 }}>{[75, 60, 88][i]}%</span>
+            </div>
+          ))}
+          <div style={{ marginTop: 20, padding: "12px 16px", background: "rgba(255,255,255,0.06)", borderRadius: 10, fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
+            Análise concluída · 12 recomendações
+          </div>
+        </div>
+      ),
+    },
+    {
+      label: "Estratégia",
+      color: "linear-gradient(135deg, #0D1B3E, #1A5FAD)",
+      content: (
+        <div style={{ padding: 24 }}>
+          <div style={{ fontSize: 12, color: "#60C3E8", fontWeight: 600, marginBottom: 16, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+            Plano 90 dias
+          </div>
+          {["Mês 1 · Fundação", "Mês 2 · Aceleração", "Mês 3 · Escala"].map((item, i) => (
+            <div key={item} style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: i === 0 ? "linear-gradient(135deg, #1A5FAD, #40ADDB)" : "rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", fontWeight: 700, flexShrink: 0 }}>
+                {i + 1}
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{item}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
+                  {["Diagnóstico, persona, funil", "Conteúdo + tráfego pago", "Automações + ROI"][i]}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      label: "Resultado",
+      color: "linear-gradient(135deg, #40ADDB, #1A5FAD)",
+      content: (
+        <div style={{ padding: 24 }}>
+          <div style={{ fontSize: 12, color: "#60C3E8", fontWeight: 600, marginBottom: 16, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+            Dashboard de ROI
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {[["ROAS", "4.1x"], ["Leads", "+127"], ["CPL", "R$ 48"], ["Conv.", "22%"]].map(([label, val]) => (
+              <div key={label} style={{ background: "rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>{val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <section style={{ background: "#0D1B3E", position: "relative", paddingTop: 112, paddingBottom: 112 }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, transform: "translateY(-1px)" }}>
+    <section
+      ref={containerRef}
+      style={{
+        background: "#0D1B3E",
+        position: "relative",
+        height: isMobile ? "auto" : "300vh",
+      }}
+    >
+      {/* top wave */}
+      <div style={{ position: isMobile ? "relative" : "absolute", top: 0, left: 0, right: 0, transform: "translateY(-1px)" }}>
         <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block", transform: "rotate(180deg)" }} preserveAspectRatio="none">
           <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
         </svg>
       </div>
 
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="mb-16 text-center">
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#60C3E8" }}>Como funciona</span>
-          <h2 className="mt-3 text-3xl font-extrabold text-white md:text-4xl">Do diagnóstico à agenda cheia</h2>
-        </div>
+      <div
+        style={{
+          position: isMobile ? "relative" : "sticky",
+          top: 0,
+          height: isMobile ? "auto" : "100vh",
+          display: "flex",
+          alignItems: "center",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "80px 24px" : "0 24px", width: "100%" }}>
+          <div style={{ textAlign: "center", marginBottom: 64 }}>
+            <span
+              style={{
+                background: "rgba(26,95,173,0.08)",
+                border: "1px solid rgba(26,95,173,0.15)",
+                borderRadius: 4,
+                padding: "4px 10px",
+                fontSize: 11,
+                fontWeight: 500,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase" as const,
+                color: "#60C3E8",
+              }}
+            >
+              ● Como funciona
+            </span>
+            <h2
+              style={{
+                fontSize: "clamp(36px, 4vw, 64px)",
+                fontWeight: 500,
+                lineHeight: 1.05,
+                letterSpacing: "-0.01em",
+                color: "#fff",
+                marginTop: 16,
+              }}
+            >
+              Do diagnóstico à{" "}
+              <span
+                style={{
+                  backgroundImage: "linear-gradient(135deg, #60C3E8, #40ADDB)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
+                agenda cheia
+              </span>
+            </h2>
+          </div>
 
-        <div className="relative grid gap-8 md:grid-cols-3">
-          {/* connecting line */}
+          {/* Frames */}
           <div
             style={{
-              position: "absolute", top: 32, left: "calc(16.666% + 1rem)", right: "calc(16.666% + 1rem)",
-              height: 1, background: "linear-gradient(90deg, rgba(26,95,173,0.15), rgba(26,95,173,0.6), rgba(26,95,173,0.15))",
-              display: "none",
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+              gap: 64,
+              alignItems: "center",
             }}
-            className="md:block"
-          />
-
-          {STEPS.map((s) => (
-            <div key={s.n} className="flex flex-col items-center text-center">
-              <div
-                className="relative flex h-16 w-16 items-center justify-center rounded-2xl text-2xl font-extrabold"
-                style={{ border: "1px solid rgba(26,95,173,0.35)", background: "rgba(26,95,173,0.15)", color: "#60C3E8" }}
-              >
-                {s.n}
-              </div>
-              <h3 className="mt-6 text-lg font-bold text-white">{s.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>{s.desc}</p>
+          >
+            {/* Step pills */}
+            <div style={{ display: "flex", flexDirection: isMobile ? "row" : "column", gap: 16, flexWrap: "wrap" }}>
+              {STEPS.map((s, i) => (
+                <div
+                  key={s.n}
+                  onClick={() => setActiveStep(i)}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 16,
+                    padding: "20px 24px",
+                    borderRadius: 16,
+                    border: `1px solid ${activeStep === i ? "rgba(26,95,173,0.5)" : "rgba(255,255,255,0.08)"}`,
+                    background: activeStep === i ? "rgba(26,95,173,0.15)" : "rgba(255,255,255,0.03)",
+                    cursor: "pointer",
+                    transition: "all 0.3s",
+                    flex: isMobile ? "1 1 280px" : undefined,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 12,
+                      border: `1px solid ${activeStep === i ? "rgba(26,95,173,0.5)" : "rgba(255,255,255,0.1)"}`,
+                      background: activeStep === i ? "rgba(26,95,173,0.25)" : "rgba(255,255,255,0.05)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: activeStep === i ? "#60C3E8" : "rgba(255,255,255,0.4)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {s.n}
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, color: activeStep === i ? "#fff" : "rgba(255,255,255,0.6)", margin: 0 }}>{s.title}</h3>
+                    <p style={{ fontSize: 13, lineHeight: 1.5, color: activeStep === i ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)", marginTop: 6, marginBottom: 0 }}>{s.desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+
+            {/* Mockup */}
+            {!isMobile && (
+              <div
+                style={{
+                  borderRadius: 20,
+                  overflow: "hidden",
+                  background: mockups[activeStep].color,
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  boxShadow: "0 24px 64px rgba(0,0,0,0.4)",
+                  transition: "all 0.4s ease",
+                  minHeight: 280,
+                }}
+              >
+                <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", gap: 8 }}>
+                  {[0, 1, 2].map((d) => (
+                    <div key={d} style={{ width: 10, height: 10, borderRadius: "50%", background: ["#ff5f57", "#febc2e", "#28c840"][d] }} />
+                  ))}
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginLeft: 8 }}>Portal Tabgha · {mockups[activeStep].label}</span>
+                </div>
+                {mockups[activeStep].content}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}>
+      {/* bottom wave */}
+      <div style={{ position: isMobile ? "relative" : "absolute", bottom: 0, left: 0, right: 0 }}>
         <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block" }} preserveAspectRatio="none">
           <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
         </svg>
@@ -495,80 +1515,223 @@ function HowItWorks() {
   );
 }
 
-// ─── Results ──────────────────────────────────────────────────────────────────
+// ─── Results — CountUp ────────────────────────────────────────────────────────
+
+function MetricCard({ stat }: { stat: typeof STATS[0] }) {
+  const isDecimal = !Number.isInteger(stat.numericValue);
+  const { count, ref } = useCountUp(stat.numericValue, 1500, isDecimal ? 1 : 0);
+  const { ref: revealRef, visible } = useScrollReveal();
+  const Icon = stat.icon;
+
+  return (
+    <div
+      ref={revealRef}
+      className={cn("scroll-reveal", visible && "visible")}
+      style={{
+        background: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
+        borderRadius: 16,
+        padding: "28px 32px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        boxShadow: "0 12px 40px rgba(26,95,173,0.3)",
+      }}
+    >
+      <Icon style={{ width: 28, height: 28, color: "rgba(255,255,255,0.7)", marginBottom: 16 }} />
+      <span
+        ref={ref}
+        style={{
+          fontSize: "clamp(48px, 6vw, 80px)",
+          fontWeight: 500,
+          lineHeight: 1,
+          color: "#fff",
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {stat.prefix}{isDecimal ? count.toFixed(1) : Math.round(count)}{stat.suffix}
+      </span>
+      <span style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", marginTop: 8 }}>{stat.label}</span>
+    </div>
+  );
+}
 
 function ResultsSection() {
+  const { ref: titleRef, visible: titleVisible } = useScrollReveal();
+
   return (
     <section id="resultados" style={{ background: "#f8fafc", paddingTop: 112, paddingBottom: 112 }}>
-      <div className="mx-auto max-w-6xl px-6">
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
         <div
-          className="overflow-hidden rounded-3xl p-12 shadow-2xl md:p-16"
-          style={{
-            background: "linear-gradient(135deg, #0D1B3E 0%, #0f2040 50%, #0a2535 100%)",
-            boxShadow: "0 24px 80px rgba(0,0,0,0.25)",
-          }}
+          ref={titleRef}
+          className={cn("scroll-reveal", titleVisible && "visible")}
+          style={{ textAlign: "center", marginBottom: 64 }}
         >
-          <div className="mb-12 text-center">
-            <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#60C3E8" }}>Resultados reais</span>
-            <h2 className="mt-3 text-3xl font-extrabold text-white md:text-4xl">
-              Números que a sua clínica{" "}
-              <span style={{ backgroundImage: "linear-gradient(135deg, #60C3E8, #40ADDB)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                merece ter
-              </span>
-            </h2>
-          </div>
+          <span
+            style={{
+              background: "rgba(26,95,173,0.08)",
+              border: "1px solid rgba(26,95,173,0.12)",
+              borderRadius: 4,
+              padding: "4px 10px",
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase" as const,
+              color: "#1A5FAD",
+            }}
+          >
+            ● Resultados reais
+          </span>
+          <h2
+            style={{
+              fontSize: "clamp(36px, 4vw, 64px)",
+              fontWeight: 500,
+              lineHeight: 1.05,
+              letterSpacing: "-0.01em",
+              color: "#0D1B3E",
+              marginTop: 16,
+            }}
+          >
+            Números que a sua clínica{" "}
+            <span
+              style={{
+                backgroundImage: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              merece ter
+            </span>
+          </h2>
+          <p style={{ fontSize: 16, lineHeight: 1.6, color: "#64748b", marginTop: 16, maxWidth: 480, margin: "16px auto 0" }}>
+            Dados reais dos nossos clientes ativos — transparência total sobre o que entregamos.
+          </p>
+        </div>
 
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
-            {STATS.map((s) => {
-              const Icon = s.icon;
-              return (
-                <div key={s.label} className="flex flex-col items-center text-center">
-                  <Icon className="mb-3 h-6 w-6" style={{ color: "rgba(96,195,232,0.6)" }} />
-                  <span className="text-4xl font-extrabold text-white md:text-5xl">{s.value}</span>
-                  <span className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>{s.label}</span>
-                </div>
-              );
-            })}
-          </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
+          {STATS.map((s) => (
+            <MetricCard key={s.label} stat={s} />
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
-// ─── Testimonials ─────────────────────────────────────────────────────────────
+// ─── Testimonials + Logo Strip ────────────────────────────────────────────────
 
 function Testimonials() {
+  const { ref: titleRef, visible: titleVisible } = useScrollReveal();
+
   return (
-    <section id="depoimentos" style={{ background: "#f8fafc", paddingBottom: 112 }}>
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="mb-12 text-center">
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#1A5FAD" }}>Depoimentos</span>
-          <h2 className="mt-3 text-3xl font-extrabold text-slate-900 md:text-4xl">
+    <section id="depoimentos" style={{ background: "#0D1B3E", paddingBottom: 112, paddingTop: 80, position: "relative" }}>
+      {/* top wave */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, transform: "translateY(-1px)" }}>
+        <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block", transform: "rotate(180deg)" }} preserveAspectRatio="none">
+          <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
+        </svg>
+      </div>
+
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
+        <div
+          ref={titleRef}
+          className={cn("scroll-reveal", titleVisible && "visible")}
+          style={{ textAlign: "center", marginBottom: 48 }}
+        >
+          <span
+            style={{
+              background: "rgba(26,95,173,0.08)",
+              border: "1px solid rgba(26,95,173,0.15)",
+              borderRadius: 4,
+              padding: "4px 10px",
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase" as const,
+              color: "#60C3E8",
+            }}
+          >
+            ● Depoimentos
+          </span>
+          <h2
+            style={{
+              fontSize: "clamp(36px, 4vw, 64px)",
+              fontWeight: 500,
+              lineHeight: 1.05,
+              letterSpacing: "-0.01em",
+              color: "#fff",
+              marginTop: 16,
+            }}
+          >
             Quem já tem agenda cheia fala por nós
           </h2>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+        {/* Auto-scroll logo strip */}
+        <div style={{ overflow: "hidden", marginBottom: 64, position: "relative" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              animation: "logo-scroll 30s linear infinite",
+              width: "max-content",
+            }}
+          >
+            {[...SPECIALTIES, ...SPECIALTIES].map((s, i) => (
+              <div
+                key={`${s}-${i}`}
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 12,
+                  padding: "20px 32px",
+                  whiteSpace: "nowrap" as const,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: "rgba(255,255,255,0.5)",
+                  flexShrink: 0,
+                }}
+              >
+                {s}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Testimonial cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
           {TESTIMONIALS.map((t) => (
             <div
               key={t.name}
-              className="flex flex-col rounded-3xl p-8 transition-all"
-              style={{ border: "1px solid #e2e8f0", background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(255,255,255,0.04)",
+                borderRadius: 20,
+                padding: 32,
+              }}
             >
-              <div className="flex gap-0.5">
+              <div style={{ display: "flex", gap: 4 }}>
                 {Array.from({ length: t.stars }).map((_, i) => (
-                  <Star key={i} className="h-4 w-4" style={{ fill: "#f59e0b", color: "#f59e0b" }} />
+                  <Star key={i} style={{ width: 14, height: 14, fill: "#f59e0b", color: "#f59e0b" }} />
                 ))}
               </div>
-              <p className="mt-4 flex-1 text-sm leading-relaxed" style={{ color: "#475569" }}>"{t.text}"</p>
-              <div className="mt-6 border-t pt-6" style={{ borderColor: "#f1f5f9" }}>
-                <p className="text-sm font-bold text-slate-900">{t.name}</p>
-                <p className="text-xs" style={{ color: "#94a3b8" }}>{t.role}</p>
+              <p style={{ marginTop: 16, flex: 1, fontSize: 14, lineHeight: 1.7, color: "rgba(255,255,255,0.7)" }}>"{t.text}"</p>
+              <div style={{ marginTop: 24, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 20 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "#fff", margin: 0 }}>{t.name}</p>
+                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", margin: 0, marginTop: 2 }}>{t.role}</p>
               </div>
             </div>
           ))}
         </div>
+      </div>
+
+      {/* bottom wave */}
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}>
+        <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block" }} preserveAspectRatio="none">
+          <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
+        </svg>
       </div>
     </section>
   );
@@ -580,50 +1743,86 @@ function FAQ() {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <section id="faq" style={{ background: "#0D1B3E", position: "relative", paddingTop: 112, paddingBottom: 112 }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, transform: "translateY(-1px)" }}>
-        <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block", transform: "rotate(180deg)" }} preserveAspectRatio="none">
-          <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
-        </svg>
-      </div>
-
-      <div className="mx-auto max-w-2xl px-6">
-        <div className="mb-12 text-center">
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#60C3E8" }}>FAQ</span>
-          <h2 className="mt-3 text-3xl font-extrabold text-white md:text-4xl">Perguntas frequentes</h2>
+    <section id="faq" style={{ background: "#f8fafc", paddingTop: 112, paddingBottom: 112 }}>
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "0 24px" }}>
+        <div style={{ textAlign: "center", marginBottom: 48 }}>
+          <span
+            style={{
+              background: "rgba(26,95,173,0.08)",
+              border: "1px solid rgba(26,95,173,0.12)",
+              borderRadius: 4,
+              padding: "4px 10px",
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase" as const,
+              color: "#1A5FAD",
+            }}
+          >
+            ● FAQ
+          </span>
+          <h2
+            style={{
+              fontSize: "clamp(36px, 4vw, 64px)",
+              fontWeight: 500,
+              lineHeight: 1.05,
+              letterSpacing: "-0.01em",
+              color: "#0D1B3E",
+              marginTop: 16,
+            }}
+          >
+            Perguntas frequentes
+          </h2>
         </div>
 
-        <div className="space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {FAQS.map((f, i) => (
             <div
               key={i}
-              className="overflow-hidden rounded-2xl transition-all"
-              style={{ border: `1px solid ${open === i ? "rgba(26,95,173,0.35)" : "rgba(255,255,255,0.1)"}`, background: "rgba(255,255,255,0.05)" }}
+              style={{
+                borderRadius: 16,
+                border: `1px solid ${open === i ? "rgba(26,95,173,0.35)" : "#e2e8f0"}`,
+                background: "#fff",
+                overflow: "hidden",
+                transition: "border-color 0.2s",
+                boxShadow: open === i ? "0 4px 20px rgba(26,95,173,0.08)" : "0 1px 4px rgba(0,0,0,0.04)",
+              }}
             >
               <button
                 onClick={() => setOpen(open === i ? null : i)}
-                className="flex w-full items-center justify-between px-6 py-5 text-left"
+                style={{
+                  display: "flex",
+                  width: "100%",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "20px 24px",
+                  textAlign: "left",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
               >
-                <span className="text-sm font-semibold text-white">{f.q}</span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: "#0D1B3E" }}>{f.q}</span>
                 <ChevronDown
-                  className="ml-4 h-4 w-4 shrink-0 transition-transform"
-                  style={{ color: "rgba(255,255,255,0.4)", transform: open === i ? "rotate(180deg)" : undefined }}
+                  style={{
+                    marginLeft: 16,
+                    width: 16,
+                    height: 16,
+                    color: "#94a3b8",
+                    flexShrink: 0,
+                    transition: "transform 0.2s",
+                    transform: open === i ? "rotate(180deg)" : undefined,
+                  }}
                 />
               </button>
               {open === i && (
-                <div className="px-6 pb-5">
-                  <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>{f.a}</p>
+                <div style={{ padding: "0 24px 20px" }}>
+                  <p style={{ fontSize: 14, lineHeight: 1.7, color: "#64748b", margin: 0 }}>{f.a}</p>
                 </div>
               )}
             </div>
           ))}
         </div>
-      </div>
-
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}>
-        <svg viewBox="0 0 1440 80" style={{ width: "100%", display: "block" }} preserveAspectRatio="none">
-          <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#f8fafc" />
-        </svg>
       </div>
     </section>
   );
@@ -631,60 +1830,247 @@ function FAQ() {
 
 // ─── CTA ──────────────────────────────────────────────────────────────────────
 
+const TABGHA_CLIENTE_ID = "00000000-0000-0000-0000-000000000001";
+
 function CTASection() {
+  const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email) return;
+    setLoading(true);
+    setErro(null);
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { error } = await supabase.from("leads").insert({
+      cliente_id: TABGHA_CLIENTE_ID,
+      nome: nome || null,
+      email,
+      telefone: telefone || null,
+      canal: "lp",
+      status: "novo",
+      utm_source: typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("utm_source") : null,
+      utm_medium: typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("utm_medium") : null,
+      utm_campaign: typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("utm_campaign") : null,
+    });
+    setLoading(false);
+    if (error) {
+      setErro("Erro ao enviar. Tente novamente.");
+    } else {
+      setSuccess(true);
+      setNome(""); setEmail(""); setTelefone("");
+    }
+  }
 
   return (
     <section id="diagnostico" style={{ background: "#f8fafc", paddingBottom: 112 }}>
-      <div className="mx-auto max-w-6xl px-6">
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
         <div
-          className="relative overflow-hidden rounded-3xl p-12 text-center shadow-2xl md:p-20"
           style={{
-            background: "linear-gradient(135deg, #1A5FAD 0%, #40ADDB 100%)",
-            boxShadow: "0 24px 80px rgba(26,95,173,0.25)",
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 20,
+            background: "linear-gradient(135deg, #0D1B3E 0%, #0f2040 100%)",
+            padding: "80px",
+            textAlign: "center",
+            boxShadow: "0 24px 80px rgba(13,27,62,0.25)",
           }}
         >
           {/* blobs */}
-          <div style={{ position: "absolute", top: -80, left: -80, width: 256, height: 256, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none", filter: "blur(40px)" }} />
-          <div style={{ position: "absolute", bottom: -80, right: -80, width: 256, height: 256, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none", filter: "blur(40px)" }} />
+          <div style={{ position: "absolute", top: -80, left: -80, width: 300, height: 300, borderRadius: "50%", background: "rgba(26,95,173,0.15)", filter: "blur(60px)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", bottom: -80, right: -80, width: 300, height: 300, borderRadius: "50%", background: "rgba(64,173,219,0.1)", filter: "blur(60px)", pointerEvents: "none" }} />
+          {/* subtle grid */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: 0.04,
+              backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+              backgroundSize: "50px 50px",
+              pointerEvents: "none",
+            }}
+          />
 
           <div style={{ position: "relative" }}>
             <span
-              className="inline-block rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white"
-              style={{ background: "rgba(255,255,255,0.2)" }}
+              style={{
+                display: "inline-block",
+                borderRadius: 20,
+                padding: "6px 16px",
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase" as const,
+                color: "#60C3E8",
+                border: "1px solid rgba(96,195,232,0.25)",
+                background: "rgba(96,195,232,0.08)",
+              }}
             >
               Gratuito e sem compromisso
             </span>
-            <h2 className="mt-5 text-3xl font-extrabold text-white md:text-5xl">
-              Pronto para ter uma<br />agenda cheia?
+
+            <h2
+              style={{
+                fontSize: "clamp(36px, 4vw, 64px)",
+                fontWeight: 500,
+                lineHeight: 1.05,
+                letterSpacing: "-0.01em",
+                color: "#fff",
+                marginTop: 20,
+              }}
+            >
+              Pronto para ter uma{" "}
+              <span
+                style={{
+                  backgroundImage: "linear-gradient(135deg, #60C3E8, #40ADDB)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
+                agenda cheia?
+              </span>
             </h2>
-            <p className="mx-auto mt-4 max-w-md text-base" style={{ color: "rgba(255,255,255,0.8)" }}>
+
+            <p
+              style={{
+                fontSize: "clamp(18px, 1.5vw, 20px)",
+                fontWeight: 400,
+                lineHeight: 1.4,
+                color: "rgba(255,255,255,0.7)",
+                marginTop: 16,
+                maxWidth: 480,
+                margin: "16px auto 0",
+              }}
+            >
               Solicite o diagnóstico gratuito. Nossa equipe analisa sua presença digital
               e entrega um plano personalizado em até 48h.
             </p>
 
+            {success ? (
+              <div
+                style={{
+                  marginTop: 40,
+                  padding: "24px 32px",
+                  borderRadius: 12,
+                  background: "rgba(96,195,232,0.12)",
+                  border: "1px solid rgba(96,195,232,0.25)",
+                  color: "#60C3E8",
+                  fontSize: 15,
+                  fontWeight: 500,
+                }}
+              >
+                ✓ Recebemos seu contato! Nossa equipe retorna em até 48h.
+              </div>
+            ) : (
             <form
-              onSubmit={(e) => e.preventDefault()}
-              className="mx-auto mt-8 flex max-w-md flex-col gap-3 sm:flex-row"
+              onSubmit={handleSubmit}
+              style={{
+                marginTop: 40,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                maxWidth: 420,
+                margin: "40px auto 0",
+              }}
             >
               <input
+                type="text"
+                placeholder="Seu nome"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                style={{
+                  borderRadius: 8,
+                  padding: "14px 20px",
+                  fontSize: 14,
+                  color: "#fff",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  outline: "none",
+                  width: "100%",
+                }}
+              />
+              <input
                 type="email"
+                required
                 placeholder="seu@email.com.br"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="flex-1 rounded-full px-5 py-3 text-sm text-white outline-none"
-                style={{ border: "1px solid rgba(255,255,255,0.35)", background: "rgba(255,255,255,0.2)" }}
+                style={{
+                  borderRadius: 8,
+                  padding: "14px 20px",
+                  fontSize: 14,
+                  color: "#fff",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  outline: "none",
+                  width: "100%",
+                }}
               />
+              <input
+                type="tel"
+                placeholder="Telefone / WhatsApp"
+                value={telefone}
+                onChange={(e) => setTelefone(e.target.value)}
+                style={{
+                  borderRadius: 8,
+                  padding: "14px 20px",
+                  fontSize: 14,
+                  color: "#fff",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  outline: "none",
+                  width: "100%",
+                }}
+              />
+              {erro && <p style={{ color: "#f87171", fontSize: 13, margin: 0 }}>{erro}</p>}
               <button
                 type="submit"
-                className="inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 text-sm font-bold transition-all"
-                style={{ background: "#fff", color: "#1A5FAD", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
+                disabled={loading}
+                className="cta-btn"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  background: loading ? "rgba(26,95,173,0.6)" : "linear-gradient(135deg, #1A5FAD, #40ADDB)",
+                  borderRadius: 8,
+                  padding: "14px 24px",
+                  color: "#fff",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  border: "none",
+                  cursor: loading ? "not-allowed" : "pointer",
+                  boxShadow: "0 4px 20px rgba(26,95,173,0.35)",
+                  width: "100%",
+                }}
               >
-                Quero o diagnóstico <ArrowRight className="h-4 w-4" />
+                {loading ? "Enviando…" : "Quero o diagnóstico"}
+                {!loading && (
+                  <div
+                    className="icon-box-arrow"
+                    style={{
+                      width: 36,
+                      height: 36,
+                      background: "rgba(255,255,255,0.15)",
+                      borderRadius: 6,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <ArrowUpRight style={{ width: 16, height: 16 }} />
+                  </div>
+                )}
               </button>
             </form>
+            )}
 
-            <p className="mt-4 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+            <p style={{ marginTop: 16, fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
               Sem spam. Seus dados são tratados com total confidencialidade.
             </p>
           </div>
@@ -699,56 +2085,151 @@ function CTASection() {
 function Footer() {
   return (
     <footer style={{ background: "#0D1B3E", paddingTop: 64, paddingBottom: 40 }}>
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="grid gap-10 md:grid-cols-4">
-          <div className="md:col-span-2">
-            <div className="flex items-center">
-              <img
-                src="https://tabghamkt.com.br/wp-content/uploads/2025/05/logo_tabgha_health_mkt_caixa_alta-04-scaled-e1747895382243.png"
-                alt="Tabgha Health Marketing"
-                className="h-8 w-auto brightness-0 invert opacity-60"
-              />
-            </div>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.4)" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "2fr 1fr 1fr 1fr",
+            gap: 40,
+          }}
+          className="footer-grid"
+        >
+          {/* Brand */}
+          <div>
+            <img
+              src="https://tabghamkt.com.br/wp-content/uploads/2025/05/logo_tabgha_health_mkt_caixa_alta-04-scaled-e1747895382243.png"
+              alt="Tabgha Health Marketing"
+              style={{ height: 32, width: "auto", filter: "brightness(0) invert(1)", opacity: 0.6 }}
+            />
+            <p style={{ marginTop: 16, maxWidth: 260, fontSize: 13, lineHeight: 1.7, color: "rgba(255,255,255,0.4)" }}>
               Estratégia, conteúdo e tecnologia integrados para clínicas e consultórios que querem crescer com previsibilidade.
             </p>
           </div>
 
+          {/* Navigation */}
           <div>
-            <h4 className="mb-4 text-xs font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>Produto</h4>
-            <ul className="space-y-3">
-              {["Solução", "Como funciona", "Resultados", "FAQ"].map((l) => (
-                <li key={l}>
-                  <a href="#" className="text-sm transition-colors" style={{ color: "rgba(255,255,255,0.5)" }}>{l}</a>
+            <h4
+              style={{
+                marginBottom: 16,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase" as const,
+                color: "rgba(255,255,255,0.3)",
+              }}
+            >
+              Navegação
+            </h4>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+              {[["#solucao", "Solução"], ["#resultados", "Resultados"], ["#depoimentos", "Depoimentos"], ["#faq", "FAQ"]].map(([href, label]) => (
+                <li key={label}>
+                  <a href={href} style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", textDecoration: "none", transition: "color 0.2s" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#fff"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+                  >
+                    {label}
+                  </a>
                 </li>
               ))}
             </ul>
           </div>
 
+          {/* Connect */}
           <div>
-            <h4 className="mb-4 text-xs font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>Empresa</h4>
-            <ul className="space-y-3">
-              {["Sobre nós", "Blog", "Política de privacidade", "Termos de uso"].map((l) => (
-                <li key={l}>
-                  <a href="#" className="text-sm transition-colors" style={{ color: "rgba(255,255,255,0.5)" }}>{l}</a>
+            <h4
+              style={{
+                marginBottom: 16,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase" as const,
+                color: "rgba(255,255,255,0.3)",
+              }}
+            >
+              Connect
+            </h4>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+              {["Instagram", "LinkedIn", "YouTube", "WhatsApp"].map((s) => (
+                <li key={s}>
+                  <a href="#" style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", textDecoration: "none", transition: "color 0.2s" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#fff"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+                  >
+                    {s}
+                  </a>
                 </li>
               ))}
+            </ul>
+          </div>
+
+          {/* Login */}
+          <div>
+            <h4
+              style={{
+                marginBottom: 16,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase" as const,
+                color: "rgba(255,255,255,0.3)",
+              }}
+            >
+              Plataforma
+            </h4>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+              <li>
+                <Link to="/login" style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", textDecoration: "none", transition: "color 0.2s" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "#fff"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.5)"; }}
+                >
+                  Acesso à plataforma
+                </Link>
+              </li>
+              <li>
+                <a href="#" style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", textDecoration: "none" }}>Política de privacidade</a>
+              </li>
+              <li>
+                <a href="#" style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", textDecoration: "none" }}>Termos de uso</a>
+              </li>
             </ul>
           </div>
         </div>
 
         <div
-          className="mt-14 flex flex-col items-center justify-between gap-4 border-t pt-8 md:flex-row"
-          style={{ borderColor: "rgba(255,255,255,0.1)" }}
+          style={{
+            marginTop: 56,
+            borderTop: "1px solid rgba(255,255,255,0.1)",
+            paddingTop: 32,
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+          }}
         >
-          <p className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", margin: 0 }}>
             © {new Date().getFullYear()} Tabgha Health Marketing. Todos os direitos reservados.
           </p>
-          <Link to="/login" className="text-xs transition-colors" style={{ color: "rgba(255,255,255,0.3)" }}>
+          <Link to="/login" style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", textDecoration: "none", transition: "color 0.2s" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.6)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.3)"; }}
+          >
             Acesso à plataforma →
           </Link>
         </div>
       </div>
+      <style>{`
+        @media (max-width: 768px) {
+          .footer-grid {
+            grid-template-columns: 1fr 1fr !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .footer-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </footer>
   );
 }
@@ -757,7 +2238,8 @@ function Footer() {
 
 function Landing() {
   return (
-    <div className="font-sans antialiased">
+    <div style={{ fontFamily: "'DM Sans', Inter, system-ui, sans-serif" }}>
+      <GlobalStyles />
       <Nav />
       <Hero />
       <TrustBar />

@@ -33,7 +33,7 @@ function extractZapiConfig(dadosExtras: Json | null): ZapiConfig {
 }
 
 async function ensurePhoneExists(
-  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  supabase: AuthContext["supabase"],
   phone: string,
   zapi: ZapiConfig,
 ) {

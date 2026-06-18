@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useWhatsappConversations } from "@/hooks/useWhatsappConversations";
 import { useWhatsappMessages } from "@/hooks/useWhatsappMessages";
+import { useClientesOptions } from "@/hooks/useClientesOptions";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   ConversationFilters,
@@ -74,6 +75,7 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
   const [clienteFilter, setClienteFilter] = useState<string | null>(() =>
     loadStoredFilter(FILTER_KEYS.cliente, null),
   );
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const filters: ConversationFilters = useMemo(
     () => ({
@@ -93,9 +95,14 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
     }
   }, [clienteFilter, isAdmin]);
 
+  const { data: clientesOptions = [] } = useClientesOptions();
   const { data: conversations = [], isLoading } = useWhatsappConversations(filters);
   const selected = conversations.find((item) => item.id === selectedId) ?? null;
   const { data: messages = [], isLoading: messagesLoading } = useWhatsappMessages(selectedId);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   async function handleSend() {
     if (!selectedId || !message.trim()) {
@@ -143,13 +150,25 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
           mobilePane !== "list" && "hidden md:flex",
         )}
       >
-        <div className="space-y-3 border-b border-border p-3">
+        <div className="space-y-2 border-b border-border p-3">
+          {isAdmin && (
+            <select
+              value={clienteFilter ?? ""}
+              onChange={(e) => setClienteFilter(e.target.value || null)}
+              className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Todos os clientes</option>
+              {clientesOptions.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          )}
           <Tabs value={tab} onValueChange={(value) => setTab(value as InboxTab)}>
-            <TabsList className="grid w-full grid-cols-2 gap-1">
-              <TabsTrigger value="awaiting_human">Aguardando</TabsTrigger>
-              <TabsTrigger value="active">Ativas</TabsTrigger>
-              <TabsTrigger value="closed">Fechadas</TabsTrigger>
-              <TabsTrigger value="all">Todas</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="awaiting_human" className="text-xs px-1">Aguardando</TabsTrigger>
+              <TabsTrigger value="active" className="text-xs px-1">Ativas</TabsTrigger>
+              <TabsTrigger value="closed" className="text-xs px-1">Fechadas</TabsTrigger>
+              <TabsTrigger value="all" className="text-xs px-1">Todas</TabsTrigger>
             </TabsList>
           </Tabs>
           <Input
@@ -241,6 +260,7 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
                   />
                 ))
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             <div className="border-t border-border p-3">

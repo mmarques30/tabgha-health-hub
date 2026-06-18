@@ -1,94 +1,77 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { startOfMonth, endOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { EmptyState } from "@/components/EmptyState";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { useClientesOptions } from "@/hooks/useClientesOptions";
+import { CalendarGrid, type CalEvent } from "@/components/CalendarGrid";
 
 export const Route = createFileRoute("/_authenticated/admin/calendario")({
   component: CalendarioAdminPage,
   head: () => ({ meta: [{ title: "Calendário — Tabgha Admin" }] }),
 });
 
-const STATUS_COLORS: Record<string, string> = {
-  briefing: "bg-slate-100 text-slate-600",
-  roteiro: "bg-purple-100 text-purple-700",
-  producao: "bg-yellow-100 text-yellow-700",
-  aprovacao: "bg-orange-100 text-orange-700",
-  agendado: "bg-blue-100 text-blue-700",
-  postado: "bg-green-100 text-green-700",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  briefing: "Briefing",
-  roteiro: "Roteiro",
-  producao: "Produção",
-  aprovacao: "Aguard. aprovação",
-  agendado: "Agendado",
-  postado: "Postado",
-};
-
 function CalendarioAdminPage() {
-  const { data: conteudos = [], isLoading } = useQuery({
-    queryKey: ["admin", "calendario", "conteudos"],
+  const [filterCliente, setFilterCliente] = useState("");
+  const [refMonth, setRefMonth] = useState(new Date());
+  const { data: clientesOptions = [] } = useClientesOptions();
+
+  const from = startOfMonth(refMonth).toISOString().slice(0, 10);
+  const to = endOfMonth(refMonth).toISOString().slice(0, 10);
+
+  const { data: events = [], isLoading } = useQuery<CalEvent[]>({
+    queryKey: ["admin", "calendario", from, to, filterCliente],
     staleTime: 30_000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("conteudos")
-        .select("*, clientes(nome)")
-        .order("data_postagem", { ascending: true, nullsFirst: false })
-        .limit(100);
+        .select("id, titulo, data_postagem, rede, tipo")
+        .not("data_postagem", "is", null)
+        .gte("data_postagem", from)
+        .lte("data_postagem", to);
+
+      if (filterCliente) q = q.eq("cliente_id", filterCliente);
+
+      const { data, error } = await q.order("data_postagem");
       if (error) throw error;
-      return data ?? [];
+
+      return (data ?? []).map((c) => ({
+        id: c.id,
+        date: c.data_postagem!,
+        title: c.titulo ?? "Conteúdo",
+        type: c.tipo?.toLowerCase().includes("grav") ? ("gravacao" as const) : ("conteudo" as const),
+        sub: [c.rede, c.tipo].filter(Boolean).join(" · "),
+      }));
     },
   });
 
   return (
-    <div className="px-8 py-8">
-      <header className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Operação
-        </p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Calendário Editorial</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Pipeline de conteúdo de todos os clientes.
-        </p>
+    <div className="px-6 py-6">
+      <header className="mb-6">
+        <h1 className="text-xl font-bold tracking-tight">Calendário editorial</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">Conteúdos agendados de todos os clientes</p>
       </header>
 
       {isLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : conteudos.length === 0 ? (
-        <EmptyState
-          icon={<Calendar className="h-6 w-6" />}
-          title="Nenhum conteúdo agendado"
-          description="Os conteúdos aparecem aqui conforme forem criados nos clientes."
-        />
       ) : (
-        <div className="divide-y divide-border rounded-xl border border-border">
-          {conteudos.map((c) => (
-            <div key={c.id} className="flex items-center gap-4 px-5 py-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{c.titulo ?? "Sem título"}</p>
-                <p className="text-xs text-muted-foreground">
-                  {(c.clientes as { nome: string } | null)?.nome ?? "—"} · {c.rede ?? "—"} · {c.tipo ?? "—"}
-                </p>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                {c.data_postagem && (
-                  <span className="text-xs text-muted-foreground">
-                    {format(new Date(c.data_postagem), "dd MMM", { locale: ptBR })}
-                  </span>
-                )}
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[c.status] ?? "bg-muted text-muted-foreground"}`}>
-                  {STATUS_LABELS[c.status] ?? c.status}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <CalendarGrid
+          events={events}
+          onMonthChange={setRefMonth}
+          filters={
+            <select
+              value={filterCliente}
+              onChange={(e) => setFilterCliente(e.target.value)}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+            >
+              <option value="">Todos os clientes</option>
+              {clientesOptions.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            </select>
+          }
+        />
       )}
     </div>
   );

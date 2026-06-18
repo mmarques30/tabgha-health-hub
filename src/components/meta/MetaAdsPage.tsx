@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMetaInsights } from "@/hooks/useMetaInsights";
 import { useAuth } from "@/lib/auth";
+import { useClientesOptions } from "@/hooks/useClientesOptions";
 import { defaultRange, formatCurrency, getLeads, META_TOOLTIP_STYLE } from "@/lib/types";
 
 type MetaAdsPageProps = {
@@ -37,6 +38,7 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
   const { profile } = useAuth();
   const [range, setRange] = useState(defaultRange(7));
   const [clienteId, setClienteId] = useState<string | null>(fixedClienteId);
+  const { data: clientesOptions = [] } = useClientesOptions();
   const activeClienteId = fixedClienteId ?? clienteId ?? profile?.cliente_id ?? null;
 
   const overview = useMetaInsights(
@@ -97,7 +99,19 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
           <h2 className="text-2xl font-semibold tracking-tight">Meta Ads</h2>
           <p className="text-sm text-muted-foreground">Performance em tempo real via Graph API</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && !fixedClienteId && (
+            <select
+              value={clienteId ?? ""}
+              onChange={(e) => setClienteId(e.target.value || null)}
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Selecione um cliente…</option>
+              {clientesOptions.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          )}
           {[7, 14, 30].map((days) => (
             <Button
               key={days}
@@ -221,21 +235,6 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
         </>
       )}
 
-      {isAdmin && !fixedClienteId ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Cliente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <input
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              placeholder="Cole o cliente_id (UUID) por enquanto"
-              value={clienteId ?? ""}
-              onChange={(event) => setClienteId(event.target.value || null)}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
     </div>
   );
 }

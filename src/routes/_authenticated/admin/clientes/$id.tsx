@@ -75,32 +75,106 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
 }
 
 // ── Tab: Diagnóstico ──────────────────────────────────────────────────────────
+type DiagnosticoData = {
+  perfil: { especialidade: string; cidade: string; tempo_mercado: string; publico_alvo: string; ticket_medio: string; diferencial: string };
+  jornada: { canais_aquisicao: string; funil: string; objecoes: string; taxa_agendamento: string; taxa_conversao: string };
+  dores: { principais: string; marketing: string; operacional: string };
+  concorrentes: string;
+  plano_acao: string;
+};
+
+const EMPTY_DIAG: DiagnosticoData = {
+  perfil: { especialidade: "", cidade: "", tempo_mercado: "", publico_alvo: "", ticket_medio: "", diferencial: "" },
+  jornada: { canais_aquisicao: "", funil: "", objecoes: "", taxa_agendamento: "", taxa_conversao: "" },
+  dores: { principais: "", marketing: "", operacional: "" },
+  concorrentes: "",
+  plano_acao: "",
+};
+
+function parseDiag(raw: unknown): DiagnosticoData {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return EMPTY_DIAG;
+  const r = raw as Record<string, unknown>;
+  const perfil = (r.perfil && typeof r.perfil === "object" && !Array.isArray(r.perfil)) ? r.perfil as Record<string, unknown> : {};
+  const jornada = (r.jornada && typeof r.jornada === "object" && !Array.isArray(r.jornada)) ? r.jornada as Record<string, unknown> : {};
+  const dores = (r.dores && typeof r.dores === "object" && !Array.isArray(r.dores)) ? r.dores as Record<string, unknown> : {};
+  return {
+    perfil: { especialidade: String(perfil.especialidade ?? ""), cidade: String(perfil.cidade ?? ""), tempo_mercado: String(perfil.tempo_mercado ?? ""), publico_alvo: String(perfil.publico_alvo ?? ""), ticket_medio: String(perfil.ticket_medio ?? ""), diferencial: String(perfil.diferencial ?? "") },
+    jornada: { canais_aquisicao: String(jornada.canais_aquisicao ?? ""), funil: String(jornada.funil ?? ""), objecoes: String(jornada.objecoes ?? ""), taxa_agendamento: String(jornada.taxa_agendamento ?? ""), taxa_conversao: String(jornada.taxa_conversao ?? "") },
+    dores: { principais: String(dores.principais ?? ""), marketing: String(dores.marketing ?? ""), operacional: String(dores.operacional ?? "") },
+    concorrentes: typeof r.concorrentes === "string" ? r.concorrentes : (Array.isArray(r.concorrentes) ? r.concorrentes.join("\n") : ""),
+    plano_acao: typeof r.plano_acao === "string" ? r.plano_acao : (Array.isArray(r.plano_acao) ? r.plano_acao.map((a: unknown) => typeof a === "object" ? JSON.stringify(a) : String(a)).join("\n") : ""),
+  };
+}
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return <p className="mt-5 mb-2 text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border pb-1">{children}</p>;
+}
+
 function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   const qc = useQueryClient();
-  const [json, setJson] = useState(
-    cliente.diagnostico ? JSON.stringify(cliente.diagnostico, null, 2) : ""
-  );
-  const [error, setError] = useState("");
+  const [d, setD] = useState<DiagnosticoData>(() => parseDiag(cliente.diagnostico));
+
+  const field = (path: string) => {
+    const [sec, key] = path.split(".") as [keyof DiagnosticoData, string];
+    const value = key ? (d[sec] as Record<string, string>)[key] ?? "" : (d[sec] as string);
+    const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setD((prev) => {
+        if (key) {
+          return { ...prev, [sec]: { ...(prev[sec] as object), [key]: e.target.value } };
+        }
+        return { ...prev, [sec]: e.target.value };
+      });
+    };
+    return { value, onChange };
+  };
 
   const save = useMutation({
     mutationFn: async () => {
-      let parsed;
-      try { parsed = JSON.parse(json); } catch { throw new Error("JSON inválido."); }
-      const { error } = await supabase.from("clientes").update({ diagnostico: parsed }).eq("id", cliente.id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await supabase.from("clientes").update({ diagnostico: d as any }).eq("id", cliente.id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Diagnóstico salvo."); qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] }); setError(""); },
-    onError: (e: Error) => setError(e.message),
+    onSuccess: () => { toast.success("Diagnóstico salvo."); qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] }); },
+    onError: () => toast.error("Erro ao salvar."),
   });
 
   return (
-    <div className="max-w-lg space-y-3 py-4">
-      <p className="text-xs text-muted-foreground">Edite o diagnóstico estratégico em JSON. Campos livres — molde conforme o template do cliente.</p>
-      <Textarea className="font-mono text-xs" rows={18} value={json} onChange={(e) => setJson(e.target.value)} />
-      {error && <p className="text-xs text-destructive">{error}</p>}
-      <Button onClick={() => save.mutate()} disabled={save.isPending}>
-        {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar diagnóstico
-      </Button>
+    <div className="max-w-xl py-4 space-y-1">
+      <SectionHeader>Perfil do consultório</SectionHeader>
+      <div className="grid grid-cols-2 gap-3">
+        {([ ["especialidade", "Especialidade"], ["cidade", "Cidade"], ["tempo_mercado", "Tempo de mercado"], ["publico_alvo", "Público-alvo"], ["ticket_medio", "Ticket médio"], ] as [string, string][]).map(([k, l]) => (
+          <div key={k} className="space-y-1"><Label className="text-xs">{l}</Label><Input className="text-sm" {...field(`perfil.${k}`)} /></div>
+        ))}
+        <div className="col-span-2 space-y-1"><Label className="text-xs">Diferencial</Label><Textarea rows={2} className="text-sm" {...field("perfil.diferencial")} /></div>
+      </div>
+
+      <SectionHeader>Jornada do paciente</SectionHeader>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2 space-y-1"><Label className="text-xs">Canais de aquisição</Label><Input className="text-sm" placeholder="Meta Ads, Indicação, Orgânico..." {...field("jornada.canais_aquisicao")} /></div>
+        <div className="col-span-2 space-y-1"><Label className="text-xs">Descrição do funil</Label><Textarea rows={2} className="text-sm" {...field("jornada.funil")} /></div>
+        <div className="col-span-2 space-y-1"><Label className="text-xs">Objeções frequentes</Label><Textarea rows={2} className="text-sm" {...field("jornada.objecoes")} /></div>
+        <div className="space-y-1"><Label className="text-xs">Taxa de agendamento</Label><Input className="text-sm" placeholder="ex: 40%" {...field("jornada.taxa_agendamento")} /></div>
+        <div className="space-y-1"><Label className="text-xs">Taxa de conversão</Label><Input className="text-sm" placeholder="ex: 25%" {...field("jornada.taxa_conversao")} /></div>
+      </div>
+
+      <SectionHeader>Dores identificadas</SectionHeader>
+      <div className="space-y-3">
+        <div className="space-y-1"><Label className="text-xs">Principais dores do paciente</Label><Textarea rows={2} className="text-sm" {...field("dores.principais")} /></div>
+        <div className="space-y-1"><Label className="text-xs">Dores de marketing</Label><Textarea rows={2} className="text-sm" {...field("dores.marketing")} /></div>
+        <div className="space-y-1"><Label className="text-xs">Dores operacionais</Label><Textarea rows={2} className="text-sm" {...field("dores.operacional")} /></div>
+      </div>
+
+      <SectionHeader>Concorrentes</SectionHeader>
+      <div className="space-y-1"><Label className="text-xs">Descreva os principais concorrentes e seu posicionamento</Label><Textarea rows={3} className="text-sm" {...field("concorrentes")} /></div>
+
+      <SectionHeader>Plano de ação</SectionHeader>
+      <div className="space-y-1"><Label className="text-xs">Ações, prazos e responsáveis</Label><Textarea rows={4} className="text-sm" placeholder="1. Criar campanha no Meta Ads — prazo: 2 semanas&#10;2. Configurar automação de WhatsApp — prazo: 1 mês" {...field("plano_acao")} /></div>
+
+      <div className="pt-4">
+        <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar diagnóstico
+        </Button>
+      </div>
     </div>
   );
 }

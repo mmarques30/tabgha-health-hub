@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Tabgha Health Marketing — Mais pacientes. Todo mês." },

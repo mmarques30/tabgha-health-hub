@@ -181,8 +181,13 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
 
 // ── Tab: Leads ────────────────────────────────────────────────────────────────
 const STATUS_LABELS: Record<string, string> = {
-  novo: "Novo", qualificado: "Qualificado", em_atendimento: "Em atendimento",
-  agendado: "Agendado", convertido: "Convertido", perdido: "Perdido",
+  novo:        "Novo",
+  em_conversa: "Em conversa",
+  interessado: "Interessado",
+  agendado:    "Agendado",
+  atendido:    "Atendido",
+  convertido:  "Convertido",
+  perdido:     "Perdido",
 };
 
 function TabLeads({ clienteId }: { clienteId: string }) {
@@ -210,7 +215,7 @@ function TabLeads({ clienteId }: { clienteId: string }) {
             <p className="text-xs text-muted-foreground">{l.telefone ?? l.email ?? "—"} · {l.canal ?? "—"}</p>
           </div>
           <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-            { novo: "bg-blue-100 text-blue-700", qualificado: "bg-blue-100 text-blue-700", em_atendimento: "bg-yellow-100 text-yellow-700", agendado: "bg-yellow-100 text-yellow-700", convertido: "bg-green-100 text-green-700", perdido: "bg-red-100 text-red-700" }[l.status] ?? "bg-slate-100 text-slate-600"
+            { novo: "bg-blue-100 text-blue-700", em_conversa: "bg-amber-100 text-amber-700", interessado: "bg-violet-100 text-violet-700", agendado: "bg-cyan-100 text-cyan-700", atendido: "bg-teal-100 text-teal-700", convertido: "bg-green-100 text-green-700", perdido: "bg-slate-100 text-slate-600" }[l.status] ?? "bg-slate-100 text-slate-600"
           }`}>
             {STATUS_LABELS[l.status] ?? l.status}
           </span>
@@ -257,33 +262,60 @@ function TabConteudo({ clienteId }: { clienteId: string }) {
   );
 }
 
-// ── Tab: Conexões ─────────────────────────────────────────────────────────────
+// ── Tab: Conexões + Agente IA ─────────────────────────────────────────────────
 function TabConexoes({ cliente }: { cliente: Cliente }) {
   const qc = useQueryClient();
-  const [json, setJson] = useState(
-    cliente.dados_extras ? JSON.stringify(cliente.dados_extras, null, 2) : "{}"
-  );
-  const [error, setError] = useState("");
 
-  const save = useMutation({
+  const extras = (cliente.dados_extras ?? {}) as Record<string, unknown>;
+  const agenteIa = (extras.agente_ia ?? {}) as Record<string, string>;
+
+  const [metodo, setMetodo] = useState<string>(agenteIa.metodo_qualificacao ?? "");
+  const [json, setJson] = useState(JSON.stringify(extras, null, 2));
+  const [jsonError, setJsonError] = useState("");
+
+  const saveAgente = useMutation({
     mutationFn: async () => {
-      let parsed;
-      try { parsed = JSON.parse(json); } catch { throw new Error("JSON inválido."); }
-      const { error } = await supabase.from("clientes").update({ dados_extras: parsed }).eq("id", cliente.id);
+      let base: Record<string, unknown>;
+      try { base = JSON.parse(json); } catch { throw new Error("JSON inválido."); }
+      const novoExtras = { ...base, agente_ia: { ...(base.agente_ia as object ?? {}), metodo_qualificacao: metodo || null } };
+      const { error } = await supabase.from("clientes").update({ dados_extras: novoExtras }).eq("id", cliente.id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Conexões salvas."); qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] }); setError(""); },
-    onError: (e: Error) => setError(e.message),
+    onSuccess: () => { toast.success("Configurações salvas."); qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] }); setJsonError(""); },
+    onError: (e: Error) => setJsonError(e.message),
   });
 
   return (
-    <div className="max-w-lg space-y-3 py-4">
-      <p className="text-xs text-muted-foreground">JSON de configurações: redes, automações (meta_page_id, zapi_instance_id), GA4, etc.</p>
-      <Textarea className="font-mono text-xs" rows={18} value={json} onChange={(e) => setJson(e.target.value)} />
-      {error && <p className="text-xs text-destructive">{error}</p>}
-      <Button onClick={() => save.mutate()} disabled={save.isPending}>
-        {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar
-      </Button>
+    <div className="max-w-lg space-y-6 py-4">
+      {/* Método de qualificação do agente IA */}
+      <div className="space-y-2 rounded-xl border border-border bg-card p-4">
+        <div>
+          <p className="text-sm font-semibold">Método de qualificação do agente</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Cole aqui a metodologia que o agente deve seguir nas conversas. Se deixar vazio, ele usa um padrão genérico (avalia intenção, urgência, fit e capacidade financeira de forma natural).
+          </p>
+        </div>
+        <Textarea
+          rows={6}
+          placeholder="Ex: Avalie o lead com base em: (1) Urgência — já tem pacientes interessados? (2) Volume — quantos atendimentos por semana? (3) Disposição — aberto a investir em marketing? Conduza de forma natural, sem parecer interrogatório."
+          value={metodo}
+          onChange={(e) => setMetodo(e.target.value)}
+        />
+        {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
+        <Button size="sm" onClick={() => saveAgente.mutate()} disabled={saveAgente.isPending}>
+          {saveAgente.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar método
+        </Button>
+      </div>
+
+      {/* JSON bruto de configurações */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">JSON avançado</p>
+        <p className="text-xs text-muted-foreground">Redes, automações (meta_page_id, zapi_instance_id), GA4, etc.</p>
+        <Textarea className="font-mono text-xs" rows={14} value={json} onChange={(e) => setJson(e.target.value)} />
+        <Button size="sm" variant="outline" onClick={() => saveAgente.mutate()} disabled={saveAgente.isPending}>
+          {saveAgente.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar JSON
+        </Button>
+      </div>
     </div>
   );
 }

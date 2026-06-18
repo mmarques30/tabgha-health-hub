@@ -22,27 +22,53 @@ export const Route = createFileRoute("/_authenticated/cliente/leads")({
 type Lead = Tables<"leads">;
 
 const STATUS_LABELS: Record<string, string> = {
-  novo: "Novo", qualificado: "Qualificado", em_atendimento: "Em atendimento",
-  agendado: "Agendado", convertido: "Convertido", perdido: "Perdido",
+  novo:        "Novo",
+  em_conversa: "Em conversa",
+  interessado: "Interessado",
+  agendado:    "Agendado",
+  atendido:    "Atendido",
+  convertido:  "Convertido",
+  perdido:     "Perdido",
 };
 const STATUS_COLORS: Record<string, string> = {
-  novo: "bg-blue-100 text-blue-700", qualificado: "bg-blue-100 text-blue-700",
-  em_atendimento: "bg-yellow-100 text-yellow-700", agendado: "bg-yellow-100 text-yellow-700",
-  convertido: "bg-green-100 text-green-700", perdido: "bg-red-100 text-red-700",
+  novo:        "bg-blue-100 text-blue-700",
+  em_conversa: "bg-amber-100 text-amber-700",
+  interessado: "bg-violet-100 text-violet-700",
+  agendado:    "bg-cyan-100 text-cyan-700",
+  atendido:    "bg-teal-100 text-teal-700",
+  convertido:  "bg-green-100 text-green-700",
+  perdido:     "bg-slate-100 text-slate-600",
+};
+
+const MOTIVO_LABELS: Record<string, string> = {
+  sem_plano:      "Sem plano / orçamento",
+  fora_regiao:    "Fora da região",
+  sem_interesse:  "Sem interesse",
+  por_engano:     "Entrou por engano",
+  nao_respondeu:  "Não respondeu",
+  outro:          "Outro",
 };
 
 function LeadModal({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const [obs, setObs] = useState(lead.observacoes ?? "");
+  const [status, setStatus] = useState(lead.status);
+  const [motivo, setMotivo] = useState<string>("");
   const qc = useQueryClient();
   const { profile } = useAuth();
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("leads").update({ observacoes: obs }).eq("id", lead.id).eq("cliente_id", profile!.cliente_id!);
+      const patch: { observacoes: string; status: string; motivo_perda: string | null } = {
+        observacoes: obs,
+        status,
+        motivo_perda: status === "perdido" ? (motivo || null) : null,
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await supabase.from("leads").update(patch as any).eq("id", lead.id).eq("cliente_id", profile!.cliente_id!);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Observação salva.");
+      toast.success("Lead atualizado.");
       qc.invalidateQueries({ queryKey: ["cliente", "leads"] });
       onClose();
     },
@@ -58,11 +84,37 @@ function LeadModal({ lead, onClose }: { lead: Lead; onClose: () => void }) {
             <div><span className="text-muted-foreground">Canal:</span> {lead.canal ?? "—"}</div>
             <div><span className="text-muted-foreground">Telefone:</span> {lead.telefone ?? "—"}</div>
             <div><span className="text-muted-foreground">Email:</span> {lead.email ?? "—"}</div>
-            <div><span className="text-muted-foreground">Status:</span> {STATUS_LABELS[lead.status] ?? lead.status}</div>
           </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Status</label>
+            <select
+              value={status}
+              onChange={(e) => { setStatus(e.target.value); if (e.target.value !== "perdido") setMotivo(""); }}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              {Object.entries(STATUS_LABELS).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+          </div>
+          {status === "perdido" && (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Motivo da perda</label>
+              <select
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Selecione…</option>
+                {Object.entries(MOTIVO_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="text-xs font-medium text-muted-foreground">Observações</label>
-            <Textarea className="mt-1" value={obs} onChange={(e) => setObs(e.target.value)} rows={4} />
+            <Textarea className="mt-1" value={obs} onChange={(e) => setObs(e.target.value)} rows={3} />
           </div>
         </div>
         <DialogFooter>

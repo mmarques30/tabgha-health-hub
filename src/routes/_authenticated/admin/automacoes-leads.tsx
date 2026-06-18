@@ -21,26 +21,34 @@ type ClienteMetrics = {
   leads: Lead[];
   leads_total: number;
   leads_novos: number;
-  leads_qualificados: number;
+  leads_em_andamento: number;
   leads_convertidos: number;
   taxa_conversao: number;
 };
 
-const LEAD_STATUSES = ["novo", "qualificado", "em_atendimento", "agendado", "convertido", "perdido"] as const;
+const LEAD_STATUSES = ["novo","em_conversa","interessado","agendado","atendido","convertido","perdido"] as const;
 const STATUS_LABEL: Record<string, string> = {
-  novo: "Novo", qualificado: "Qualificado", em_atendimento: "Em atend.",
-  agendado: "Agendado", convertido: "Convertido", perdido: "Perdido",
+  novo: "Novo",
+  em_conversa: "Em conversa",
+  interessado: "Interessado",
+  agendado: "Agendado",
+  atendido: "Atendido",
+  convertido: "Convertido",
+  perdido: "Perdido",
 };
 const STATUS_COLOR: Record<string, string> = {
-  novo: "bg-slate-100 text-slate-600",
-  qualificado: "bg-blue-100 text-blue-700",
-  em_atendimento: "bg-yellow-100 text-yellow-700",
-  agendado: "bg-accent text-accent-foreground",
-  convertido: "bg-green-100 text-green-700",
-  perdido: "bg-red-100 text-red-700",
+  novo:        "bg-blue-100 text-blue-700",
+  em_conversa: "bg-amber-100 text-amber-700",
+  interessado: "bg-violet-100 text-violet-700",
+  agendado:    "bg-cyan-100 text-cyan-700",
+  atendido:    "bg-teal-100 text-teal-700",
+  convertido:  "bg-green-100 text-green-700",
+  perdido:     "bg-slate-100 text-slate-600",
 };
 
-const CANAIS = ["WhatsApp", "Meta Ads", "Indicação", "Orgânico", "Outro"];
+const TABGHA_ID = "00000000-0000-0000-0000-000000000001";
+
+const CANAIS = ["WhatsApp", "Meta Ads", "Indicação", "Orgânico", "site", "Outro"];
 
 const TABS = ["Pipeline", "Evolução"] as const;
 type Tab = (typeof TABS)[number];
@@ -68,10 +76,10 @@ function AutomacoesLeadsPage() {
         const leads = (Array.isArray(c.leads) ? c.leads : []) as Lead[];
         const total = leads.length;
         const novos = leads.filter((l) => l.criado_em >= startOfMonth.toISOString()).length;
-        const qualificados = leads.filter((l) => ["qualificado", "em_atendimento", "agendado", "convertido"].includes(l.status)).length;
+        const emAndamento = leads.filter((l) => ["em_conversa","interessado","agendado","atendido","convertido"].includes(l.status)).length;
         const convertidos = leads.filter((l) => l.status === "convertido").length;
         const taxa = total > 0 ? (convertidos / total) * 100 : 0;
-        return { id: c.id, nome: c.nome, especialidade: c.especialidade, status: c.status, leads, leads_total: total, leads_novos: novos, leads_qualificados: qualificados, leads_convertidos: convertidos, taxa_conversao: taxa };
+        return { id: c.id, nome: c.nome, especialidade: c.especialidade, status: c.status, leads, leads_total: total, leads_novos: novos, leads_em_andamento: emAndamento, leads_convertidos: convertidos, taxa_conversao: taxa };
       });
     },
   });
@@ -130,7 +138,9 @@ function AutomacoesLeadsPage() {
             className="h-8 rounded-md border border-input bg-background px-2 text-xs"
           >
             <option value="">Todos canais</option>
-            {CANAIS.map((c) => <option key={c}>{c}</option>)}
+            {CANAIS.map((c) => (
+              <option key={c} value={c}>{c === "site" ? "Leads do site (Tabgha)" : c}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -202,7 +212,7 @@ function AutomacoesLeadsPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-secondary text-[10.5px] uppercase tracking-wide text-muted-foreground">
-                        {["Cliente", "Especialidade", "Total", "Novos/mês", "Qualificados", "Convertidos", "% Conv."].map((h) => (
+                        {["Cliente", "Especialidade", "Total", "Novos/mês", "Em andamento", "Convertidos", "% Conv."].map((h) => (
                           <th key={h} className="px-4 py-2 text-left font-semibold">{h}</th>
                         ))}
                       </tr>
@@ -210,11 +220,18 @@ function AutomacoesLeadsPage() {
                     <tbody className="divide-y divide-border">
                       {metricas.map((m) => (
                         <tr key={m.id} className="hover:bg-secondary/40">
-                          <td className="px-4 py-2.5 font-medium">{m.nome}</td>
+                          <td className="px-4 py-2.5 font-medium">
+                            <span className="flex items-center gap-2">
+                              {m.nome}
+                              {m.id === TABGHA_ID && (
+                                <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">site</span>
+                              )}
+                            </span>
+                          </td>
                           <td className="px-4 py-2.5 text-muted-foreground">{m.especialidade ?? "—"}</td>
                           <td className="px-4 py-2.5">{m.leads_total}</td>
                           <td className="px-4 py-2.5 font-medium text-blue-700">{m.leads_novos}</td>
-                          <td className="px-4 py-2.5">{m.leads_qualificados}</td>
+                          <td className="px-4 py-2.5">{m.leads_em_andamento}</td>
                           <td className="px-4 py-2.5 font-medium text-green-700">{m.leads_convertidos}</td>
                           <td className="px-4 py-2.5 font-semibold">{m.taxa_conversao > 0 ? `${m.taxa_conversao.toFixed(0)}%` : "—"}</td>
                         </tr>

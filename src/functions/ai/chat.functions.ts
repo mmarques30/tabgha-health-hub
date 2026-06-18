@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { buildSystemPrompt } from "@/server/ai/prompts";
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),

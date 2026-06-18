@@ -72,7 +72,7 @@ async function loadCreds(
 
 export const getMetaInsights = createServerFn({ method: "POST" })
   .validator((data: unknown) => metaInsightsInput.parse(data))
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<any> => {
     const auth = await requireAuth();
     assertClienteAccess(auth, data.cliente_id);
 

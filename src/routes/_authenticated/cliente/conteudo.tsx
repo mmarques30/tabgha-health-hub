@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/cliente/conteudo")({
   head: () => ({ meta: [{ title: "Conteúdo — Portal" }] }),
 });
 
-type Conteudo = Tables<"conteudos"> & { entregas: { id: string; status: string }[] | null };
+type ConteudoRow = Tables<"conteudos">;
 
 const STATUS_LABELS: Record<string, string> = {
   briefing: "Briefing", roteiro: "Roteiro", producao: "Produção",

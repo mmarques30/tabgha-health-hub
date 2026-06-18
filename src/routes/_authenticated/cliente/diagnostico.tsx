@@ -1,42 +1,60 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Stethoscope, Loader2 } from "lucide-react";
+import { Stethoscope, Loader2, Users, Route as RouteIcon, HeartCrack, Trophy, ListChecks } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { EmptyState } from "@/components/EmptyState";
-import type { Json } from "@/integrations/supabase/types";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/cliente/diagnostico")({
   component: DiagnosticoPage,
   head: () => ({ meta: [{ title: "Diagnóstico — Portal" }] }),
 });
 
-function renderJson(value: Json, depth = 0): React.ReactNode {
-  if (value === null || value === undefined) return <span className="text-muted-foreground">—</span>;
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return <span className="text-foreground">{String(value)}</span>;
-  }
-  if (Array.isArray(value)) {
-    return (
-      <ul className="mt-1 space-y-1">
-        {value.map((item, i) => <li key={i} className="ml-4 list-disc text-sm">{renderJson(item, depth + 1)}</li>)}
-      </ul>
-    );
-  }
-  if (typeof value === "object") {
-    return (
-      <div className={depth > 0 ? "mt-2 pl-4 border-l border-border" : ""}>
-        {Object.entries(value as Record<string, Json>).map(([k, v]) => (
-          <div key={k} className="mb-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{k.replace(/_/g, " ")}</p>
-            <div className="mt-0.5 text-sm">{renderJson(v, depth + 1)}</div>
-          </div>
-        ))}
+type DiagnosticoData = {
+  perfil?: Record<string, string>;
+  jornada?: Record<string, string>;
+  dores?: Record<string, string>;
+  concorrentes?: string;
+  plano_acao?: string;
+  [key: string]: unknown;
+};
+
+function Section({ icon: Icon, title, children, className }: { icon: React.ElementType; title: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("rounded-xl border border-border bg-card overflow-hidden", className)}>
+      <div className="flex items-center gap-2 border-b border-border bg-secondary/30 px-4 py-3">
+        <Icon className="h-4 w-4 text-primary" />
+        <p className="text-sm font-semibold">{title}</p>
       </div>
-    );
-  }
-  return null;
+      <div className="px-4 py-4">{children}</div>
+    </div>
+  );
 }
+
+function Field({ label, value }: { label: string; value: string | undefined | null }) {
+  if (!value) return null;
+  return (
+    <div className="mb-3">
+      <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm whitespace-pre-line">{value}</p>
+    </div>
+  );
+}
+
+const PERFIL_LABELS: Record<string, string> = {
+  especialidade: "Especialidade", cidade: "Cidade", tempo_mercado: "Tempo de mercado",
+  publico_alvo: "Público-alvo", ticket_medio: "Ticket médio", diferencial: "Diferencial",
+};
+
+const JORNADA_LABELS: Record<string, string> = {
+  canais_aquisicao: "Canais de aquisição", funil: "Funil de vendas",
+  objecoes: "Objeções frequentes", taxa_agendamento: "Taxa de agendamento", taxa_conversao: "Taxa de conversão",
+};
+
+const DORES_LABELS: Record<string, string> = {
+  principais: "Principais dores do paciente", marketing: "Dores de marketing", operacional: "Dores operacionais",
+};
 
 function DiagnosticoPage() {
   const { profile } = useAuth();
@@ -54,24 +72,62 @@ function DiagnosticoPage() {
     },
   });
 
+  const d = cliente?.diagnostico as DiagnosticoData | null | undefined;
+
   return (
-    <div className="px-8 py-8">
-      <header className="mb-8">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Estratégia</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Diagnóstico</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Análise estratégica do {cliente?.especialidade ? `consultório de ${cliente.especialidade}` : "seu consultório"}.
+    <div className="px-6 py-6">
+      <header className="mb-6">
+        <h1 className="text-xl font-bold tracking-tight">Diagnóstico</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Análise estratégica do {cliente?.especialidade ? `consultório de ${cliente.especialidade}` : "seu consultório"}
         </p>
       </header>
 
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-      ) : !cliente?.diagnostico ? (
-        <EmptyState icon={<Stethoscope className="h-6 w-6" />} title="Diagnóstico não preenchido"
-          description="A equipe Tabgha preencherá o diagnóstico estratégico do seu consultório em breve." />
+      ) : !d ? (
+        <EmptyState
+          icon={<Stethoscope className="h-6 w-6" />}
+          title="Diagnóstico não preenchido"
+          description="A equipe Tabgha preencherá o diagnóstico estratégico do seu consultório em breve."
+        />
       ) : (
-        <div className="max-w-2xl rounded-xl border border-border bg-card p-6">
-          {renderJson(cliente.diagnostico)}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {d.perfil && (
+            <Section icon={Users} title="Perfil do consultório">
+              {Object.entries(PERFIL_LABELS).map(([k, l]) => (
+                <Field key={k} label={l} value={d.perfil?.[k]} />
+              ))}
+            </Section>
+          )}
+
+          {d.jornada && (
+            <Section icon={RouteIcon} title="Jornada do paciente">
+              {Object.entries(JORNADA_LABELS).map(([k, l]) => (
+                <Field key={k} label={l} value={d.jornada?.[k]} />
+              ))}
+            </Section>
+          )}
+
+          {d.dores && (
+            <Section icon={HeartCrack} title="Dores identificadas">
+              {Object.entries(DORES_LABELS).map(([k, l]) => (
+                <Field key={k} label={l} value={d.dores?.[k]} />
+              ))}
+            </Section>
+          )}
+
+          {d.concorrentes && (
+            <Section icon={Trophy} title="Concorrentes">
+              <p className="text-sm whitespace-pre-line">{d.concorrentes}</p>
+            </Section>
+          )}
+
+          {d.plano_acao && (
+            <Section icon={ListChecks} title="Plano de ação" className="lg:col-span-2">
+              <p className="text-sm whitespace-pre-line">{d.plano_acao}</p>
+            </Section>
+          )}
         </div>
       )}
     </div>

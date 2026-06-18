@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +75,7 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
   const [clienteFilter, setClienteFilter] = useState<string | null>(() =>
     loadStoredFilter(FILTER_KEYS.cliente, null),
   );
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const filters: ConversationFilters = useMemo(
     () => ({
@@ -98,6 +99,10 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
   const { data: conversations = [], isLoading } = useWhatsappConversations(filters);
   const selected = conversations.find((item) => item.id === selectedId) ?? null;
   const { data: messages = [], isLoading: messagesLoading } = useWhatsappMessages(selectedId);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   async function handleSend() {
     if (!selectedId || !message.trim()) {
@@ -255,6 +260,7 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
                   />
                 ))
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             <div className="border-t border-border p-3">

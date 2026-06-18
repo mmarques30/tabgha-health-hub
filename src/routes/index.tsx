@@ -618,7 +618,7 @@ function Hero() {
           {/* CTAs */}
           <div style={{ marginTop: 40, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
             <a
-              href="#diagnostico"
+              href="#contato"
               className="cta-btn"
               style={{
                 display: "inline-flex",
@@ -634,7 +634,7 @@ function Hero() {
                 boxShadow: "0 8px 32px rgba(26,95,173,0.35)",
               }}
             >
-              Solicitar diagnóstico gratuito
+              Quero saber mais
               <div
                 className="icon-box-arrow"
                 style={{
@@ -1074,7 +1074,7 @@ function SolutionSection() {
             estratégia, conteúdo e tecnologia funcionando juntos.
           </p>
           <a
-            href="#diagnostico"
+            href="#contato"
             className="cta-btn"
             style={{
               display: "inline-flex",
@@ -1724,31 +1724,45 @@ function FAQ() {
   );
 }
 
-// ─── CTA ──────────────────────────────────────────────────────────────────────
+// ─── CTA / Quero saber mais ───────────────────────────────────────────────────
 
 const TABGHA_CLIENTE_ID = "00000000-0000-0000-0000-000000000001";
+
+const ESPECIALIDADES = ["Ortopedia","Dermatologia","Clínica geral","OPME","Cardiologia","Oftalmologia","Ginecologia","Pediatria","Neurologia","Outro"];
+const VOLUMES = [
+  { value: "menos_50",   label: "Menos de 50 pacientes/mês" },
+  { value: "50_150",     label: "50 – 150 pacientes/mês" },
+  { value: "150_500",    label: "150 – 500 pacientes/mês" },
+  { value: "mais_500",   label: "Mais de 500 pacientes/mês" },
+];
 
 function CTASection() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [especialidade, setEspecialidade] = useState("");
+  const [volume, setVolume] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email) return;
+    if (!nome || (!email && !telefone)) {
+      setErro("Preencha o nome e pelo menos um contato (email ou telefone).");
+      return;
+    }
     setLoading(true);
     setErro(null);
     const { supabase } = await import("@/integrations/supabase/client");
     const { error } = await supabase.from("leads").insert({
       cliente_id: TABGHA_CLIENTE_ID,
-      nome: nome || null,
-      email,
+      nome,
+      email: email || null,
       telefone: telefone || null,
-      canal: "lp",
+      canal: "site",
       status: "novo",
+      observacoes: JSON.stringify({ especialidade: especialidade || null, volume_estimado: volume || null, origem_form: "landing_quero_saber_mais" }),
       utm_source: typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("utm_source") : null,
       utm_medium: typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("utm_medium") : null,
       utm_campaign: typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("utm_campaign") : null,
@@ -1758,12 +1772,12 @@ function CTASection() {
       setErro("Erro ao enviar. Tente novamente.");
     } else {
       setSuccess(true);
-      setNome(""); setEmail(""); setTelefone("");
+      setNome(""); setEmail(""); setTelefone(""); setEspecialidade(""); setVolume("");
     }
   }
 
   return (
-    <section id="diagnostico" style={{ background: "#f8fafc", paddingBottom: 112 }}>
+    <section id="contato" style={{ background: "#f8fafc", paddingBottom: 112 }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
         <div
           style={{
@@ -1806,20 +1820,20 @@ function CTASection() {
                 background: "rgba(96,195,232,0.08)",
               }}
             >
-              Gratuito e sem compromisso
+              Fale com o time
             </span>
 
             <h2
               style={{
-                fontSize: "clamp(36px, 4vw, 64px)",
+                fontSize: "clamp(30px, 4vw, 52px)",
                 fontWeight: 500,
-                lineHeight: 1.05,
+                lineHeight: 1.1,
                 letterSpacing: "-0.01em",
                 color: "#fff",
                 marginTop: 20,
               }}
             >
-              Pronto para ter uma{" "}
+              Conheça a plataforma que{" "}
               <span
                 style={{
                   backgroundImage: "linear-gradient(135deg, #60C3E8, #40ADDB)",
@@ -1828,23 +1842,22 @@ function CTASection() {
                   backgroundClip: "text",
                 }}
               >
-                agenda cheia?
+                organiza seu marketing do início ao fim
               </span>
             </h2>
 
             <p
               style={{
-                fontSize: "clamp(18px, 1.5vw, 20px)",
+                fontSize: "clamp(16px, 1.4vw, 18px)",
                 fontWeight: 400,
-                lineHeight: 1.4,
-                color: "rgba(255,255,255,0.7)",
+                lineHeight: 1.5,
+                color: "rgba(255,255,255,0.65)",
                 marginTop: 16,
-                maxWidth: 480,
+                maxWidth: 460,
                 margin: "16px auto 0",
               }}
             >
-              Solicite o diagnóstico gratuito. Nossa equipe analisa sua presença digital
-              e entrega um plano personalizado em até 48h.
+              Preencha o formulário e o time da Tabgha entra em contato em até 1 dia útil.
             </p>
 
             {success ? (
@@ -1860,7 +1873,7 @@ function CTASection() {
                   fontWeight: 500,
                 }}
               >
-                ✓ Recebemos seu contato! Nossa equipe retorna em até 48h.
+                ✓ Recebemos sua mensagem. O time da Tabgha vai te chamar em até 1 dia útil.
               </div>
             ) : (
             <form
@@ -1869,96 +1882,64 @@ function CTASection() {
                 marginTop: 40,
                 display: "flex",
                 flexDirection: "column",
-                gap: 12,
+                gap: 10,
                 maxWidth: 420,
                 margin: "40px auto 0",
               }}
             >
               <input
                 type="text"
-                placeholder="Seu nome"
+                required
+                placeholder="Seu nome *"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                style={{
-                  borderRadius: 8,
-                  padding: "14px 20px",
-                  fontSize: 14,
-                  color: "#fff",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  outline: "none",
-                  width: "100%",
-                }}
-              />
-              <input
-                type="email"
-                required
-                placeholder="seu@email.com.br"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                style={{
-                  borderRadius: 8,
-                  padding: "14px 20px",
-                  fontSize: 14,
-                  color: "#fff",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  outline: "none",
-                  width: "100%",
-                }}
+                style={{ borderRadius: 8, padding: "13px 18px", fontSize: 14, color: "#fff", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", outline: "none", width: "100%" }}
               />
               <input
                 type="tel"
                 placeholder="Telefone / WhatsApp"
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
-                style={{
-                  borderRadius: 8,
-                  padding: "14px 20px",
-                  fontSize: 14,
-                  color: "#fff",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  outline: "none",
-                  width: "100%",
-                }}
+                style={{ borderRadius: 8, padding: "13px 18px", fontSize: 14, color: "#fff", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", outline: "none", width: "100%" }}
               />
+              <input
+                type="email"
+                placeholder="Email (opcional)"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={{ borderRadius: 8, padding: "13px 18px", fontSize: 14, color: "#fff", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", outline: "none", width: "100%" }}
+              />
+              <select
+                value={especialidade}
+                onChange={(e) => setEspecialidade(e.target.value)}
+                style={{ borderRadius: 8, padding: "13px 18px", fontSize: 14, color: especialidade ? "#fff" : "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", outline: "none", width: "100%" }}
+              >
+                <option value="" style={{ background: "#0D1B3E" }}>Especialidade</option>
+                {ESPECIALIDADES.map((e) => <option key={e} value={e} style={{ background: "#0D1B3E" }}>{e}</option>)}
+              </select>
+              <select
+                value={volume}
+                onChange={(e) => setVolume(e.target.value)}
+                style={{ borderRadius: 8, padding: "13px 18px", fontSize: 14, color: volume ? "#fff" : "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", outline: "none", width: "100%" }}
+              >
+                <option value="" style={{ background: "#0D1B3E" }}>Volume estimado de pacientes/mês</option>
+                {VOLUMES.map((v) => <option key={v.value} value={v.value} style={{ background: "#0D1B3E" }}>{v.label}</option>)}
+              </select>
               {erro && <p style={{ color: "#f87171", fontSize: 13, margin: 0 }}>{erro}</p>}
               <button
                 type="submit"
                 disabled={loading}
-                className="cta-btn"
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10,
                   background: loading ? "rgba(26,95,173,0.6)" : "linear-gradient(135deg, #1A5FAD, #40ADDB)",
-                  borderRadius: 8,
-                  padding: "14px 24px",
-                  color: "#fff",
-                  fontSize: 15,
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  boxShadow: "0 4px 20px rgba(26,95,173,0.35)",
-                  width: "100%",
+                  borderRadius: 8, padding: "14px 24px", color: "#fff", fontSize: 15, fontWeight: 600,
+                  border: "none", cursor: loading ? "not-allowed" : "pointer",
+                  boxShadow: "0 4px 20px rgba(26,95,173,0.35)", width: "100%", marginTop: 4,
                 }}
               >
-                {loading ? "Enviando…" : "Quero o diagnóstico"}
+                {loading ? "Enviando…" : "Quero saber mais"}
                 {!loading && (
-                  <div
-                    className="icon-box-arrow"
-                    style={{
-                      width: 36,
-                      height: 36,
-                      background: "rgba(255,255,255,0.15)",
-                      borderRadius: 6,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
+                  <div style={{ width: 36, height: 36, background: "rgba(255,255,255,0.15)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <ArrowUpRight style={{ width: 16, height: 16 }} />
                   </div>
                 )}

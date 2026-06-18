@@ -8,7 +8,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
-import { createClientWithAccess } from "@/server/clientes/createClientWithAccess";
+import { createClientWithAccess } from "@/functions/clientes/createClientWithAccess.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

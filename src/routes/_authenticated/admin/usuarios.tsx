@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { PermissionPicker } from "@/components/PermissionPicker";
-import { createUserWithRole } from "@/server/usuarios/createUserWithRole";
+import { createUserWithRole } from "@/functions/usuarios/createUserWithRole.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

@@ -20,6 +20,8 @@ export const ADMIN_PERMISSION_GROUPS = {
   clientes:     "admin.clientes",
   estrategia:   "admin.estrategia",
   operacao:     "admin.operacao",
+  atendimento:  "admin.atendimento",
+  meta_ads:     "admin.meta_ads",
   roi:          "admin.roi",
   usuarios:     "admin.usuarios",
   diagnosticos: "admin.diagnosticos",

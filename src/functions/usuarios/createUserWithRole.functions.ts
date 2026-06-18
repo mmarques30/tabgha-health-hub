@@ -31,7 +31,6 @@ export const createUserWithRole = createServerFn()
     });
     if (rpcError) throw new Error(rpcError.message);
 
-    // Atualiza o nome no profile (a RPC cria o profile, depois setamos o nome)
     await supabaseAdmin
       .from("profiles")
       .update({ nome: data.nome, email: data.email })

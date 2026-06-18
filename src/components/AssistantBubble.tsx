@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { MessageCircle, X, Send, Loader2, Bot } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { chatWithAI } from "@/server/ai/chat";
+import { chatWithAI } from "@/functions/ai/chat.functions";
 import { cn } from "@/lib/utils";
 
 type Message = { role: "user" | "assistant"; content: string };

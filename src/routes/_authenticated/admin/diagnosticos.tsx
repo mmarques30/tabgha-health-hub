@@ -43,18 +43,25 @@ function DiagnosticosPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Total</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight">{clientes.length}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Preenchidos</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-green-700">{comDiagnostico.length}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Pendentes</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-yellow-700">{semDiagnostico.length}</p>
-        </div>
+        {[
+          { label: "Total", value: clientes.length, color: "text-foreground", bg: "bg-secondary/60" },
+          { label: "Preenchidos", value: comDiagnostico.length, color: "text-green-700", bg: "bg-emerald-50 border-emerald-100" },
+          { label: "Pendentes", value: semDiagnostico.length, color: "text-amber-700", bg: "bg-amber-50 border-amber-100" },
+        ].map(({ label, value, color, bg }, i) => (
+          <div
+            key={label}
+            className="card-lift animate-fade-up rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]"
+            style={{ animationDelay: `${i * 75}ms` }}
+          >
+            <p className="text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
+            <div className="mt-2 flex items-end justify-between">
+              <p className={`text-3xl font-extrabold tracking-tight animate-numeric-pop ${color}`} style={{ animationDelay: `${i * 75 + 120}ms` }}>{value}</p>
+              <div className={`rounded-xl px-2.5 py-1 text-[11px] font-bold ${color} ${bg}`}>
+                {label === "Pendentes" ? `${clientes.length > 0 ? Math.round((value / clientes.length) * 100) : 0}%` : label === "Preenchidos" ? `${clientes.length > 0 ? Math.round((value / clientes.length) * 100) : 0}%` : `${value} clientes`}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {isLoading ? (

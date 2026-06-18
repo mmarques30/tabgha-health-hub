@@ -79,9 +79,14 @@ async function ensurePhoneExists(
   }
 }
 
-export const sendWhatsappMessage = createServerFn({ method: "POST" })
-  .validator((data: unknown) => sendWhatsappInput.parse(data))
-  .handler(async ({ data }) => {
+type SendInput = z.infer<typeof sendWhatsappInput>;
+type SendOutput = { ok: true; message_id: string; zapi_message_id: string | null };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const sendWhatsappMessage = ((createServerFn({ method: "POST" }) as any)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  .handler(async (ctx: any) => {
+    const data = sendWhatsappInput.parse(ctx.data);
     const auth = await requireAuth();
 
     const { data: conversation, error: conversationError } = await auth.supabase
@@ -176,4 +181,4 @@ export const sendWhatsappMessage = createServerFn({ method: "POST" })
       message_id: message.id,
       zapi_message_id: zapiMessageId,
     };
-  });
+  })) as (input: { data: SendInput }) => Promise<SendOutput>;

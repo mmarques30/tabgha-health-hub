@@ -1,9 +1,7 @@
-import { createFileRoute, useNavigate, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   ssr: false,
@@ -38,104 +36,149 @@ function LoginPage() {
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (error) {
-      setError("Email ou senha incorretos.");
-      return;
-    }
+    if (error) { setError("Email ou senha incorretos."); return; }
     const userId = data.user?.id;
-    if (!userId) {
-      setError("Sessão não criada.");
-      return;
-    }
+    if (!userId) { setError("Sessão não criada."); return; }
     const { data: roles, error: rolesError } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-
-    if (rolesError) {
-      setError("Login realizado, mas não foi possível carregar seu perfil.");
-      return;
-    }
-
+      .from("user_roles").select("role").eq("user_id", userId);
+    if (rolesError) { setError("Login realizado, mas não foi possível carregar seu perfil."); return; }
     const isAdmin = roles?.some((r) => r.role === "admin");
     navigate({ to: isAdmin ? "/admin/dashboard" : "/cliente/dashboard", replace: true });
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
-      <div className="w-full max-w-sm">
+    <div
+      className="relative min-h-screen w-full overflow-hidden flex items-center justify-center px-4"
+      style={{ backgroundColor: "#07121E" }}
+    >
+      {/* Decorative gradient orbs */}
+      <div
+        className="pointer-events-none absolute -top-40 -right-40 h-[480px] w-[480px] rounded-full opacity-25 blur-[100px]"
+        style={{ background: "radial-gradient(circle, #1E5CC8 0%, transparent 70%)" }}
+      />
+      <div
+        className="pointer-events-none absolute -bottom-40 -left-40 h-[400px] w-[400px] rounded-full opacity-20 blur-[100px]"
+        style={{ background: "radial-gradient(circle, #F6A623 0%, transparent 70%)" }}
+      />
+      {/* Subtle grid texture */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+
+      {/* Glass card */}
+      <div
+        className="relative z-10 w-full max-w-[380px] rounded-2xl p-8"
+        style={{
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          boxShadow: "0 32px 64px rgba(0,0,0,0.40), 0 0 0 1px rgba(255,255,255,0.05) inset",
+        }}
+      >
         {/* Logo */}
-        <Link to="/" className="mb-8 flex items-center gap-2.5">
+        <div className="flex flex-col items-center mb-7">
           <img
             src="https://tabghamkt.com.br/wp-content/uploads/2025/05/logo_tabgha_health_mkt_caixa_alta-04-scaled-e1747895382243.png"
             alt="Tabgha Health Marketing"
-            className="h-7 w-auto brightness-0"
+            className="h-8 w-auto mb-5 brightness-0 invert"
           />
-        </Link>
+          <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-white/30">
+            Plataforma de Gestão
+          </p>
+        </div>
 
-        {/* Access type tabs */}
-        <div className="mb-4 grid grid-cols-2 rounded-xl border border-border bg-card p-1">
+        {/* Access type switcher */}
+        <div
+          className="mb-6 grid grid-cols-2 rounded-xl p-1 gap-1"
+          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
           {(["equipe", "cliente"] as AccessType[]).map((t) => (
             <button
               key={t}
               type="button"
-              onClick={() => setAccess(t)}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+              onClick={() => { setAccess(t); setError(null); }}
+              className="rounded-lg px-3 py-2 text-[12px] font-semibold transition-all duration-200"
+              style={
                 access === t
-                  ? "bg-foreground text-background shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+                  ? { background: "#1E5CC8", color: "#ffffff", boxShadow: "0 2px 8px rgba(30,92,200,0.40)" }
+                  : { color: "rgba(255,255,255,0.45)" }
+              }
             >
               {t === "equipe" ? "Equipe Tabgha" : "Portal do Cliente"}
             </button>
           ))}
         </div>
 
-        {/* Login card */}
-        <div className="rounded-xl border border-border bg-card p-6">
-          <h1 className="text-lg font-semibold tracking-tight">
-            {access === "equipe" ? "Acesso da equipe" : "Acesso do cliente"}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {access === "equipe"
-              ? "Entre com suas credenciais da equipe Tabgha."
-              : "Entre com o email e senha cadastrados pela Tabgha."}
-          </p>
-          <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Entrando…" : "Entrar"}
-            </Button>
-          </form>
-        </div>
+        {/* Form */}
+        <form onSubmit={onSubmit} className="space-y-3">
+          <input
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-all"
+            style={{
+              background: "rgba(255,255,255,0.07)",
+              border: "1px solid rgba(255,255,255,0.10)",
+            }}
+            onFocus={(e) => (e.currentTarget.style.border = "1px solid rgba(30,92,200,0.70)")}
+            onBlur={(e) => (e.currentTarget.style.border = "1px solid rgba(255,255,255,0.10)")}
+          />
+          <input
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="Senha"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-all"
+            style={{
+              background: "rgba(255,255,255,0.07)",
+              border: "1px solid rgba(255,255,255,0.10)",
+            }}
+            onFocus={(e) => (e.currentTarget.style.border = "1px solid rgba(30,92,200,0.70)")}
+            onBlur={(e) => (e.currentTarget.style.border = "1px solid rgba(255,255,255,0.10)")}
+          />
 
-        <p className="mt-4 text-center text-xs text-muted-foreground">
+          {error && (
+            <p className="rounded-lg px-3 py-2 text-xs text-red-300" style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.20)" }}>
+              {error}
+            </p>
+          )}
+
+          <div className="pt-1">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-xl py-3 text-sm font-semibold text-white transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ background: "linear-gradient(135deg, #1E5CC8 0%, #1749A0 100%)", boxShadow: "0 4px 14px rgba(30,92,200,0.35)" }}
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {loading ? "Entrando…" : "Entrar"}
+            </button>
+          </div>
+        </form>
+
+        {/* Footer link */}
+        <p className="mt-6 text-center text-[11px] text-white/25">
           Problemas com o acesso?{" "}
-          <a href="mailto:contato@tabghamkt.com.br" className="underline underline-offset-2">
+          <a href="mailto:contato@tabghamkt.com.br" className="text-white/50 underline underline-offset-2 hover:text-white/70 transition-colors">
             Fale com a equipe
           </a>
+        </p>
+      </div>
+
+      {/* Bottom badge */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-center">
+        <p className="text-[10px] text-white/20 tracking-wider">
+          TABGHA HEALTH MARKETING © 2025
         </p>
       </div>
     </div>

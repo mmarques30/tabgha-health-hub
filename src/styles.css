@@ -6,10 +6,11 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * TABGHA OS Design System — Dark Navy Palette
+ * TABGHA OS Design System — Light Professional Palette
  *
- * @theme inline maps CSS custom properties to Tailwind utilities.
- * :root defines the dark values (always-on dark theme).
+ * Interior da aplicação: branco/cinza claro.
+ * Sidebar mantém dark navy (tokens --sidebar-*).
+ * Login page usa dark navy via classe ou bg inline.
  */
 
 @theme inline {
@@ -73,80 +74,80 @@
 }
 
 :root {
-  --radius: 0.625rem; /* 10px — rounded-md = 8px (TABGHA OS buttons) */
+  --radius: 0.625rem;
 
-  /* ── TABGHA OS — Dark Navy Base ── */
-  --background: oklch(0.14 0.044 264);        /* #0B1A2B dark navy */
-  --foreground: oklch(0.963 0.005 264);       /* #F2F4F7 off-white */
+  /* ── TABGHA OS — Light Professional Base ── */
+  --background: oklch(0.975 0.004 264);        /* #F7F9FC very light blue-gray */
+  --foreground: oklch(0.14 0.044 264);          /* #0B1A2B brand navy */
 
-  --card: oklch(0.20 0.012 264);              /* #26292E charcoal */
-  --card-foreground: oklch(0.963 0.005 264);
+  --card: oklch(1 0 0);                         /* pure white */
+  --card-foreground: oklch(0.14 0.044 264);
 
-  --popover: oklch(0.18 0.016 264);           /* dropdown dark glass */
-  --popover-foreground: oklch(0.963 0.005 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.14 0.044 264);
 
   /* Primary = AZUL #1E5CC8 */
   --primary: oklch(0.463 0.170 264);
   --primary-foreground: oklch(1 0 0);
 
-  /* Secondary = lighter dark surface for table headers, etc. */
-  --secondary: oklch(0.22 0.018 264);
-  --secondary-foreground: oklch(0.963 0.005 264);
+  /* Secondary = light gray surface */
+  --secondary: oklch(0.945 0.006 264);          /* #EEF1F6 */
+  --secondary-foreground: oklch(0.22 0.040 264);
 
-  --muted: oklch(0.22 0.018 264);
-  --muted-foreground: oklch(0.72 0.018 264);  /* ~rgba(F2F4F7, 0.78) */
+  --muted: oklch(0.945 0.006 264);
+  --muted-foreground: oklch(0.50 0.018 264);    /* medium gray */
 
-  /* Accent = subtle blue glass for hovers */
-  --accent: oklch(0.463 0.170 264 / 12%);
-  --accent-foreground: oklch(0.85 0.09 264);
+  /* Accent = blue tint for hovers */
+  --accent: oklch(0.463 0.170 264 / 8%);
+  --accent-foreground: oklch(0.463 0.170 264);
 
-  --destructive: oklch(0.63 0.22 17);
-  --destructive-foreground: oklch(0.963 0.005 264);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.971 0.013 17.38);
 
-  --border: oklch(0.963 0.005 264 / 10%);    /* rgba(F2F4F7, 0.10) */
-  --input: oklch(0.963 0.005 264 / 10%);
-  --ring: oklch(0.463 0.170 264);             /* accent blue */
+  --border: oklch(0.14 0.044 264 / 10%);        /* dark/10% hairline */
+  --input: oklch(0.14 0.044 264 / 7%);
+  --ring: oklch(0.463 0.170 264);
 
   /* Charts */
-  --chart-1: oklch(0.463 0.170 264);          /* #1E5CC8 blue */
-  --chart-2: oklch(0.770 0.160 72);           /* #F6A623 amber */
-  --chart-3: oklch(0.765 0.090 220);          /* #60C3E8 sky */
-  --chart-4: oklch(0.730 0.180 155);          /* #2FD27A green */
-  --chart-5: oklch(0.630 0.220 17);           /* red */
+  --chart-1: oklch(0.463 0.170 264);
+  --chart-2: oklch(0.770 0.160 72);
+  --chart-3: oklch(0.765 0.090 220);
+  --chart-4: oklch(0.730 0.180 155);
+  --chart-5: oklch(0.630 0.220 17);
 
-  /* Sidebar = #07121E deeper navy */
-  --sidebar: oklch(0.09 0.030 264);
+  /* ── Sidebar mantém dark navy ── */
+  --sidebar: oklch(0.09 0.030 264);             /* #07121E deep navy */
   --sidebar-foreground: oklch(0.963 0.005 264);
   --sidebar-primary: oklch(0.463 0.170 264);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.963 0.005 264 / 8%);  /* rgba(F2F4F7, 0.08) */
+  --sidebar-accent: oklch(0.963 0.005 264 / 8%);
   --sidebar-accent-foreground: oklch(0.963 0.005 264);
   --sidebar-border: oklch(0.963 0.005 264 / 10%);
   --sidebar-ring: oklch(0.463 0.170 264);
 
   /* Marca Tabgha */
-  --brand-navy: oklch(0.14 0.044 264);        /* #0B1A2B */
-  --brand-blue: oklch(0.463 0.170 264);       /* #1E5CC8 */
-  --brand-sky: oklch(0.765 0.090 220);        /* #60C3E8 — chart secondary */
-  --accent-2: oklch(0.770 0.160 72);          /* #F6A623 âmbar */
-  --accent-hover: oklch(0.385 0.136 264);     /* #1749A0 */
+  --brand-navy: oklch(0.14 0.044 264);
+  --brand-blue: oklch(0.463 0.170 264);
+  --brand-sky: oklch(0.765 0.090 220);
+  --accent-2: oklch(0.770 0.160 72);
+  --accent-hover: oklch(0.385 0.136 264);
 
-  /* Status badges — TABGHA OS dark pill style */
-  --green-100: oklch(0.730 0.180 155 / 15%); /* rgba(15,188,95, .15) */
-  --green-700: oklch(0.730 0.180 155);        /* #2FD27A */
-  --yellow-100: oklch(0.770 0.160 72 / 18%); /* rgba(246,166,35, .18) */
-  --yellow-700: oklch(0.770 0.160 72);        /* #F6A623 */
-  --blue-100: oklch(0.463 0.170 264 / 15%);  /* rgba(30,92,200, .15) */
-  --blue-700: oklch(0.463 0.170 264);         /* #1E5CC8 */
-  --slate-100: oklch(0.963 0.005 264 / 8%);  /* glass */
-  --slate-600: oklch(0.72 0.018 264);         /* muted text */
-  --red-100: oklch(0.630 0.220 17 / 15%);    /* rgba(244,63,94, .15) */
-  --red-700: oklch(0.680 0.220 17);           /* #F43F5E */
+  /* Status badges — otimizado para fundo branco (contraste AA ≥4.5:1) */
+  --green-100: oklch(0.920 0.065 155);          /* soft green bg */
+  --green-700: oklch(0.42 0.175 155);           /* dark green text */
+  --yellow-100: oklch(0.950 0.075 72);          /* soft amber bg */
+  --yellow-700: oklch(0.48 0.130 72);           /* dark amber text */
+  --blue-100: oklch(0.920 0.065 264);           /* soft blue bg */
+  --blue-700: oklch(0.463 0.170 264);           /* brand blue text */
+  --slate-100: oklch(0.920 0.006 264);          /* light gray bg */
+  --slate-600: oklch(0.45 0.018 264);           /* medium gray text */
+  --red-100: oklch(0.940 0.055 17);             /* soft red bg */
+  --red-700: oklch(0.46 0.220 17);              /* dark red text */
 }
 
-/* App is always dark — .dark inherits :root values */
+/* .dark não é mais o tema padrão — sidebar usa tokens próprios */
 .dark {
-  /* inherits :root */
+  /* sidebar aplica bg-sidebar, not bg-background */
 }
 
 @layer base {
@@ -165,15 +166,14 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* TABGHA OS typography scale */
   h1 {
-    font-size: clamp(1.625rem, 3vw, 2.125rem); /* 26–34px */
+    font-size: clamp(1.625rem, 3vw, 2.125rem);
     font-weight: 600;
     letter-spacing: -0.01em;
     line-height: 1.15;
   }
   h2 {
-    font-size: clamp(1.1875rem, 2vw, 1.4375rem); /* 19–23px */
+    font-size: clamp(1.1875rem, 2vw, 1.4375rem);
     font-weight: 600;
     letter-spacing: -0.01em;
     line-height: 1.25;
@@ -184,31 +184,22 @@
     line-height: 1.3;
   }
 
-  /* Dark thin scrollbars */
-  ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
+  /* Light scrollbars */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: oklch(0.963 0.005 264 / 15%);
+    background: oklch(0.14 0.044 264 / 15%);
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.963 0.005 264 / 28%);
+    background: oklch(0.14 0.044 264 / 30%);
   }
 }
 
 /* ── TABGHA OS Utility Classes ── */
 
-/* Âmbar para números-chave e palavras de destaque */
-.text-highlight {
-  color: var(--accent-2);
-}
+.text-highlight { color: var(--accent-2); }
 
-/* Gradiente de marca — apenas em títulos/números hero */
 .text-gradient {
   background: linear-gradient(135deg, oklch(0.463 0.170 264) 0%, oklch(0.770 0.160 72) 100%);
   -webkit-background-clip: text;
@@ -216,7 +207,6 @@
   background-clip: text;
 }
 
-/* KPI number typography */
 .kpi-number {
   font-size: clamp(1.875rem, 4vw, 2.75rem);
   font-weight: 600;
@@ -224,20 +214,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Eyebrow pill — label de categoria/seção */
+/* Eyebrow pill — adaptado para fundo claro */
 .eyebrow-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: oklch(0.963 0.005 264 / 8%);
-  border: 1px solid oklch(0.963 0.005 264 / 10%);
+  background: oklch(0.14 0.044 264 / 6%);
+  border: 1px solid oklch(0.14 0.044 264 / 10%);
   border-radius: 4px;
   padding: 4px 10px;
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: oklch(0.72 0.018 264);
+  color: oklch(0.45 0.018 264);
 }
 .eyebrow-pill::before {
   content: '';
@@ -249,7 +239,7 @@
   flex-shrink: 0;
 }
 
-/* Skeleton shimmer — dark theme */
+/* Skeleton shimmer — light theme */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
@@ -257,19 +247,17 @@
 .animate-shimmer {
   background: linear-gradient(
     90deg,
-    oklch(0.963 0.005 264 / 4%)  0%,
-    oklch(0.963 0.005 264 / 10%) 50%,
-    oklch(0.963 0.005 264 / 4%)  100%
+    oklch(0.14 0.044 264 / 4%)  0%,
+    oklch(0.14 0.044 264 / 10%) 50%,
+    oklch(0.14 0.044 264 / 4%)  100%
   );
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
 }
 
-/* Fade-up reveal animation */
+/* Fade-up reveal */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(24px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-up {
-  animation: fadeUp 0.4s ease-out both;
-}
+.animate-fade-up { animation: fadeUp 0.4s ease-out both; }

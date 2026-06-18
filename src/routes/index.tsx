@@ -344,59 +344,21 @@ function Nav() {
           ))}
         </nav>
 
-        {/* Desktop CTAs */}
-        <div className="hidden md:flex" style={{ alignItems: "center", gap: 8 }}>
+        {/* Desktop CTA */}
+        <div className="hidden md:flex" style={{ alignItems: "center" }}>
           <Link
             to="/login"
             style={{
-              color: "#fff",
-              fontSize: 14,
+              color: "rgba(255,255,255,0.55)",
+              fontSize: 13,
               textDecoration: "none",
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.15)",
-              borderRadius: 8,
-              padding: "10px 20px",
-              transition: "all 0.2s",
+              transition: "color 0.2s",
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.14)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.08)"; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.9)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.55)"; }}
           >
-            Entrar
+            Entrar →
           </Link>
-          <a
-            href="#diagnostico"
-            className="cta-btn"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              background: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
-              borderRadius: 8,
-              padding: "12px 24px",
-              color: "#fff",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-              boxShadow: "0 4px 20px rgba(26,95,173,0.3)",
-              transition: "all 0.2s",
-            }}
-          >
-            Diagnóstico gratuito
-            <div
-              className="icon-box-arrow"
-              style={{
-                width: 36,
-                height: 36,
-                background: "rgba(255,255,255,0.15)",
-                borderRadius: 6,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <ArrowUpRight style={{ width: 16, height: 16 }} />
-            </div>
-          </a>
         </div>
 
         {/* Mobile hamburger */}
@@ -426,28 +388,10 @@ function Nav() {
                 {label}
               </a>
             ))}
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-              <Link to="/login" style={{ color: "rgba(255,255,255,0.7)", fontSize: 14, textDecoration: "none" }}>
-                Entrar
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 16 }}>
+              <Link to="/login" style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, textDecoration: "none" }}>
+                Entrar →
               </Link>
-              <a
-                href="#diagnostico"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  background: "linear-gradient(135deg, #1A5FAD, #40ADDB)",
-                  borderRadius: 8,
-                  padding: "12px 20px",
-                  color: "#fff",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  textDecoration: "none",
-                }}
-              >
-                Diagnóstico gratuito <ArrowRight style={{ width: 14, height: 14 }} />
-              </a>
             </div>
           </nav>
         </div>

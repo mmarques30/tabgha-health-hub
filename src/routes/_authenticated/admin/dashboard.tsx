@@ -103,8 +103,8 @@ function AdminDashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis dataKey="date" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
                   <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
-                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-                  <Line type="monotone" dataKey="count" name="Leads" stroke="#1A5FAD" strokeWidth={2} dot={false} />
+                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, background: "var(--color-card)", border: "1px solid var(--color-border)", color: "var(--color-foreground)" }} />
+                  <Line type="monotone" dataKey="count" name="Leads" stroke="#1E5CC8" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

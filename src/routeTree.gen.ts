@@ -118,6 +118,12 @@ const AuthenticatedAdminRoiRoute = AuthenticatedAdminRoiRouteImport.update({
   path: '/admin/roi',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminMetaAdsRoute =
+  AuthenticatedAdminMetaAdsRouteImport.update({
+    id: '/admin/meta-ads',
+    path: '/admin/meta-ads',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminEstrategiaRoute =
   AuthenticatedAdminEstrategiaRouteImport.update({
     id: '/admin/estrategia',
@@ -130,22 +136,16 @@ const AuthenticatedAdminDiagnosticosRoute =
     path: '/admin/diagnosticos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedAdminCalendarioRoute =
-  AuthenticatedAdminCalendarioRouteImport.update({
-    id: '/admin/calendario',
-    path: '/admin/calendario',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedAdminMetaAdsRoute =
-  AuthenticatedAdminMetaAdsRouteImport.update({
-    id: '/admin/meta-ads',
-    path: '/admin/meta-ads',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedAdminDashboardRoute =
   AuthenticatedAdminDashboardRouteImport.update({
     id: '/admin/dashboard',
     path: '/admin/dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminCalendarioRoute =
+  AuthenticatedAdminCalendarioRouteImport.update({
+    id: '/admin/calendario',
+    path: '/admin/calendario',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminAutomacoesLeadsRoute =
@@ -230,8 +230,8 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/admin/atendimento': typeof AuthenticatedAdminAtendimentoRoute
   '/_authenticated/admin/automacoes-leads': typeof AuthenticatedAdminAutomacoesLeadsRoute
-  '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/calendario': typeof AuthenticatedAdminCalendarioRoute
+  '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
   '/_authenticated/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
   '/_authenticated/admin/meta-ads': typeof AuthenticatedAdminMetaAdsRoute
@@ -435,39 +435,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminUsuariosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/roi': {
+      id: '/_authenticated/admin/roi'
+      path: '/admin/roi'
+      fullPath: '/admin/roi'
+      preLoaderRoute: typeof AuthenticatedAdminRoiRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/meta-ads': {
       id: '/_authenticated/admin/meta-ads'
       path: '/admin/meta-ads'
       fullPath: '/admin/meta-ads'
       preLoaderRoute: typeof AuthenticatedAdminMetaAdsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin/dashboard': {
-      id: '/_authenticated/admin/dashboard'
-      path: '/admin/dashboard'
-      fullPath: '/admin/dashboard'
-      preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin/automacoes-leads': {
-      id: '/_authenticated/admin/automacoes-leads'
-      path: '/admin/automacoes-leads'
-      fullPath: '/admin/automacoes-leads'
-      preLoaderRoute: typeof AuthenticatedAdminAutomacoesLeadsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin/calendario': {
-      id: '/_authenticated/admin/calendario'
-      path: '/admin/calendario'
-      fullPath: '/admin/calendario'
-      preLoaderRoute: typeof AuthenticatedAdminCalendarioRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin/diagnosticos': {
-      id: '/_authenticated/admin/diagnosticos'
-      path: '/admin/diagnosticos'
-      fullPath: '/admin/diagnosticos'
-      preLoaderRoute: typeof AuthenticatedAdminDiagnosticosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/estrategia': {
@@ -477,11 +456,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminEstrategiaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/admin/roi': {
-      id: '/_authenticated/admin/roi'
-      path: '/admin/roi'
-      fullPath: '/admin/roi'
-      preLoaderRoute: typeof AuthenticatedAdminRoiRouteImport
+    '/_authenticated/admin/diagnosticos': {
+      id: '/_authenticated/admin/diagnosticos'
+      path: '/admin/diagnosticos'
+      fullPath: '/admin/diagnosticos'
+      preLoaderRoute: typeof AuthenticatedAdminDiagnosticosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/dashboard': {
+      id: '/_authenticated/admin/dashboard'
+      path: '/admin/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/calendario': {
+      id: '/_authenticated/admin/calendario'
+      path: '/admin/calendario'
+      fullPath: '/admin/calendario'
+      preLoaderRoute: typeof AuthenticatedAdminCalendarioRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/automacoes-leads': {
+      id: '/_authenticated/admin/automacoes-leads'
+      path: '/admin/automacoes-leads'
+      fullPath: '/admin/automacoes-leads'
+      preLoaderRoute: typeof AuthenticatedAdminAutomacoesLeadsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/atendimento': {

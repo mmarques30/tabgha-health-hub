@@ -37,8 +37,10 @@ function LeadModal({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const { profile } = useAuth();
 
   const save = useMutation({
-    mutationFn: () =>
-      supabase.from("leads").update({ observacoes: obs }).eq("id", lead.id).eq("cliente_id", profile!.cliente_id!),
+    mutationFn: async () => {
+      const { error } = await supabase.from("leads").update({ observacoes: obs }).eq("id", lead.id).eq("cliente_id", profile!.cliente_id!);
+      if (error) throw error;
+    },
     onSuccess: () => {
       toast.success("Observação salva.");
       qc.invalidateQueries({ queryKey: ["cliente", "leads"] });

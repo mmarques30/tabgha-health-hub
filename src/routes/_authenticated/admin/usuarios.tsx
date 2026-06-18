@@ -55,7 +55,8 @@ async function fetchTeam(): Promise<TeamMember[]> {
     id: p.id,
     nome: p.nome,
     email: p.email,
-    role: (p.user_roles as { role: string }[] | null)?.[0]?.role ?? null,
+    // user_roles is a joined array — cast needed because Supabase types don't infer nested joins
+    role: (p.user_roles as unknown as { role: string }[] | null)?.[0]?.role ?? null,
     permissoes: p.permissoes ?? [],
   }));
 }
@@ -67,7 +68,12 @@ const addUserSchema = z.object({
   cliente_id: z.string().nullable().default(null),
 });
 
-type AddUserForm = z.infer<typeof addUserSchema>;
+type AddUserForm = {
+  nome: string;
+  email: string;
+  role: "admin" | "cliente";
+  cliente_id: string | null;
+};
 
 function initials(nome: string | null): string {
   if (!nome) return "?";
@@ -79,7 +85,8 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
   const queryClient = useQueryClient();
 
   const form = useForm<AddUserForm>({
-    resolver: zodResolver(addUserSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(addUserSchema) as any,
     defaultValues: { nome: "", email: "", role: "admin", cliente_id: null },
   });
 
@@ -104,7 +111,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
         </DialogHeader>
 
         <form
-          onSubmit={form.handleSubmit((d) => mutation.mutate(d))}
+          onSubmit={form.handleSubmit((d) => mutation.mutate(d as AddUserForm))}
           className="space-y-4 py-2"
         >
           <div className="space-y-1">

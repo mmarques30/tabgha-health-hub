@@ -37,14 +37,17 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
   }});
 
   const save = useMutation({
-    mutationFn: (data: ReturnType<typeof form.getValues>) =>
-      supabase.from("clientes").update(data).eq("id", cliente.id),
+    mutationFn: async () => {
+      const data = form.getValues();
+      const { error } = await supabase.from("clientes").update(data).eq("id", cliente.id);
+      if (error) throw error;
+    },
     onSuccess: () => { toast.success("Dados atualizados."); qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] }); },
     onError: () => toast.error("Erro ao salvar."),
   });
 
   return (
-    <form onSubmit={form.handleSubmit((d) => save.mutate(d))} className="max-w-lg space-y-4 py-4">
+    <form onSubmit={form.handleSubmit(() => save.mutate())} className="max-w-lg space-y-4 py-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2 space-y-1"><Label>Nome</Label><Input {...form.register("nome")} /></div>
         <div className="space-y-1"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>
@@ -80,10 +83,11 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   const [error, setError] = useState("");
 
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       let parsed;
       try { parsed = JSON.parse(json); } catch { throw new Error("JSON inválido."); }
-      return supabase.from("clientes").update({ diagnostico: parsed }).eq("id", cliente.id);
+      const { error } = await supabase.from("clientes").update({ diagnostico: parsed }).eq("id", cliente.id);
+      if (error) throw error;
     },
     onSuccess: () => { toast.success("Diagnóstico salvo."); qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] }); setError(""); },
     onError: (e: Error) => setError(e.message),
@@ -184,10 +188,11 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
   const [error, setError] = useState("");
 
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       let parsed;
       try { parsed = JSON.parse(json); } catch { throw new Error("JSON inválido."); }
-      return supabase.from("clientes").update({ dados_extras: parsed }).eq("id", cliente.id);
+      const { error } = await supabase.from("clientes").update({ dados_extras: parsed }).eq("id", cliente.id);
+      if (error) throw error;
     },
     onSuccess: () => { toast.success("Conexões salvas."); qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] }); setError(""); },
     onError: (e: Error) => setError(e.message),

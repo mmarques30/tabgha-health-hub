@@ -19,10 +19,7 @@ export const Route = createFileRoute("/_authenticated/cliente/conteudo")({
   head: () => ({ meta: [{ title: "Conteúdo — Portal" }] }),
 });
 
-type Conteudo = Tables<"conteudo"> & { entregas: { id: string; status: string }[] | null };
-
-// @ts-expect-error table name from schema
-type ConteudoRow = Tables<"conteudos">;
+type Conteudo = Tables<"conteudos"> & { entregas: { id: string; status: string }[] | null };
 
 const STATUS_LABELS: Record<string, string> = {
   briefing: "Briefing", roteiro: "Roteiro", producao: "Produção",
@@ -34,7 +31,7 @@ const STATUS_COLORS: Record<string, string> = {
   agendado: "bg-blue-100 text-blue-700", postado: "bg-green-100 text-green-700",
 };
 
-function AprovacaoModal({ conteudo, onClose }: { conteudo: ConteudoRow; onClose: () => void }) {
+function AprovacaoModal({ conteudo, onClose }: { conteudo: Tables<"conteudos">; onClose: () => void }) {
   const [feedback, setFeedback] = useState("");
   const qc = useQueryClient();
   const { profile } = useAuth();
@@ -105,7 +102,7 @@ function AprovacaoModal({ conteudo, onClose }: { conteudo: ConteudoRow; onClose:
 function ConteudoPage() {
   const { profile } = useAuth();
   const clienteId = profile?.cliente_id;
-  const [selected, setSelected] = useState<ConteudoRow | null>(null);
+  const [selected, setSelected] = useState<Tables<"conteudos"> | null>(null);
 
   const { data: conteudos = [], isLoading } = useQuery({
     queryKey: ["cliente", "conteudos", clienteId],

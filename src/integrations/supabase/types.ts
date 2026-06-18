@@ -76,6 +76,44 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_logs: {
+        Row: {
+          action: string
+          cliente_id: string | null
+          criado_em: string
+          id: string
+          metadata: Json | null
+          tokens_in: number | null
+          tokens_out: number | null
+        }
+        Insert: {
+          action: string
+          cliente_id?: string | null
+          criado_em?: string
+          id?: string
+          metadata?: Json | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+        }
+        Update: {
+          action?: string
+          cliente_id?: string | null
+          criado_em?: string
+          id?: string
+          metadata?: Json | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_logs_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           atualizado_em: string
@@ -339,6 +377,24 @@ export type Database = {
           },
         ]
       }
+      phone_cache: {
+        Row: {
+          checked_at: string
+          exists: boolean
+          telefone: string
+        }
+        Insert: {
+          checked_at?: string
+          exists: boolean
+          telefone: string
+        }
+        Update: {
+          checked_at?: string
+          exists?: boolean
+          telefone?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           atualizado_em: string
@@ -392,63 +448,98 @@ export type Database = {
         }
         Relationships: []
       }
-      whatsapp_conversations: {
+      webhook_errors: {
         Row: {
-          id: string
-          cliente_id: string
-          lead_id: string | null
-          contact_phone: string
-          contact_name: string | null
-          origem: string
-          state: string
-          step_count: number
-          bot_score: number | null
-          bot_notes: Json
-          owner_state: string | null
-          last_inbound_at: string | null
-          last_outbound_at: string | null
-          closed_at: string | null
-          closed_reason: string | null
+          cliente_id: string | null
           criado_em: string
-          atualizado_em: string
+          error: string | null
+          id: string
+          payload: Json | null
+          source: string
         }
         Insert: {
-          id?: string
-          cliente_id: string
-          lead_id?: string | null
-          contact_phone: string
-          contact_name?: string | null
-          origem?: string
-          state?: string
-          step_count?: number
-          bot_score?: number | null
-          bot_notes?: Json
-          owner_state?: string | null
-          last_inbound_at?: string | null
-          last_outbound_at?: string | null
-          closed_at?: string | null
-          closed_reason?: string | null
+          cliente_id?: string | null
           criado_em?: string
-          atualizado_em?: string
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          source: string
         }
         Update: {
+          cliente_id?: string | null
+          criado_em?: string
+          error?: string | null
           id?: string
-          cliente_id?: string
-          lead_id?: string | null
-          contact_phone?: string
-          contact_name?: string | null
-          origem?: string
-          state?: string
-          step_count?: number
+          payload?: Json | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_errors_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_conversations: {
+        Row: {
+          atualizado_em: string
+          bot_notes: Json | null
+          bot_score: number | null
+          cliente_id: string
+          closed_at: string | null
+          closed_reason: string | null
+          contact_name: string | null
+          contact_phone: string
+          criado_em: string
+          id: string
+          last_inbound_at: string | null
+          last_outbound_at: string | null
+          lead_id: string | null
+          origem: string
+          owner_state: string | null
+          state: string
+          step_count: number
+        }
+        Insert: {
+          atualizado_em?: string
+          bot_notes?: Json | null
           bot_score?: number | null
-          bot_notes?: Json
-          owner_state?: string | null
-          last_inbound_at?: string | null
-          last_outbound_at?: string | null
+          cliente_id: string
           closed_at?: string | null
           closed_reason?: string | null
+          contact_name?: string | null
+          contact_phone: string
           criado_em?: string
+          id?: string
+          last_inbound_at?: string | null
+          last_outbound_at?: string | null
+          lead_id?: string | null
+          origem?: string
+          owner_state?: string | null
+          state?: string
+          step_count?: number
+        }
+        Update: {
           atualizado_em?: string
+          bot_notes?: Json | null
+          bot_score?: number | null
+          cliente_id?: string
+          closed_at?: string | null
+          closed_reason?: string | null
+          contact_name?: string | null
+          contact_phone?: string
+          criado_em?: string
+          id?: string
+          last_inbound_at?: string | null
+          last_outbound_at?: string | null
+          lead_id?: string | null
+          origem?: string
+          owner_state?: string | null
+          state?: string
+          step_count?: number
         }
         Relationships: [
           {
@@ -464,50 +555,57 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "leads"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
       whatsapp_messages: {
         Row: {
-          id: string
-          conversation_id: string
+          body: string
           cliente_id: string
+          conversation_id: string
+          delivery_status: string | null
           direction: string
+          id: string
+          metadata: Json | null
           sender_type: string
           sender_user_id: string | null
-          body: string
-          zapi_message_id: string | null
-          delivery_status: string | null
-          metadata: Json
           sent_at: string
+          zapi_message_id: string | null
         }
         Insert: {
-          id?: string
-          conversation_id: string
+          body: string
           cliente_id: string
+          conversation_id: string
+          delivery_status?: string | null
           direction: string
+          id?: string
+          metadata?: Json | null
           sender_type: string
           sender_user_id?: string | null
-          body: string
-          zapi_message_id?: string | null
-          delivery_status?: string | null
-          metadata?: Json
           sent_at?: string
+          zapi_message_id?: string | null
         }
         Update: {
-          id?: string
-          conversation_id?: string
+          body?: string
           cliente_id?: string
+          conversation_id?: string
+          delivery_status?: string | null
           direction?: string
+          id?: string
+          metadata?: Json | null
           sender_type?: string
           sender_user_id?: string | null
-          body?: string
-          zapi_message_id?: string | null
-          delivery_status?: string | null
-          metadata?: Json
           sent_at?: string
+          zapi_message_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "whatsapp_messages_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -515,13 +613,6 @@ export type Database = {
             referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "whatsapp_messages_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          }
         ]
       }
     }
@@ -545,6 +636,15 @@ export type Database = {
       assert_current_admin: { Args: never; Returns: undefined }
       bootstrap_admin: { Args: { _email: string }; Returns: string }
       current_cliente_id: { Args: never; Returns: string }
+      get_or_create_conversation: {
+        Args: {
+          _cliente_id: string
+          _nome?: string
+          _origem?: string
+          _phone: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

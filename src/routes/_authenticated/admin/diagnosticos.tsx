@@ -34,6 +34,14 @@ function DiagnosticosPage() {
         <p className="mt-0.5 text-xs text-muted-foreground">Diagnósticos estratégicos por cliente. Edite via ficha do cliente.</p>
       </div>
 
+      {/* Banner informativo — diagnóstico é exclusivamente interno */}
+      <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-100/40 px-4 py-3 text-blue-700">
+        <Stethoscope className="mt-0.5 h-4 w-4 shrink-0 opacity-70" />
+        <p className="text-xs leading-relaxed">
+          <span className="font-semibold">Diagnóstico 100% interno.</span> Clientes acessam somente depois do onboarding, dentro do próprio portal — nunca pela landing pública. Não existe diagnóstico externo ou de captação.
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Total</p>

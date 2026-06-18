@@ -13,3 +13,16 @@ export function hasPermission(permissoes: string[] | null | undefined, required:
 export function hasAnyPermission(permissoes: string[] | null | undefined, required: string[]): boolean {
   return required.some((r) => hasPermission(permissoes, r));
 }
+
+// Grupos canônicos de permissão admin (notação dot, espelhada na sidebar)
+export const ADMIN_PERMISSION_GROUPS = {
+  dashboard:    "admin.dashboard",
+  clientes:     "admin.clientes",
+  estrategia:   "admin.estrategia",
+  operacao:     "admin.operacao",
+  roi:          "admin.roi",
+  usuarios:     "admin.usuarios",
+  diagnosticos: "admin.diagnosticos",
+} as const;
+
+export type AdminPermissionGroup = keyof typeof ADMIN_PERMISSION_GROUPS;

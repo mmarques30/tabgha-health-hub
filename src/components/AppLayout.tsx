@@ -5,22 +5,46 @@ import { hasPermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
+  Users,
+  BarChart3,
+  Calendar,
+  Zap,
+  TrendingUp,
+  UserCog,
+  Stethoscope,
+  FileText,
+  UserCheck,
+  Link2,
   LogOut,
 } from "lucide-react";
 
 type NavItem = {
-  to: "/admin/dashboard" | "/cliente/dashboard";
+  to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   perm: string;
 };
 
 const ADMIN_NAV: NavItem[] = [
-  { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "admin.dashboard" },
+  { to: "/admin/dashboard",        label: "Dashboard",         icon: LayoutDashboard, perm: "admin.dashboard" },
+  { to: "/admin/clientes",         label: "Clientes",          icon: Users,           perm: "admin.clientes" },
+  { to: "/admin/estrategia",       label: "Estratégia",        icon: BarChart3,       perm: "admin.estrategia" },
+  { to: "/admin/calendario",       label: "Calendário",        icon: Calendar,        perm: "admin.operacao" },
+  { to: "/admin/automacoes-leads", label: "Automações Leads",  icon: Zap,             perm: "admin.operacao" },
+  { to: "/admin/roi",              label: "ROI",               icon: TrendingUp,      perm: "admin.roi" },
+  { to: "/admin/usuarios",         label: "Usuários",          icon: UserCog,         perm: "admin.usuarios" },
+  { to: "/admin/diagnosticos",     label: "Diagnósticos",      icon: Stethoscope,     perm: "admin.diagnosticos" },
 ];
 
 const CLIENTE_NAV: NavItem[] = [
-  { to: "/cliente/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "cliente.dashboard" },
+  { to: "/cliente/dashboard",  label: "Dashboard",   icon: LayoutDashboard, perm: "cliente.dashboard" },
+  { to: "/cliente/leads",      label: "Leads",       icon: Users,           perm: "cliente.leads" },
+  { to: "/cliente/clientes",   label: "Clientes",    icon: UserCheck,       perm: "cliente.clientes" },
+  { to: "/cliente/roi",        label: "ROI",         icon: TrendingUp,      perm: "cliente.roi" },
+  { to: "/cliente/conteudo",   label: "Conteúdo",    icon: FileText,        perm: "cliente.conteudo" },
+  { to: "/cliente/diagnostico",label: "Diagnóstico", icon: Stethoscope,     perm: "cliente.diagnostico" },
+  { to: "/cliente/conexoes",   label: "Conexões",    icon: Link2,           perm: "cliente.conexoes" },
+  { to: "/cliente/calendario", label: "Calendário",  icon: Calendar,        perm: "cliente.calendario" },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -47,7 +71,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             return (
               <Link
                 key={it.to}
-                to={it.to}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                to={it.to as any}
                 className={cn(
                   "mx-2 mb-0.5 flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
                   active

@@ -9,9 +9,13 @@ const schema = z.object({
   permissoes: z.array(z.string()),
 });
 
-export const createUserWithRole = createServerFn()
-  .validator((data: unknown) => schema.parse(data))
-  .handler(async ({ data }) => {
+type Input = z.infer<typeof schema>;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const createUserWithRole = (createServerFn() as any)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  .handler(async (ctx: any) => {
+    const data = schema.parse(ctx.data);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -37,4 +41,4 @@ export const createUserWithRole = createServerFn()
       .eq("id", userId);
 
     return { user_id: userId };
-  });
+  }) as (input: { data: Input }) => Promise<{ user_id: string }>;

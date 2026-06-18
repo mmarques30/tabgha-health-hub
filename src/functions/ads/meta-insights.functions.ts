@@ -70,9 +70,13 @@ async function loadCreds(
   return creds;
 }
 
-export const getMetaInsights = createServerFn({ method: "POST" })
-  .validator((data: unknown) => metaInsightsInput.parse(data))
-  .handler(async ({ data }): Promise<any> => {
+type MetaInput = z.infer<typeof metaInsightsInput>;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const getMetaInsights = ((createServerFn({ method: "POST" }) as any)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  .handler(async (ctx: any): Promise<any> => {
+    const data = metaInsightsInput.parse(ctx.data);
     const auth = await requireAuth();
     assertClienteAccess(auth, data.cliente_id);
 
@@ -196,4 +200,4 @@ export const getMetaInsights = createServerFn({ method: "POST" })
     });
 
     return result;
-  });
+  })) as (input: { data: MetaInput }) => Promise<any>;

@@ -13,9 +13,14 @@ const schema = z.object({
   cliente_id: z.string().uuid().optional(),
 });
 
-export const chatWithAI = createServerFn()
-  .validator((data: unknown) => schema.parse(data))
-  .handler(async ({ data }) => {
+type Input = z.infer<typeof schema>;
+type Output = { content: string; usage: { input_tokens: number; output_tokens: number } };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const chatWithAI = (createServerFn() as any)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  .handler(async (ctx: any) => {
+    const data = schema.parse(ctx.data);
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY não configurada.");
 
@@ -60,4 +65,4 @@ export const chatWithAI = createServerFn()
 
     const text = result.content.find((b) => b.type === "text")?.text ?? "";
     return { content: text, usage: result.usage };
-  });
+  }) as (input: { data: Input }) => Promise<Output>;

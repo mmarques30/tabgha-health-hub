@@ -23,8 +23,12 @@ import { Route as AuthenticatedClienteClientesRouteImport } from './routes/_auth
 import { Route as AuthenticatedClienteCalendarioRouteImport } from './routes/_authenticated/cliente/calendario'
 import { Route as AuthenticatedClienteAtendimentoRouteImport } from './routes/_authenticated/cliente/atendimento'
 import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin/usuarios'
+import { Route as AuthenticatedAdminRoiRouteImport } from './routes/_authenticated/admin/roi'
 import { Route as AuthenticatedAdminMetaAdsRouteImport } from './routes/_authenticated/admin/meta-ads'
+import { Route as AuthenticatedAdminEstrategiaRouteImport } from './routes/_authenticated/admin/estrategia'
+import { Route as AuthenticatedAdminDiagnosticosRouteImport } from './routes/_authenticated/admin/diagnosticos'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin/dashboard'
+import { Route as AuthenticatedAdminCalendarioRouteImport } from './routes/_authenticated/admin/calendario'
 import { Route as AuthenticatedAdminAutomacoesLeadsRouteImport } from './routes/_authenticated/admin/automacoes-leads'
 import { Route as AuthenticatedAdminAtendimentoRouteImport } from './routes/_authenticated/admin/atendimento'
 import { Route as AuthenticatedAdminClientesIndexRouteImport } from './routes/_authenticated/admin/clientes/index'
@@ -109,6 +113,29 @@ const AuthenticatedAdminUsuariosRoute =
     path: '/admin/usuarios',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminRoiRoute = AuthenticatedAdminRoiRouteImport.update({
+  id: '/admin/roi',
+  path: '/admin/roi',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminEstrategiaRoute =
+  AuthenticatedAdminEstrategiaRouteImport.update({
+    id: '/admin/estrategia',
+    path: '/admin/estrategia',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminDiagnosticosRoute =
+  AuthenticatedAdminDiagnosticosRouteImport.update({
+    id: '/admin/diagnosticos',
+    path: '/admin/diagnosticos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminCalendarioRoute =
+  AuthenticatedAdminCalendarioRouteImport.update({
+    id: '/admin/calendario',
+    path: '/admin/calendario',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminMetaAdsRoute =
   AuthenticatedAdminMetaAdsRouteImport.update({
     id: '/admin/meta-ads',
@@ -151,8 +178,12 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/admin/atendimento': typeof AuthenticatedAdminAtendimentoRoute
   '/admin/automacoes-leads': typeof AuthenticatedAdminAutomacoesLeadsRoute
+  '/admin/calendario': typeof AuthenticatedAdminCalendarioRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
+  '/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
+  '/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
   '/admin/meta-ads': typeof AuthenticatedAdminMetaAdsRoute
+  '/admin/roi': typeof AuthenticatedAdminRoiRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/cliente/atendimento': typeof AuthenticatedClienteAtendimentoRoute
   '/cliente/calendario': typeof AuthenticatedClienteCalendarioRoute
@@ -172,8 +203,12 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/admin/atendimento': typeof AuthenticatedAdminAtendimentoRoute
   '/admin/automacoes-leads': typeof AuthenticatedAdminAutomacoesLeadsRoute
+  '/admin/calendario': typeof AuthenticatedAdminCalendarioRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
+  '/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
+  '/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
   '/admin/meta-ads': typeof AuthenticatedAdminMetaAdsRoute
+  '/admin/roi': typeof AuthenticatedAdminRoiRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/cliente/atendimento': typeof AuthenticatedClienteAtendimentoRoute
   '/cliente/calendario': typeof AuthenticatedClienteCalendarioRoute
@@ -196,7 +231,11 @@ export interface FileRoutesById {
   '/_authenticated/admin/atendimento': typeof AuthenticatedAdminAtendimentoRoute
   '/_authenticated/admin/automacoes-leads': typeof AuthenticatedAdminAutomacoesLeadsRoute
   '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
+  '/_authenticated/admin/calendario': typeof AuthenticatedAdminCalendarioRoute
+  '/_authenticated/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
+  '/_authenticated/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
   '/_authenticated/admin/meta-ads': typeof AuthenticatedAdminMetaAdsRoute
+  '/_authenticated/admin/roi': typeof AuthenticatedAdminRoiRoute
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/_authenticated/cliente/atendimento': typeof AuthenticatedClienteAtendimentoRoute
   '/_authenticated/cliente/calendario': typeof AuthenticatedClienteCalendarioRoute
@@ -218,8 +257,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/atendimento'
     | '/admin/automacoes-leads'
+    | '/admin/calendario'
     | '/admin/dashboard'
+    | '/admin/diagnosticos'
+    | '/admin/estrategia'
     | '/admin/meta-ads'
+    | '/admin/roi'
     | '/admin/usuarios'
     | '/cliente/atendimento'
     | '/cliente/calendario'
@@ -239,8 +282,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/atendimento'
     | '/admin/automacoes-leads'
+    | '/admin/calendario'
     | '/admin/dashboard'
+    | '/admin/diagnosticos'
+    | '/admin/estrategia'
     | '/admin/meta-ads'
+    | '/admin/roi'
     | '/admin/usuarios'
     | '/cliente/atendimento'
     | '/cliente/calendario'
@@ -261,8 +308,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/admin/atendimento'
     | '/_authenticated/admin/automacoes-leads'
+    | '/_authenticated/admin/calendario'
     | '/_authenticated/admin/dashboard'
+    | '/_authenticated/admin/diagnosticos'
+    | '/_authenticated/admin/estrategia'
     | '/_authenticated/admin/meta-ads'
+    | '/_authenticated/admin/roi'
     | '/_authenticated/admin/usuarios'
     | '/_authenticated/cliente/atendimento'
     | '/_authenticated/cliente/calendario'
@@ -405,6 +456,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAutomacoesLeadsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/calendario': {
+      id: '/_authenticated/admin/calendario'
+      path: '/admin/calendario'
+      fullPath: '/admin/calendario'
+      preLoaderRoute: typeof AuthenticatedAdminCalendarioRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/diagnosticos': {
+      id: '/_authenticated/admin/diagnosticos'
+      path: '/admin/diagnosticos'
+      fullPath: '/admin/diagnosticos'
+      preLoaderRoute: typeof AuthenticatedAdminDiagnosticosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/estrategia': {
+      id: '/_authenticated/admin/estrategia'
+      path: '/admin/estrategia'
+      fullPath: '/admin/estrategia'
+      preLoaderRoute: typeof AuthenticatedAdminEstrategiaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/roi': {
+      id: '/_authenticated/admin/roi'
+      path: '/admin/roi'
+      fullPath: '/admin/roi'
+      preLoaderRoute: typeof AuthenticatedAdminRoiRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/atendimento': {
       id: '/_authenticated/admin/atendimento'
       path: '/admin/atendimento'
@@ -432,8 +511,12 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminAtendimentoRoute: typeof AuthenticatedAdminAtendimentoRoute
   AuthenticatedAdminAutomacoesLeadsRoute: typeof AuthenticatedAdminAutomacoesLeadsRoute
+  AuthenticatedAdminCalendarioRoute: typeof AuthenticatedAdminCalendarioRoute
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
+  AuthenticatedAdminDiagnosticosRoute: typeof AuthenticatedAdminDiagnosticosRoute
+  AuthenticatedAdminEstrategiaRoute: typeof AuthenticatedAdminEstrategiaRoute
   AuthenticatedAdminMetaAdsRoute: typeof AuthenticatedAdminMetaAdsRoute
+  AuthenticatedAdminRoiRoute: typeof AuthenticatedAdminRoiRoute
   AuthenticatedAdminUsuariosRoute: typeof AuthenticatedAdminUsuariosRoute
   AuthenticatedClienteAtendimentoRoute: typeof AuthenticatedClienteAtendimentoRoute
   AuthenticatedClienteCalendarioRoute: typeof AuthenticatedClienteCalendarioRoute
@@ -453,8 +536,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminAtendimentoRoute: AuthenticatedAdminAtendimentoRoute,
   AuthenticatedAdminAutomacoesLeadsRoute:
     AuthenticatedAdminAutomacoesLeadsRoute,
+  AuthenticatedAdminCalendarioRoute: AuthenticatedAdminCalendarioRoute,
   AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
+  AuthenticatedAdminDiagnosticosRoute: AuthenticatedAdminDiagnosticosRoute,
+  AuthenticatedAdminEstrategiaRoute: AuthenticatedAdminEstrategiaRoute,
   AuthenticatedAdminMetaAdsRoute: AuthenticatedAdminMetaAdsRoute,
+  AuthenticatedAdminRoiRoute: AuthenticatedAdminRoiRoute,
   AuthenticatedAdminUsuariosRoute: AuthenticatedAdminUsuariosRoute,
   AuthenticatedClienteAtendimentoRoute: AuthenticatedClienteAtendimentoRoute,
   AuthenticatedClienteCalendarioRoute: AuthenticatedClienteCalendarioRoute,

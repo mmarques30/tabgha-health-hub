@@ -650,43 +650,6 @@ function Hero() {
                 <ArrowUpRight style={{ width: 16, height: 16 }} />
               </div>
             </a>
-            <a
-              href="#solucao"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                border: "1px solid rgba(255,255,255,0.2)",
-                borderRadius: 8,
-                padding: "14px 24px",
-                color: "rgba(255,255,255,0.8)",
-                fontSize: 15,
-                fontWeight: 500,
-                textDecoration: "none",
-                transition: "all 0.2s",
-              }}
-            >
-              Ver como funciona
-            </a>
-          </div>
-
-          {/* Specialty logo strip */}
-          <div style={{ marginTop: 48, display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {SPECIALTIES.slice(0, 5).map((s) => (
-              <span
-                key={s}
-                style={{
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color: "rgba(255,255,255,0.45)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: 20,
-                  padding: "4px 10px",
-                }}
-              >
-                {s}
-              </span>
-            ))}
           </div>
         </div>
       </div>
@@ -1000,7 +963,6 @@ function ProblemSection() {
               <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "24px 28px", zIndex: 2 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div>
-                    <span style={{ fontSize: 24 }}>{seg.emoji}</span>
                     <div
                       style={{
                         marginTop: 8,
@@ -1161,21 +1123,6 @@ function SolutionSection() {
                   alignItems: "flex-start",
                 }}
               >
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 12,
-                    background: "linear-gradient(135deg, rgba(26,95,173,0.1), rgba(64,173,219,0.1))",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    color: "#1A5FAD",
-                  }}
-                >
-                  <Icon style={{ width: 22, height: 22 }} />
-                </div>
                 <div>
                   <h3 style={{ fontSize: 17, fontWeight: 600, color: "#0D1B3E", margin: 0 }}>{f.label}</h3>
                   <p style={{ fontSize: 14, lineHeight: 1.6, color: "#64748b", marginTop: 6, marginBottom: 0 }}>{f.desc}</p>

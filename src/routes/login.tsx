@@ -49,12 +49,12 @@ function LoginPage() {
   return (
     <div
       className="relative min-h-screen w-full overflow-hidden flex items-center justify-center px-4"
-      style={{ backgroundColor: "#07121E" }}
+      style={{ backgroundColor: "#0B1B3E" }}
     >
       {/* Decorative gradient orbs */}
       <div
         className="pointer-events-none absolute -top-40 -right-40 h-[480px] w-[480px] rounded-full opacity-25 blur-[100px]"
-        style={{ background: "radial-gradient(circle, #1E5CC8 0%, transparent 70%)" }}
+        style={{ background: "radial-gradient(circle, #1A5FAD 0%, transparent 70%)" }}
       />
       <div
         className="pointer-events-none absolute -bottom-40 -left-40 h-[400px] w-[400px] rounded-full opacity-20 blur-[100px]"
@@ -105,7 +105,7 @@ function LoginPage() {
               className="rounded-lg px-3 py-2 text-[12px] font-semibold transition-all duration-200"
               style={
                 access === t
-                  ? { background: "#1E5CC8", color: "#ffffff", boxShadow: "0 2px 8px rgba(30,92,200,0.40)" }
+                  ? { background: "#1A5FAD", color: "#ffffff", boxShadow: "0 2px 8px rgba(30,92,200,0.40)" }
                   : { color: "rgba(255,255,255,0.45)" }
               }
             >
@@ -158,7 +158,7 @@ function LoginPage() {
               type="submit"
               disabled={loading}
               className="w-full rounded-xl py-3 text-sm font-semibold text-white transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
-              style={{ background: "linear-gradient(135deg, #1E5CC8 0%, #1749A0 100%)", boxShadow: "0 4px 14px rgba(30,92,200,0.35)" }}
+              style={{ background: "linear-gradient(135deg, #1A5FAD 0%, #1749A0 100%)", boxShadow: "0 4px 14px rgba(30,92,200,0.35)" }}
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {loading ? "Entrando…" : "Entrar"}

@@ -86,8 +86,8 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.14 0.044 264);
 
-  /* Primary = AZUL #1E5CC8 */
-  --primary: oklch(0.463 0.170 264);
+  /* Primary = AZUL #1A5FAD */
+  --primary: oklch(0.440 0.158 261);
   --primary-foreground: oklch(1 0 0);
 
   /* Secondary = light gray surface */
@@ -98,39 +98,39 @@
   --muted-foreground: oklch(0.50 0.018 264);    /* medium gray */
 
   /* Accent = blue tint for hovers */
-  --accent: oklch(0.463 0.170 264 / 8%);
-  --accent-foreground: oklch(0.463 0.170 264);
+  --accent: oklch(0.440 0.158 261 / 8%);
+  --accent-foreground: oklch(0.440 0.158 261);
 
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.971 0.013 17.38);
 
   --border: oklch(0.14 0.044 264 / 10%);        /* dark/10% hairline */
   --input: oklch(0.14 0.044 264 / 7%);
-  --ring: oklch(0.463 0.170 264);
+  --ring: oklch(0.440 0.158 261);
 
   /* Charts */
-  --chart-1: oklch(0.463 0.170 264);
+  --chart-1: oklch(0.440 0.158 261);
   --chart-2: oklch(0.770 0.160 72);
   --chart-3: oklch(0.765 0.090 220);
   --chart-4: oklch(0.730 0.180 155);
   --chart-5: oklch(0.630 0.220 17);
 
-  /* ── Sidebar mantém dark navy ── */
-  --sidebar: oklch(0.09 0.030 264);             /* #07121E deep navy */
+  /* ── Sidebar · brand navy #0B1B3E ── */
+  --sidebar: oklch(0.165 0.068 264);            /* #0B1B3E brand navy */
   --sidebar-foreground: oklch(0.963 0.005 264);
-  --sidebar-primary: oklch(0.463 0.170 264);
+  --sidebar-primary: oklch(0.440 0.158 261);    /* #1A5FAD brand blue */
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.963 0.005 264 / 8%);
   --sidebar-accent-foreground: oklch(0.963 0.005 264);
   --sidebar-border: oklch(0.963 0.005 264 / 10%);
-  --sidebar-ring: oklch(0.463 0.170 264);
+  --sidebar-ring: oklch(0.440 0.158 261);
 
   /* Marca Tabgha */
-  --brand-navy: oklch(0.14 0.044 264);
-  --brand-blue: oklch(0.463 0.170 264);
-  --brand-sky: oklch(0.765 0.090 220);
+  --brand-navy: oklch(0.165 0.068 264);         /* #0B1B3E */
+  --brand-blue: oklch(0.440 0.158 261);         /* #1A5FAD */
+  --brand-sky: oklch(0.770 0.095 215);          /* #60C3E8 */
   --accent-2: oklch(0.770 0.160 72);
-  --accent-hover: oklch(0.385 0.136 264);
+  --accent-hover: oklch(0.375 0.135 261);
 
   /* Status badges — otimizado para fundo branco (contraste AA ≥4.5:1) */
   --green-100: oklch(0.920 0.065 155);          /* soft green bg */

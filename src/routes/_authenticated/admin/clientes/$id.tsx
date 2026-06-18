@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, ArrowLeft, Sparkles, Save, RefreshCw } from "lucide-react";
+import { Loader2, ArrowLeft, Sparkles, Save, RefreshCw, ChevronDown, Stethoscope } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,6 +50,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // ── Tab: Cadastro ─────────────────────────────────────────────────────────────
 function TabCadastro({ cliente }: { cliente: Cliente }) {
   const qc = useQueryClient();
+  const [diagOpen, setDiagOpen] = useState(false);
+
   const form = useForm({
     defaultValues: {
       nome: cliente.nome,
@@ -96,49 +98,67 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
   const extras = (cliente.dados_extras ?? {}) as Record<string, unknown>;
   const redesData = extras.redes as Record<string, string> | undefined;
   const redesConectadas = redesData ? Object.values(redesData).filter(Boolean).length : 0;
+  const diagPreenchido = !!cliente.diagnostico;
 
   return (
-    <form onSubmit={form.handleSubmit(() => save.mutate())} className="py-5">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_268px]">
-        {/* ── Campos ── */}
-        <div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Nome">
-              <Input {...form.register("nome")} />
-            </Field>
-            <Field label="Email">
-              <Input type="email" {...form.register("email")} />
-            </Field>
-            <Field label="Telefone">
-              <Input {...form.register("telefone")} />
-            </Field>
-            <Field label="Especialidade">
-              <Input {...form.register("especialidade")} />
-            </Field>
-            <Field label="CNPJ">
-              <Input {...form.register("cnpj")} />
-            </Field>
-            <Field label="Razão Social">
-              <Input {...form.register("razao_social")} />
-            </Field>
-            <Field label="Status">
-              <Select value={form.watch("status")} onValueChange={(v) => form.setValue("status", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {["onboarding", "ativo", "pausa", "inativo"].map((s) => (
-                    <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+    <div className="py-5 space-y-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_268px]">
+        {/* ── Campos em card estilizado ── */}
+        <form onSubmit={form.handleSubmit(() => save.mutate())}>
+          <div className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(15,27,53,0.04)] overflow-hidden">
+            {/* Identificação */}
+            <div className="px-5 pt-5 pb-4">
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Identificação</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Nome">
+                  <Input {...form.register("nome")} />
+                </Field>
+                <Field label="Email">
+                  <Input type="email" {...form.register("email")} />
+                </Field>
+                <Field label="Telefone">
+                  <Input {...form.register("telefone")} />
+                </Field>
+                <Field label="Especialidade">
+                  <Input {...form.register("especialidade")} />
+                </Field>
+              </div>
+            </div>
+
+            {/* Dados fiscais */}
+            <div className="border-t border-border px-5 py-4">
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Dados fiscais</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="CNPJ">
+                  <Input {...form.register("cnpj")} />
+                </Field>
+                <Field label="Razão Social">
+                  <Input {...form.register("razao_social")} />
+                </Field>
+              </div>
+            </div>
+
+            {/* Status + ação */}
+            <div className="border-t border-border px-5 py-4 flex items-end gap-4">
+              <div className="w-48">
+                <Field label="Status">
+                  <Select value={form.watch("status")} onValueChange={(v) => form.setValue("status", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["onboarding", "ativo", "pausa", "inativo"].map((s) => (
+                        <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <Button type="submit" disabled={save.isPending} className="mb-0.5">
+                {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Salvar
+              </Button>
+            </div>
           </div>
-          <div className="mt-6">
-            <Button type="submit" disabled={save.isPending}>
-              {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Salvar
-            </Button>
-          </div>
-        </div>
+        </form>
 
         {/* ── Sidebar de resumo ── */}
         <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
@@ -194,7 +214,36 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
           </div>
         </div>
       </div>
-    </form>
+
+      {/* ── Diagnóstico colapsável ── */}
+      <div className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(15,27,53,0.04)] overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setDiagOpen((v) => !v)}
+          className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-secondary/30 transition-colors"
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <Stethoscope className="h-4 w-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">Diagnóstico estratégico</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {diagPreenchido ? "Preenchido — clique para editar ou regenerar" : "Não preenchido — gere com IA em segundos"}
+            </p>
+          </div>
+          <span className={cn(
+            "shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+            diagPreenchido ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+          )}>
+            {diagPreenchido ? "Preenchido" : "Pendente"}
+          </span>
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200", diagOpen && "rotate-180")} />
+        </button>
+        <div className={cn("border-t border-border px-5", diagOpen ? "block" : "hidden")}>
+          <TabDiagnostico cliente={cliente} />
+        </div>
+      </div>
+    </div>
   );
 }
 

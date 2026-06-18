@@ -26,7 +26,7 @@ function KpiCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border bg-card p-5">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
+      <div className="mt-2 text-xl font-bold tracking-tight">{value}</div>
     </div>
   );
 }
@@ -84,19 +84,20 @@ function RoiPage() {
   }, {});
 
   return (
-    <div className="px-8 py-8">
-      <header className="mb-6">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Performance</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">ROI de Campanhas</h1>
-      </header>
-
-      <div className="mb-6 flex gap-2">
-        {PERIODOS.map((p) => (
-          <button key={p.days} onClick={() => setPeriodo(p.days)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${periodo === p.days ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
-            {p.label}
-          </button>
-        ))}
+    <div className="px-6 py-6 space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <span className="eyebrow-pill">Performance</span>
+          <h1 className="mt-2 text-xl font-bold tracking-tight">ROI de Campanhas</h1>
+        </div>
+        <div className="flex gap-1">
+          {PERIODOS.map((p) => (
+            <button key={p.days} onClick={() => setPeriodo(p.days)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${periodo === p.days ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {isLoading ? (
@@ -117,11 +118,11 @@ function RoiPage() {
             <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Investimento × Leads</p>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={Object.values(chartData)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis dataKey="data" tick={{ fontSize: 11 }} />
                 <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-                <Tooltip />
+                <Tooltip contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", color: "var(--color-foreground)" }} />
                 <Line yAxisId="left" type="monotone" dataKey="investimento" name="Investimento (R$)" stroke="hsl(var(--primary))" dot={false} strokeWidth={2} />
                 <Line yAxisId="right" type="monotone" dataKey="leads" name="Leads" stroke="hsl(var(--muted-foreground))" dot={false} strokeWidth={2} />
               </LineChart>

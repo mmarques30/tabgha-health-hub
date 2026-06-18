@@ -26,8 +26,8 @@ const STATUS_LABELS: Record<string, string> = {
   agendado: "Agendado", convertido: "Convertido", perdido: "Perdido",
 };
 const STATUS_COLORS: Record<string, string> = {
-  novo: "bg-blue-100 text-blue-700", qualificado: "bg-purple-100 text-purple-700",
-  em_atendimento: "bg-yellow-100 text-yellow-700", agendado: "bg-orange-100 text-orange-700",
+  novo: "bg-blue-100 text-blue-700", qualificado: "bg-blue-100 text-blue-700",
+  em_atendimento: "bg-yellow-100 text-yellow-700", agendado: "bg-yellow-100 text-yellow-700",
   convertido: "bg-green-100 text-green-700", perdido: "bg-red-100 text-red-700",
 };
 
@@ -94,12 +94,12 @@ function LeadsPage() {
   });
 
   return (
-    <div className="px-8 py-8">
-      <header className="mb-8">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Captação</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Leads</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{leads.length} lead{leads.length !== 1 ? "s" : ""} no total</p>
-      </header>
+    <div className="px-6 py-6 space-y-6">
+      <div>
+        <span className="eyebrow-pill">Captação</span>
+        <h1 className="mt-2 text-xl font-bold tracking-tight">Leads</h1>
+        <p className="mt-0.5 text-xs text-muted-foreground">{leads.length} lead{leads.length !== 1 ? "s" : ""} no total</p>
+      </div>
 
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>

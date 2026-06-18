@@ -11,7 +11,11 @@ function ClienteMetaAds() {
   const { profile } = useAuth();
 
   return (
-    <div className="px-8 py-8">
+    <div className="px-6 py-6 space-y-6">
+      <div>
+        <span className="eyebrow-pill">Aquisição</span>
+        <h1 className="mt-2 text-xl font-bold tracking-tight">Meta Ads</h1>
+      </div>
       <MetaAdsPage fixedClienteId={profile?.cliente_id ?? null} />
     </div>
   );

@@ -209,7 +209,9 @@ function TabLeads({ clienteId }: { clienteId: string }) {
             <p className="font-medium truncate">{l.nome ?? "Sem nome"}</p>
             <p className="text-xs text-muted-foreground">{l.telefone ?? l.email ?? "—"} · {l.canal ?? "—"}</p>
           </div>
-          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+            { novo: "bg-blue-100 text-blue-700", qualificado: "bg-blue-100 text-blue-700", em_atendimento: "bg-yellow-100 text-yellow-700", agendado: "bg-yellow-100 text-yellow-700", convertido: "bg-green-100 text-green-700", perdido: "bg-red-100 text-red-700" }[l.status] ?? "bg-slate-100 text-slate-600"
+          }`}>
             {STATUS_LABELS[l.status] ?? l.status}
           </span>
           <span className="shrink-0 text-xs text-muted-foreground">
@@ -246,7 +248,9 @@ function TabConteudo({ clienteId }: { clienteId: string }) {
             <p className="font-medium truncate">{c.titulo ?? "Sem título"}</p>
             <p className="text-xs text-muted-foreground">{c.rede ?? "—"} · {c.tipo ?? "—"}</p>
           </div>
-          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">{c.status}</span>
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+            { briefing: "bg-slate-100 text-slate-600", roteiro: "bg-blue-100 text-blue-700", producao: "bg-yellow-100 text-yellow-700", aprovacao: "bg-yellow-100 text-yellow-700", agendado: "bg-blue-100 text-blue-700", postado: "bg-green-100 text-green-700" }[c.status] ?? "bg-slate-100 text-slate-600"
+          }`}>{c.status}</span>
         </div>
       ))}
     </div>
@@ -307,16 +311,16 @@ function ClienteFichaPage() {
   if (!cliente) return <EmptyState title="Cliente não encontrado" />;
 
   return (
-    <div className="px-8 py-8">
-      <div className="mb-6 flex items-center gap-3">
+    <div className="px-6 py-6 space-y-6">
+      <div className="flex items-center gap-3">
         <Link to="/admin/clientes" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{cliente.nome}</h1>
-          <p className="text-sm text-muted-foreground">{cliente.especialidade ?? "—"}</p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-bold tracking-tight truncate">{cliente.nome}</h1>
+          <p className="text-xs text-muted-foreground">{cliente.especialidade ?? "—"}</p>
         </div>
-        <Badge variant="outline" className="capitalize">{cliente.status}</Badge>
+        <Badge variant="outline" className="capitalize shrink-0">{cliente.status}</Badge>
       </div>
 
       <Tabs defaultValue="cadastro">

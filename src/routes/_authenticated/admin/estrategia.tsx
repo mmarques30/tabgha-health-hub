@@ -145,7 +145,7 @@ function ConteudoCard({ item, onMove }: { item: Conteudo; onMove: (id: string, s
     : null;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3 shadow-sm space-y-2">
+    <div className="rounded-lg border border-border bg-card p-3 space-y-2">
       <p className="text-[12.5px] font-semibold leading-snug">{item.titulo ?? "(sem título)"}</p>
       <p className="text-[11px] text-muted-foreground">{item.clientes?.nome ?? "—"}</p>
       <div className="flex flex-wrap gap-1">

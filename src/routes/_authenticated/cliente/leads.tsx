@@ -139,7 +139,7 @@ function KanbanCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
     <button
       onClick={onClick}
       className={cn(
-        "w-full rounded-xl border border-border bg-card p-3 text-left",
+        "card-lift w-full rounded-xl border border-border bg-card p-3 text-left",
         "shadow-[0_1px_0_rgba(15,27,53,0.02),0_1px_3px_rgba(15,27,53,0.04)]",
         "transition-all duration-150",
         "hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-6px_rgba(15,27,53,0.12)] hover:border-primary/20",
@@ -193,6 +193,99 @@ function KanbanColumn({ status, leads, onCardClick }: { status: PipelineStatus; 
   );
 }
 
+// ── KPI Cards ─────────────────────────────────────────────────────────────────
+
+interface KpiCardsProps {
+  leads: Lead[];
+}
+
+function KpiCards({ leads }: KpiCardsProps) {
+  const total       = leads.length;
+  const convertidos = leads.filter((l) => l.status === "convertido").length;
+  const agendados   = leads.filter((l) => l.status === "agendado").length;
+  const perdidos    = leads.filter((l) => l.status === "perdido").length;
+  const taxaConv    = total > 0 ? Math.round((convertidos / total) * 100) : 0;
+
+  const kpis = [
+    { rank: "01", label: "Total de Leads",  value: total,       color: "bg-primary" },
+    { rank: "02", label: "Convertidos",     value: convertidos, color: "bg-emerald-500" },
+    { rank: "03", label: "Agendados",       value: agendados,   color: "bg-cyan-500" },
+    { rank: "04", label: "Taxa de Conversão", value: `${taxaConv}%`, color: "bg-primary" },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 px-6 pt-5">
+      {kpis.map((kpi, i) => (
+        <div
+          key={kpi.rank}
+          className="card-lift animate-fade-up rounded-2xl border border-border bg-card px-5 pt-5 pb-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)] flex flex-col"
+          style={{ animationDelay: i * 75 + "ms" }}
+        >
+          <span className="text-[9px] font-black tracking-[0.16em] text-muted-foreground/40 mb-4">{kpi.rank}</span>
+          <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{kpi.label}</p>
+          <p className="text-[2.4rem] font-black tracking-tight leading-none animate-numeric-pop mt-auto">{kpi.value}</p>
+          <div className={cn("mt-3 h-0.5 w-full rounded-full", kpi.color)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Pipeline Summary Panel (dark) ─────────────────────────────────────────────
+
+interface PipelineSummaryProps {
+  leads: Lead[];
+}
+
+function PipelineSummary({ leads }: PipelineSummaryProps) {
+  const total = leads.length || 1;
+
+  const stages: { status: PipelineStatus; color: string }[] = [
+    { status: "novo",        color: "bg-blue-400" },
+    { status: "em_conversa", color: "bg-amber-400" },
+    { status: "interessado", color: "bg-violet-400" },
+    { status: "agendado",    color: "bg-cyan-400" },
+    { status: "atendido",    color: "bg-teal-400" },
+    { status: "convertido",  color: "bg-emerald-400" },
+    { status: "perdido",     color: "bg-slate-500" },
+  ];
+
+  return (
+    <div
+      className="animate-fade-up mx-6 mt-3 rounded-2xl overflow-hidden shadow-[0_4px_24px_rgba(11,27,62,0.18)] p-5"
+      style={{ background: "linear-gradient(135deg, #0B1B3E 0%, #0F2550 100%)", animationDelay: "300ms" }}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-4">Distribuição do pipeline</p>
+      {/* Progress bar */}
+      <div className="flex h-2 w-full overflow-hidden rounded-full gap-0.5 mb-5">
+        {stages.map(({ status, color }) => {
+          const count = leads.filter((l) => l.status === status).length;
+          const pct   = (count / total) * 100;
+          if (pct === 0) return null;
+          return (
+            <div key={status} className={cn("rounded-full transition-all", color)} style={{ width: `${pct}%` }} />
+          );
+        })}
+      </div>
+      {/* Legend */}
+      <div className="grid grid-cols-3 gap-x-6 gap-y-2.5 sm:grid-cols-7">
+        {stages.map(({ status, color }) => {
+          const count = leads.filter((l) => l.status === status).length;
+          return (
+            <div key={status} className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", color)} />
+                <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wide truncate">{STATUS_LABELS[status]}</span>
+              </div>
+              <span className="text-[1.1rem] font-black text-white leading-none tabular-nums">{count}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Leads Page ────────────────────────────────────────────────────────────────
 
 function LeadsPage() {
@@ -239,20 +332,33 @@ function LeadsPage() {
           <EmptyState icon={<Users className="h-6 w-6" />} title="Nenhum lead ainda" description="Os leads chegam automaticamente via anúncios e WhatsApp." />
         </div>
       ) : (
-        /* Kanban board — horizontal scroll */
-        <div
-          className="flex-1 overflow-x-auto px-6 py-5"
-          style={{ scrollbarWidth: "thin", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
-        >
-          <div className="flex gap-3.5" style={{ minWidth: "max-content" }}>
-            {PIPELINE.map((status) => (
-              <KanbanColumn
-                key={status}
-                status={status}
-                leads={grouped[status]}
-                onCardClick={setSelected}
-              />
-            ))}
+        <div className="flex flex-col pb-6">
+          {/* KPI Cards */}
+          <KpiCards leads={leads} />
+
+          {/* Pipeline summary dark panel */}
+          <PipelineSummary leads={leads} />
+
+          {/* Kanban section title */}
+          <div className="px-6 mt-6 mb-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pipeline de leads</p>
+          </div>
+
+          {/* Kanban board — horizontal scroll */}
+          <div
+            className="overflow-x-auto px-6 animate-fade-up"
+            style={{ scrollbarWidth: "thin", WebkitOverflowScrolling: "touch", animationDelay: "375ms" } as React.CSSProperties}
+          >
+            <div className="flex gap-3.5" style={{ minWidth: "max-content" }}>
+              {PIPELINE.map((status) => (
+                <KanbanColumn
+                  key={status}
+                  status={status}
+                  leads={grouped[status]}
+                  onCardClick={setSelected}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}

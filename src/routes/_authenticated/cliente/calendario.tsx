@@ -71,19 +71,34 @@ function CalendarioPage() {
   });
 
   return (
-    <div className="px-6 py-6">
-      <header className="mb-6">
+    <div className="px-6 py-6 space-y-6">
+      {/* Page header */}
+      <header className="animate-fade-up">
+        <span className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-widest text-sky-700 mb-3">
+          Agenda
+        </span>
         <h1 className="text-xl font-bold tracking-tight">Calendário</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Gravações, reuniões e conteúdos agendados</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Gravações, reuniões e conteúdos agendados
+        </p>
       </header>
 
-      {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        <CalendarGrid events={events} onMonthChange={setRefMonth} />
-      )}
+      {/* Calendar panel */}
+      <div
+        className="animate-fade-up rounded-2xl overflow-hidden shadow-[0_4px_24px_rgba(11,27,62,0.18)]"
+        style={{
+          background: "linear-gradient(135deg, #0B1B3E 0%, #0F2550 100%)",
+          animationDelay: "75ms",
+        }}
+      >
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+          </div>
+        ) : (
+          <CalendarGrid events={events} onMonthChange={setRefMonth} />
+        )}
+      </div>
     </div>
   );
 }

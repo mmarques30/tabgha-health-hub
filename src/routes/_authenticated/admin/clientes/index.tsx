@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, Plus, Loader2, Search } from "lucide-react";
+import { Plus, Loader2, Search } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,7 +12,6 @@ import { createClientWithAccess } from "@/functions/clientes/createClientWithAcc
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -27,8 +26,16 @@ const STATUS_LABELS: Record<string, string> = {
   onboarding: "Onboarding", ativo: "Ativo", pausa: "Pausa", inativo: "Inativo",
 };
 const STATUS_COLORS: Record<string, string> = {
-  onboarding: "bg-blue-100 text-blue-700", ativo: "bg-green-100 text-green-700",
-  pausa: "bg-yellow-100 text-yellow-700", inativo: "bg-slate-100 text-slate-600",
+  onboarding: "bg-blue-100 text-blue-700",
+  ativo: "bg-green-100 text-green-700",
+  pausa: "bg-yellow-100 text-yellow-700",
+  inativo: "bg-slate-100 text-slate-600",
+};
+const STATUS_DOT: Record<string, string> = {
+  onboarding: "bg-blue-500",
+  ativo: "bg-emerald-500",
+  pausa: "bg-yellow-500",
+  inativo: "bg-slate-400",
 };
 
 const newClientSchema = z.object({
@@ -116,55 +123,122 @@ function ClientesAdminPage() {
     return matchStatus && matchSearch;
   });
 
+  // KPI counts
+  const totalAtivos = clientes.filter((c) => c.status === "ativo").length;
+  const totalOnboarding = clientes.filter((c) => c.status === "onboarding").length;
+  const totalLeads = clientes.reduce((acc, c) => acc + c.leads_count, 0);
+
+  const kpiCards = [
+    { rank: "01", label: "Total de Clientes", value: clientes.length, color: "bg-primary" },
+    { rank: "02", label: "Clientes Ativos", value: totalAtivos, color: "bg-emerald-500" },
+    { rank: "03", label: "Em Onboarding", value: totalOnboarding, color: "bg-blue-500" },
+    { rank: "04", label: "Total de Leads", value: totalLeads, color: "bg-primary" },
+  ];
+
   return (
     <div className="px-6 py-6 space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 animate-fade-up">
         <div>
           <span className="eyebrow-pill">CRM</span>
           <h1 className="mt-2 text-xl font-bold tracking-tight">Clientes</h1>
         </div>
-        <Button onClick={() => setShowNew(true)}><Plus className="mr-2 h-4 w-4" />Novo cliente</Button>
+        <Button onClick={() => setShowNew(true)}>
+          <Plus className="mr-2 h-4 w-4" />Novo cliente
+        </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative max-w-xs flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {["todos", "onboarding", "ativo", "pausa", "inativo"].map((s) => (
-            <button key={s} onClick={() => setFiltroStatus(s)}
-              className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${filtroStatus === s ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
-              {s === "todos" ? "Todos" : STATUS_LABELS[s]}
-            </button>
-          ))}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {kpiCards.map((kpi, i) => (
+          <div
+            key={kpi.rank}
+            className="card-lift animate-fade-up rounded-2xl border border-border bg-card px-5 pt-5 pb-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)] flex flex-col"
+            style={{ animationDelay: i * 75 + "ms" }}
+          >
+            <span className="text-[9px] font-black tracking-[0.16em] text-muted-foreground/40 mb-4">{kpi.rank}</span>
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{kpi.label}</p>
+            <p className="text-[2.4rem] font-black tracking-tight leading-none animate-numeric-pop mt-auto">{kpi.value}</p>
+            <div className={`mt-3 h-0.5 w-full rounded-full ${kpi.color}`} />
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div
+        className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)] animate-fade-up"
+        style={{ animationDelay: "300ms" }}
+      >
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Filtros</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative max-w-xs flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Buscar…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {["todos", "onboarding", "ativo", "pausa", "inativo"].map((s) => (
+              <button
+                key={s}
+                onClick={() => setFiltroStatus(s)}
+                className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                  filtroStatus === s
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {s === "todos" ? "Todos" : STATUS_LABELS[s]}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-      ) : filtered.length === 0 ? (
-        <EmptyState icon={<Users className="h-6 w-6" />} title="Nenhum cliente encontrado"
-          action={clientes.length === 0 ? { label: "Criar primeiro cliente", onClick: () => setShowNew(true) } : undefined} />
-      ) : (
-        <div className="divide-y divide-border rounded-xl border border-border">
-          {filtered.map((c) => (
-            <Link key={c.id} to={`/admin/clientes/${c.id}` as any}
-              className="flex items-center gap-4 px-5 py-4 hover:bg-muted/40 transition-colors">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{c.nome}</p>
-                <p className="text-xs text-muted-foreground">{c.especialidade ?? "—"} · {c.email ?? "—"}</p>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="text-xs text-muted-foreground">{c.leads_count} leads</span>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[c.status] ?? "bg-muted"}`}>
-                  {STATUS_LABELS[c.status] ?? c.status}
+      {/* Client List */}
+      <div
+        className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)] animate-fade-up"
+        style={{ animationDelay: "375ms" }}
+      >
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          Lista de clientes {filtered.length !== clientes.length && `· ${filtered.length} resultado${filtered.length !== 1 ? "s" : ""}`}
+        </p>
+
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={<Plus className="h-6 w-6" />}
+            title="Nenhum cliente encontrado"
+            action={clientes.length === 0 ? { label: "Criar primeiro cliente", onClick: () => setShowNew(true) } : undefined}
+          />
+        ) : (
+          <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+            {filtered.map((c, i) => (
+              <Link
+                key={c.id}
+                to={`/admin/clientes/${c.id}` as any}
+                className="flex items-center gap-4 px-5 py-4 hover:bg-secondary/30 transition-colors"
+              >
+                <span className="text-[10px] font-black text-muted-foreground/30 tabular-nums w-5 shrink-0">
+                  {String(i + 1).padStart(2, "0")}
                 </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{c.nome}</p>
+                  <p className="text-xs text-muted-foreground">{c.especialidade ?? "—"} · {c.email ?? "—"}</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs text-muted-foreground tabular-nums">{c.leads_count} leads</span>
+                  <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[c.status] ?? "bg-muted text-muted-foreground"}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[c.status] ?? "bg-slate-400"}`} />
+                    {STATUS_LABELS[c.status] ?? c.status}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
 
       <NovoClienteDialog open={showNew} onClose={() => setShowNew(false)} />
     </div>

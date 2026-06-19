@@ -177,13 +177,19 @@ function UsuariosPage() {
     staleTime: 60_000,
   });
 
+  const admins = team.filter((m) => m.role === "admin");
+  const clientes = team.filter((m) => m.role === "cliente");
+
   return (
     <div className="px-6 py-6 space-y-6">
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <span className="eyebrow-pill">Configurações</span>
           <h1 className="mt-2 text-xl font-bold tracking-tight">Equipe</h1>
-          <p className="mt-0.5 text-xs text-muted-foreground">Gerencie os membros e suas permissões de acesso.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Gerencie os membros e suas permissões de acesso.
+          </p>
         </div>
         <Button onClick={() => setShowAdd(true)}>
           <UserPlus className="mr-2 h-4 w-4" />
@@ -191,6 +197,31 @@ function UsuariosPage() {
         </Button>
       </div>
 
+      {/* KPI Cards */}
+      {!isLoading && team.length > 0 && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {[
+            { label: "Total de membros", value: team.length, color: "text-slate-700" },
+            { label: "Admins", value: admins.length, color: "text-primary" },
+            { label: "Clientes", value: clientes.length, color: "text-sky-700" },
+          ].map((kpi, i) => (
+            <div
+              key={kpi.label}
+              className="card-lift animate-fade-up rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]"
+              style={{ animationDelay: i * 75 + "ms" }}
+            >
+              <p className="text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {kpi.label}
+              </p>
+              <p className={`text-3xl font-extrabold tracking-tight animate-numeric-pop mt-1 ${kpi.color}`}>
+                {kpi.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Members List */}
       {isLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -203,28 +234,48 @@ function UsuariosPage() {
           action={{ label: "Adicionar membro", onClick: () => setShowAdd(true) }}
         />
       ) : (
-        <div className="divide-y divide-border rounded-xl border border-border">
-          {team.map((member) => (
-            <div key={member.id} className="flex items-center gap-4 px-5 py-4">
-              <Avatar>
-                <AvatarFallback className="text-xs">{initials(member.nome)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{member.nome ?? "—"}</p>
-                <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+            Membros
+          </p>
+          <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+            {team.map((member, i) => (
+              <div
+                key={member.id}
+                className="flex items-center gap-4 px-5 py-4 hover:bg-secondary/30 transition-colors animate-fade-up"
+                style={{ animationDelay: i * 50 + "ms" }}
+              >
+                <span className="text-[10px] font-black text-muted-foreground/30 tabular-nums w-5 shrink-0">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <Avatar>
+                  <AvatarFallback className="text-xs bg-slate-100 text-slate-700">
+                    {initials(member.nome)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{member.nome ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {member.role === "admin" ? (
+                    <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-700">
+                      Admin
+                    </span>
+                  ) : (
+                    <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-sky-50 text-sky-700">
+                      Cliente
+                    </span>
+                  )}
+                  {member.permissoes.includes("*") && (
+                    <Badge variant="outline" className="text-[11px]">
+                      Acesso total
+                    </Badge>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={member.role === "admin" ? "default" : "secondary"}>
-                  {member.role === "admin" ? "Admin" : "Cliente"}
-                </Badge>
-                {member.permissoes.includes("*") && (
-                  <Badge variant="outline" className="text-xs">
-                    Acesso total
-                  </Badge>
-                )}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 

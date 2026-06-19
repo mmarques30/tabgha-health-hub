@@ -42,38 +42,90 @@ function ClientesPage() {
 
   return (
     <div className="px-6 py-6 space-y-6">
-      <div>
+      {/* Header */}
+      <div className="animate-fade-up">
         <span className="eyebrow-pill">Carteira</span>
         <h1 className="mt-2 text-xl font-bold tracking-tight">Pacientes</h1>
         <p className="mt-0.5 text-xs text-muted-foreground">Leads convertidos em pacientes do consultório.</p>
       </div>
 
-      <div className="relative max-w-sm">
+      {/* KPI Card */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div
+          className="card-lift animate-fade-up rounded-2xl border border-border bg-card px-5 pt-5 pb-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)] flex flex-col"
+          style={{ animationDelay: "75ms" }}
+        >
+          <span className="text-[9px] font-black tracking-[0.16em] text-muted-foreground/40 mb-4">01</span>
+          <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Total de Pacientes</p>
+          <p className="text-[2.4rem] font-black tracking-tight leading-none animate-numeric-pop mt-auto text-primary">
+            {isLoading ? "—" : pacientes.length}
+          </p>
+          <div className="mt-3 h-0.5 w-full rounded-full bg-primary" />
+        </div>
+
+        <div
+          className="card-lift animate-fade-up rounded-2xl border border-border bg-card px-5 pt-5 pb-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)] flex flex-col"
+          style={{ animationDelay: "150ms" }}
+        >
+          <span className="text-[9px] font-black tracking-[0.16em] text-muted-foreground/40 mb-4">02</span>
+          <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Resultado da Busca</p>
+          <p className="text-[2.4rem] font-black tracking-tight leading-none animate-numeric-pop mt-auto text-primary">
+            {isLoading ? "—" : filtered.length}
+          </p>
+          <div className="mt-3 h-0.5 w-full rounded-full bg-primary/40" />
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm animate-fade-up" style={{ animationDelay: "225ms" }}>
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input className="pl-9" placeholder="Buscar por nome, telefone…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
+      {/* List */}
       {isLoading ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
       ) : filtered.length === 0 ? (
-        <EmptyState icon={<UserCheck className="h-6 w-6" />} title={search ? "Nenhum resultado" : "Nenhum paciente ainda"}
-          description={search ? "Tente outro termo." : "Pacientes aparecem quando um lead é convertido."} />
+        <EmptyState
+          icon={<UserCheck className="h-6 w-6" />}
+          title={search ? "Nenhum resultado" : "Nenhum paciente ainda"}
+          description={search ? "Tente outro termo." : "Pacientes aparecem quando um lead é convertido."}
+        />
       ) : (
-        <div className="divide-y divide-border rounded-xl border border-border">
-          {filtered.map((p) => (
-            <div key={p.id} className="flex items-center gap-4 px-5 py-4">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-                {(p.nome ?? "?")[0].toUpperCase()}
+        <div
+          className="animate-fade-up rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(15,27,53,0.04)] overflow-hidden"
+          style={{ animationDelay: "300ms" }}
+        >
+          <div className="px-5 pt-4 pb-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Lista de Pacientes</p>
+          </div>
+          <div className="divide-y divide-border">
+            {filtered.map((p, i) => (
+              <div
+                key={p.id}
+                className="flex items-center gap-4 px-5 py-4 hover:bg-secondary/30 transition-colors"
+              >
+                <span className="text-[10px] font-black text-muted-foreground/30 tabular-nums w-5 shrink-0">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                  {(p.nome ?? "?")[0].toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{p.nome ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground">{p.telefone ?? p.email ?? "—"}</p>
+                </div>
+                <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-green-100 text-green-700 shrink-0">
+                  Paciente
+                </span>
+                <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
+                  {format(new Date(p.criado_em), "dd MMM yyyy", { locale: ptBR })}
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{p.nome ?? "—"}</p>
-                <p className="text-xs text-muted-foreground">{p.telefone ?? p.email ?? "—"}</p>
-              </div>
-              <span className="text-xs text-muted-foreground shrink-0">
-                {format(new Date(p.criado_em), "dd MMM yyyy", { locale: ptBR })}
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -12,7 +12,6 @@ import {
 } from "recharts";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMetaInsights } from "@/hooks/useMetaInsights";
@@ -33,6 +32,13 @@ type InsightRow = {
   date_start?: string;
   campaign_name?: string;
 };
+
+const KPI_CARDS = [
+  { rank: "01", label: "Investimento", key: "spend" as const, format: (v: number) => formatCurrency(v), accent: "bg-amber-500" },
+  { rank: "02", label: "Leads", key: "leads" as const, format: (v: number) => String(v), accent: "bg-amber-500" },
+  { rank: "03", label: "CTR", key: "ctr" as const, format: (v: number) => `${v.toFixed(2)}%`, accent: "bg-amber-500" },
+  { rank: "04", label: "CPM", key: "cpm" as const, format: (v: number) => formatCurrency(v), accent: "bg-amber-500" },
+];
 
 export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsPageProps) {
   const { profile } = useAuth();
@@ -80,25 +86,20 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
 
   if (!activeClienteId && !isAdmin) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Conecte o Meta Ads</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Configuração</p>
+        <p className="text-sm text-muted-foreground">
           Este cliente ainda não possui credenciais Meta em automacoes.meta. Fale com a Tabgha para
           configurar.
-        </CardContent>
-      </Card>
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Meta Ads</h2>
-          <p className="text-sm text-muted-foreground">Performance em tempo real via Graph API</p>
-        </div>
         <div className="flex flex-wrap items-center gap-2">
           {isAdmin && !fixedClienteId && (
             <select
@@ -112,60 +113,57 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
               ))}
             </select>
           )}
-          {[7, 14, 30].map((days) => (
-            <Button
-              key={days}
-              size="sm"
-              variant="outline"
-              onClick={() => setRange(defaultRange(days))}
-            >
-              {days}d
-            </Button>
-          ))}
+          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-secondary/40 p-1">
+            {[7, 14, 30].map((days) => (
+              <Button
+                key={days}
+                size="sm"
+                variant={range.since === defaultRange(days).since ? "default" : "ghost"}
+                className="h-7 px-3 text-xs"
+                onClick={() => setRange(defaultRange(days))}
+              >
+                {days}d
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 
+      {/* KPI Cards */}
       {overview.isLoading ? (
         <div className="grid gap-4 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-24 w-full" />
+            <Skeleton key={index} className="h-36 w-full rounded-2xl" />
           ))}
         </div>
       ) : overview.isError ? (
-        <Card>
-          <CardContent className="py-6 text-sm text-destructive">
-            {(overview.error as Error).message}
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-5">
+          <p className="text-sm text-destructive">{(overview.error as Error).message}</p>
+        </div>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Investimento</CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold">
-                {formatCurrency(totals.spend)}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Leads</CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold">{totals.leads}</CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">CTR</CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold">{totals.ctr.toFixed(2)}%</CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">CPM</CardTitle>
-              </CardHeader>
-              <CardContent className="text-2xl font-semibold">{formatCurrency(totals.cpm)}</CardContent>
-            </Card>
+            {KPI_CARDS.map((card, i) => {
+              const value = totals[card.key];
+              return (
+                <div
+                  key={card.key}
+                  className="card-lift animate-fade-up rounded-2xl border border-border bg-card px-5 pt-5 pb-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)] flex flex-col"
+                  style={{ animationDelay: `${i * 75}ms` }}
+                >
+                  <span className="text-[9px] font-black tracking-[0.16em] text-muted-foreground/40 mb-4">
+                    {card.rank}
+                  </span>
+                  <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                    {card.label}
+                  </p>
+                  <p className="text-[2.4rem] font-black tracking-tight leading-none animate-numeric-pop mt-auto text-amber-700">
+                    {card.format(value)}
+                  </p>
+                  <div className={`mt-3 h-0.5 w-full rounded-full ${card.accent}`} />
+                </div>
+              );
+            })}
           </div>
 
           <Tabs defaultValue="overview">
@@ -173,47 +171,101 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
               <TabsTrigger value="overview">Visão geral</TabsTrigger>
               <TabsTrigger value="daily">Diário</TabsTrigger>
             </TabsList>
-            <TabsContent value="overview" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Top campanhas</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  {campaignInsights.length === 0 ? (
-                    <p className="text-muted-foreground">Nenhuma campanha no período.</p>
-                  ) : (
-                    campaignInsights.map((row, index) => (
-                      <div key={`${row.campaign_name}-${index}`} className="flex justify-between">
-                        <span>{row.campaign_name ?? "Campanha"}</span>
-                        <span>{formatCurrency(Number(row.spend ?? 0))}</span>
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
+
+            {/* Overview tab — Top Campaigns table */}
+            <TabsContent value="overview" className="space-y-4 mt-4">
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)] animate-fade-up" style={{ animationDelay: "150ms" }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                  Top campanhas
+                </p>
+                {campaignInsights.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma campanha no período.</p>
+                ) : (
+                  <div className="rounded-xl border border-border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-secondary/60">
+                          <th className="px-4 py-2.5 text-left text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold w-8">#</th>
+                          <th className="px-4 py-2.5 text-left text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold">Campanha</th>
+                          <th className="px-4 py-2.5 text-right text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold">Investimento</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {campaignInsights.map((row, index) => (
+                          <tr
+                            key={`${row.campaign_name}-${index}`}
+                            className="hover:bg-secondary/30 transition-colors"
+                          >
+                            <td className="px-4 py-3 text-[10px] font-black text-muted-foreground/30 tabular-nums">
+                              {String(index + 1).padStart(2, "0")}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-foreground">
+                              {row.campaign_name ?? "Campanha"}
+                            </td>
+                            <td className="px-4 py-3 text-right font-semibold text-amber-700">
+                              {formatCurrency(Number(row.spend ?? 0))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </TabsContent>
-            <TabsContent value="daily">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Investimento diário</CardTitle>
-                </CardHeader>
-                <CardContent className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={dailyInsights}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date_start" />
-                      <YAxis />
-                      <Tooltip contentStyle={META_TOOLTIP_STYLE} />
-                      <Line type="monotone" dataKey="spend" stroke="#059669" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-              <Card className="mt-4">
-                <CardHeader>
-                  <CardTitle>Leads diários</CardTitle>
-                </CardHeader>
-                <CardContent className="h-72">
+
+            {/* Daily tab — Charts */}
+            <TabsContent value="daily" className="space-y-4 mt-4">
+              {/* Daily spend — dark chart card */}
+              <div
+                className="rounded-2xl overflow-hidden shadow-[0_4px_24px_rgba(11,27,62,0.18)] animate-fade-up"
+                style={{
+                  background: "linear-gradient(135deg, #0B1B3E 0%, #0F2550 100%)",
+                  animationDelay: "75ms",
+                }}
+              >
+                <div className="p-5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">
+                    Investimento diário
+                  </p>
+                  <div className="h-64 mt-3">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={dailyInsights}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                        <XAxis
+                          dataKey="date_start"
+                          tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip contentStyle={META_TOOLTIP_STYLE} />
+                        <Line
+                          type="monotone"
+                          dataKey="spend"
+                          stroke="#60C3E8"
+                          strokeWidth={2}
+                          dot={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Daily leads — section panel */}
+              <div
+                className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)] animate-fade-up"
+                style={{ animationDelay: "150ms" }}
+              >
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                  Leads diários
+                </p>
+                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={dailyInsights.map((row) => ({
@@ -221,20 +273,24 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
                         leads: getLeads(row.actions),
                       }))}
                     >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date_start" />
-                      <YAxis />
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                      <XAxis
+                        dataKey="date_start"
+                        tick={{ fontSize: 10 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={META_TOOLTIP_STYLE} />
-                      <Bar dataKey="leads" fill="#2563eb" />
+                      <Bar dataKey="leads" fill="#D97706" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </>
       )}
-
     </div>
   );
 }

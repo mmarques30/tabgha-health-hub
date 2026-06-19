@@ -47,32 +47,65 @@ function CalendarioAdminPage() {
   });
 
   return (
-    <div className="px-6 py-6">
-      <header className="mb-6">
-        <h1 className="text-xl font-bold tracking-tight">Calendário editorial</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Conteúdos agendados de todos os clientes</p>
+    <div className="px-6 py-6 space-y-6">
+      {/* Page header */}
+      <header className="animate-fade-up" style={{ animationDelay: "0ms" }}>
+        <span className="inline-flex items-center rounded-full bg-violet-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-violet-700 mb-3">
+          Conteúdo
+        </span>
+        <h1 className="text-xl font-black tracking-tight leading-none">Calendário editorial</h1>
+        <p className="text-xs text-muted-foreground mt-1">Conteúdos agendados de todos os clientes</p>
       </header>
 
-      {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        <CalendarGrid
-          events={events}
-          onMonthChange={setRefMonth}
-          filters={
-            <select
-              value={filterCliente}
-              onChange={(e) => setFilterCliente(e.target.value)}
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-            >
-              <option value="">Todos os clientes</option>
-              {clientesOptions.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-            </select>
-          }
-        />
-      )}
+      {/* KPI strip — total events for the month */}
+      <div
+        className="card-lift animate-fade-up rounded-2xl border border-border bg-card px-5 pt-5 pb-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)] flex flex-col"
+        style={{ animationDelay: "75ms" }}
+      >
+        <span className="text-[9px] font-black tracking-[0.16em] text-muted-foreground/40 mb-4">01</span>
+        <span className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+          Conteúdos no mês
+        </span>
+        <span className="text-[2.4rem] font-black tracking-tight leading-none animate-numeric-pop mt-auto">
+          {isLoading ? "—" : events.length}
+        </span>
+        <div className="mt-3 h-0.5 w-full rounded-full bg-violet-500" />
+      </div>
+
+      {/* Calendar panel */}
+      <div
+        className="animate-fade-up rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]"
+        style={{ animationDelay: "150ms" }}
+      >
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">
+          Agenda de publicações
+        </p>
+
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <CalendarGrid
+            events={events}
+            onMonthChange={setRefMonth}
+            filters={
+              <select
+                value={filterCliente}
+                onChange={(e) => setFilterCliente(e.target.value)}
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              >
+                <option value="">Todos os clientes</option>
+                {clientesOptions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+        )}
+      </div>
     </div>
   );
 }

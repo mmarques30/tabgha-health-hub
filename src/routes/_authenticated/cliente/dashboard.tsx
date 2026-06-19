@@ -1,10 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Users, FileCheck, TrendingUp, Loader2, MessageCircle, CheckCircle2, ArrowRight, Clock, Calendar } from "lucide-react";
+import { Loader2, MessageCircle, CheckCircle2, ArrowRight, Clock, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { EmptyState } from "@/components/EmptyState";
-import { KpiCard } from "@/components/ui/kpi-card";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -88,36 +87,62 @@ function ClienteDashboard() {
     },
   });
 
+  const kpiCards = [
+    {
+      rank: "01",
+      label: "Leads totais",
+      value: counts?.leads ?? 0,
+      accent: "bg-primary",
+      delay: 0,
+    },
+    {
+      rank: "02",
+      label: "Novos este mês",
+      value: counts?.novos_mes ?? 0,
+      accent: "bg-emerald-500",
+      delay: 75,
+    },
+    {
+      rank: "03",
+      label: "Entregas pendentes",
+      value: counts?.entregas_pendentes ?? 0,
+      accent: (counts?.entregas_pendentes ?? 0) > 0 ? "bg-amber-500" : "bg-primary",
+      delay: 150,
+    },
+  ];
+
   return (
     <div className="px-6 py-6 space-y-6">
       <header className="animate-fade-up">
+        <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-primary mb-2">
+          Portal do Cliente
+        </span>
         <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-xs text-muted-foreground mt-0.5">Visão geral da sua operação de marketing</p>
       </header>
 
       {/* KPI cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="animate-fade-up delay-0">
-          <KpiCard label="Leads totais" value={counts?.leads ?? 0} icon={Users} loading={loadingCounts} />
-        </div>
-        <div className="animate-fade-up delay-75">
-          <KpiCard
-            label="Novos este mês"
-            value={counts?.novos_mes ?? 0}
-            icon={TrendingUp}
-            loading={loadingCounts}
-            delta={counts ? { value: "este mês", direction: "neutral" } : undefined}
-          />
-        </div>
-        <div className="animate-fade-up delay-150">
-          <KpiCard
-            label="Entregas pendentes"
-            value={counts?.entregas_pendentes ?? 0}
-            icon={FileCheck}
-            loading={loadingCounts}
-            accentColor={(counts?.entregas_pendentes ?? 0) > 0 ? "text-amber-600" : undefined}
-          />
-        </div>
+        {kpiCards.map((card) => (
+          <div
+            key={card.rank}
+            className="card-lift animate-fade-up rounded-2xl border border-border bg-card px-5 pt-5 pb-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)] flex flex-col"
+            style={{ animationDelay: `${card.delay}ms` }}
+          >
+            <span className="text-[9px] font-black tracking-[0.16em] text-muted-foreground/40 mb-4">{card.rank}</span>
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{card.label}</p>
+            {loadingCounts ? (
+              <div className="mt-auto flex items-center gap-2 py-2">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <p className="text-[2.4rem] font-black tracking-tight leading-none animate-numeric-pop mt-auto">
+                {card.value}
+              </p>
+            )}
+            <div className={cn("mt-3 h-0.5 w-full rounded-full", card.accent)} />
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -125,10 +150,7 @@ function ClienteDashboard() {
         <div className="animate-fade-up delay-225 card-lift rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50">
-                <CheckCircle2 className="h-4 w-4 text-amber-500" />
-              </div>
-              <p className="text-sm font-bold">Aprovações pendentes</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Aprovações pendentes</p>
               {(aprovacoes?.length ?? 0) > 0 && (
                 <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[11px] font-bold text-amber-700">
                   {aprovacoes!.length}
@@ -179,12 +201,7 @@ function ClienteDashboard() {
         {/* Conversas recentes */}
         <div className="animate-fade-up delay-300 card-lift rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
           <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-                <MessageCircle className="h-4 w-4 text-primary" />
-              </div>
-              <p className="text-sm font-bold">Conversas recentes</p>
-            </div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Conversas recentes</p>
             <Link to="/cliente/atendimento" className="flex items-center gap-1 text-xs text-primary hover:underline">
               Ver todas <ArrowRight className="h-3 w-3" />
             </Link>
@@ -197,14 +214,14 @@ function ClienteDashboard() {
               <p className="text-sm text-muted-foreground">Nenhuma conversa recente</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
               {conversas!.map((c, i) => (
                 <Link
                   key={c.id}
                   to="/cliente/atendimento"
                   className={cn(
-                    "flex items-center gap-3 rounded-xl bg-secondary/40 px-3.5 py-2.5",
-                    "hover:bg-secondary/70 transition-colors duration-150",
+                    "flex items-center gap-3 px-4 py-3",
+                    "hover:bg-secondary/30 transition-colors duration-150",
                     "animate-fade-up",
                   )}
                   style={{ animationDelay: `${i * 50}ms` }}
@@ -231,12 +248,7 @@ function ClienteDashboard() {
       {/* Próximos agendamentos */}
       <div className="animate-fade-up delay-375">
         <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-              <Calendar className="h-4 w-4 text-primary" />
-            </div>
-            <p className="text-sm font-bold">Próximos agendamentos</p>
-          </div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Próximos agendamentos</p>
           <Link to="/cliente/calendario" className="flex items-center gap-1 text-xs text-primary hover:underline">
             Ver calendário <ArrowRight className="h-3 w-3" />
           </Link>

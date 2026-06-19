@@ -665,44 +665,56 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
   });
 
   return (
-    <div className="py-5">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Método de qualificação do agente IA */}
-        <div className="space-y-3 rounded-2xl border border-border bg-card p-5">
-          <div>
-            <p className="text-sm font-semibold">Método de qualificação do agente</p>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              Cole aqui a metodologia que o agente deve seguir nas conversas.
-              Se vazio, usa um padrão genérico (avalia intenção, urgência, fit e capacidade financeira).
-            </p>
+    <div className="py-5 space-y-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* ── Método de qualificação ── */}
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+          <div className="flex items-center gap-2.5 border-b border-sky-100 bg-sky-50/60 px-5 py-3">
+            <span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />
+            <p className="text-[10.5px] font-bold uppercase tracking-widest text-sky-700">Método de qualificação do agente</p>
           </div>
-          <Textarea
-            rows={8}
-            placeholder={"Ex: Avalie o lead com base em:\n(1) Urgência — já tem pacientes interessados?\n(2) Volume — quantos atendimentos por semana?\n(3) Disposição — aberto a investir em marketing?\nConduza de forma natural, sem parecer interrogatório."}
-            value={metodo}
-            onChange={(e) => setMetodo(e.target.value)}
-          />
-          {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
-          <Button size="sm" onClick={() => saveMetodo.mutate()} disabled={saveMetodo.isPending} className="gap-2">
-            {saveMetodo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Salvar método
-          </Button>
+          <div className="p-5 space-y-3">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Cole a metodologia que o agente deve seguir nas conversas.
+              Se vazio, usa o padrão genérico (intenção, urgência, fit, capacidade financeira).
+            </p>
+            <Textarea
+              rows={10}
+              placeholder={"Ex: Avalie o lead com base em:\n(1) Urgência — já tem pacientes interessados?\n(2) Volume — quantos atendimentos por semana?\n(3) Disposição — aberto a investir em marketing?\nConduza de forma natural, sem parecer interrogatório."}
+              value={metodo}
+              onChange={(e) => setMetodo(e.target.value)}
+              className="text-sm resize-none"
+            />
+            {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
+            <Button size="sm" onClick={() => saveMetodo.mutate()} disabled={saveMetodo.isPending} className="gap-2">
+              {saveMetodo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar método
+            </Button>
+          </div>
         </div>
 
-        {/* JSON avançado */}
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">JSON avançado</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Redes sociais, automações (meta_page_id, zapi_instance_id), GA4, webhooks, etc.
-            </p>
+        {/* ── JSON avançado ── */}
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+          <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50/60 px-5 py-3">
+            <span className="h-2 w-2 rounded-full bg-slate-400 shrink-0" />
+            <p className="text-[10.5px] font-bold uppercase tracking-widest text-slate-600">JSON Avançado</p>
           </div>
-          <Textarea className="font-mono text-xs" rows={16} value={json} onChange={(e) => { setJson(e.target.value); setJsonError(""); }} />
-          {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
-          <Button size="sm" variant="outline" onClick={() => saveJson.mutate()} disabled={saveJson.isPending} className="gap-2">
-            {saveJson.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Salvar JSON
-          </Button>
+          <div className="p-5 space-y-3">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Redes sociais, automações (<span className="font-mono text-[11px]">meta_page_id</span>, <span className="font-mono text-[11px]">zapi_instance_id</span>), GA4, webhooks, etc.
+            </p>
+            <Textarea
+              className="font-mono text-xs resize-none"
+              rows={10}
+              value={json}
+              onChange={(e) => { setJson(e.target.value); setJsonError(""); }}
+            />
+            {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
+            <Button size="sm" variant="outline" onClick={() => saveJson.mutate()} disabled={saveJson.isPending} className="gap-2">
+              {saveJson.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar JSON
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -756,19 +768,18 @@ function ClienteFichaPage() {
 
       <Tabs defaultValue="cadastro">
         <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent h-auto p-0 gap-0">
-          {["cadastro", "diagnostico", "leads", "conteudo", "conexoes"].map((tab) => (
+          {["cadastro", "leads", "conteudo", "conexoes"].map((tab) => (
             <TabsTrigger
               key={tab}
               value={tab}
               className="rounded-none border-b-2 border-transparent px-4 pb-3 pt-1 text-sm font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent capitalize"
             >
-              {tab === "diagnostico" ? "Diagnóstico" : tab === "conexoes" ? "Conexões" : tab === "conteudo" ? "Conteúdo" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === "conexoes" ? "Conexões" : tab === "conteudo" ? "Conteúdo" : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </TabsTrigger>
           ))}
         </TabsList>
 
         <TabsContent value="cadastro"><TabCadastro cliente={cliente} /></TabsContent>
-        <TabsContent value="diagnostico"><TabDiagnostico cliente={cliente} /></TabsContent>
         <TabsContent value="leads"><TabLeads clienteId={cliente.id} /></TabsContent>
         <TabsContent value="conteudo"><TabConteudo clienteId={cliente.id} /></TabsContent>
         <TabsContent value="conexoes"><TabConexoes cliente={cliente} /></TabsContent>

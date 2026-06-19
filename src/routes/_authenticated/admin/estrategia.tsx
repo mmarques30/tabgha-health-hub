@@ -18,13 +18,13 @@ export const Route = createFileRoute("/_authenticated/admin/estrategia")({
 
 type Conteudo = Tables<"conteudos"> & { clientes?: { nome: string } | null };
 
-const COLUMNS: { key: string; label: string; color: string }[] = [
-  { key: "briefing",  label: "Briefing",  color: "bg-slate-100 text-slate-600" },
-  { key: "roteiro",   label: "Roteiro",   color: "bg-blue-100 text-blue-700" },
-  { key: "producao",  label: "Produção",  color: "bg-yellow-100 text-yellow-700" },
-  { key: "aprovacao", label: "Aprovação", color: "bg-red-100 text-red-700" },
-  { key: "agendado",  label: "Agendado",  color: "bg-green-100 text-green-700" },
-  { key: "postado",   label: "Postado",   color: "bg-green-100 text-green-700" },
+const COLUMNS: { key: string; label: string; color: string; accent: string }[] = [
+  { key: "briefing",  label: "Briefing",  color: "bg-slate-100 text-slate-600",          accent: "bg-slate-400" },
+  { key: "roteiro",   label: "Roteiro",   color: "bg-blue-100 text-blue-700",             accent: "bg-blue-500" },
+  { key: "producao",  label: "Produção",  color: "bg-amber-100 text-amber-700",           accent: "bg-amber-500" },
+  { key: "aprovacao", label: "Aprovação", color: "bg-red-100 text-red-700",               accent: "bg-red-500" },
+  { key: "agendado",  label: "Agendado",  color: "bg-violet-100 text-violet-700",         accent: "bg-violet-500" },
+  { key: "postado",   label: "Postado",   color: "bg-green-100 text-green-700",           accent: "bg-emerald-500" },
 ];
 
 const REDES = ["Instagram", "Facebook", "TikTok", "YouTube", "LinkedIn", "WhatsApp"];
@@ -145,18 +145,24 @@ function ConteudoCard({ item, onMove }: { item: Conteudo; onMove: (id: string, s
     : null;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+    <div className="card-lift animate-fade-up rounded-xl border border-border bg-card p-3.5 space-y-2.5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
       <p className="text-[12.5px] font-semibold leading-snug">{item.titulo ?? "(sem título)"}</p>
       <p className="text-[11px] text-muted-foreground">{item.clientes?.nome ?? "—"}</p>
       <div className="flex flex-wrap gap-1">
-        {item.rede && <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">{item.rede}</span>}
-        {item.tipo && <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">{item.tipo}</span>}
-        {dataStr && <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">{dataStr}</span>}
+        {item.rede && (
+          <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700">{item.rede}</span>
+        )}
+        {item.tipo && (
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{item.tipo}</span>
+        )}
+        {dataStr && (
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{dataStr}</span>
+        )}
       </div>
       <select
         value=""
         onChange={(e) => { if (e.target.value) onMove(item.id, e.target.value); }}
-        className="w-full rounded border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground cursor-pointer"
+        className="w-full rounded-lg border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground cursor-pointer"
       >
         <option value="">Mover para…</option>
         {nextStatuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -208,21 +214,51 @@ function EstrategiaPage() {
 
   const byStatus = (status: string) => filtered.filter((c) => c.status === status);
 
+  // KPI counts for summary bar
+  const totalPostado = conteudos.filter((c) => c.status === "postado").length;
+  const totalAprovacao = conteudos.filter((c) => c.status === "aprovacao").length;
+  const totalProducao = conteudos.filter((c) => c.status === "producao").length;
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Estratégia editorial</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Pipeline de conteúdos por etapa</p>
+          <span className="inline-flex items-center rounded-full bg-violet-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-violet-700 mb-1.5">
+            Estratégia
+          </span>
+          <h1 className="text-xl font-bold tracking-tight">Pipeline Editorial</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Acompanhe cada conteúdo por etapa</p>
         </div>
         <Button size="sm" onClick={() => setNovoOpen(true)}>
           <Plus className="h-3.5 w-3.5 mr-1" /> Novo conteúdo
         </Button>
       </div>
 
+      {/* KPI Summary Cards */}
+      <div className="grid grid-cols-3 gap-3 px-6 pt-4 pb-2">
+        {[
+          { rank: "01", label: "Postados", value: totalPostado, color: "text-emerald-600", bar: "bg-emerald-500", delay: 0 },
+          { rank: "02", label: "Em aprovação", value: totalAprovacao, color: "text-red-600", bar: "bg-red-500", delay: 75 },
+          { rank: "03", label: "Em produção", value: totalProducao, color: "text-amber-600", bar: "bg-amber-500", delay: 150 },
+        ].map((kpi) => (
+          <div
+            key={kpi.rank}
+            className="card-lift animate-fade-up rounded-2xl border border-border bg-card px-5 pt-5 pb-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)] flex flex-col"
+            style={{ animationDelay: kpi.delay + "ms" }}
+          >
+            <span className="text-[9px] font-black tracking-[0.16em] text-muted-foreground/40 mb-4">{kpi.rank}</span>
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{kpi.label}</p>
+            <p className={`text-[2.4rem] font-black tracking-tight leading-none animate-numeric-pop mt-auto ${kpi.color}`}>
+              {kpi.value}
+            </p>
+            <div className={`mt-3 h-0.5 w-full rounded-full ${kpi.bar}`} />
+          </div>
+        ))}
+      </div>
+
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 px-6 py-3 border-b border-border bg-secondary/30">
+      <div className="flex flex-wrap items-center gap-2 px-6 py-3 border-b border-border bg-secondary/20">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
@@ -248,7 +284,9 @@ function EstrategiaPage() {
           <option value="">Todas as redes</option>
           {REDES.map((r) => <option key={r}>{r}</option>)}
         </select>
-        <span className="ml-auto text-xs text-muted-foreground">{filtered.length} conteúdo{filtered.length !== 1 ? "s" : ""}</span>
+        <span className="ml-auto text-[11px] font-medium text-muted-foreground">
+          <span className="font-bold text-foreground">{filtered.length}</span> conteúdo{filtered.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
       {/* Kanban */}
@@ -257,19 +295,36 @@ function EstrategiaPage() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="flex-1 overflow-x-auto p-4">
+        <div className="flex-1 overflow-x-auto p-5">
           <div className="flex gap-3 min-w-max h-full">
-            {COLUMNS.map((col) => {
+            {COLUMNS.map((col, colIdx) => {
               const cards = byStatus(col.key);
               return (
-                <div key={col.key} className="w-56 flex flex-col bg-secondary/40 rounded-xl p-3 shrink-0">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold ${col.color}`}>{col.label}</span>
-                    <span className="text-[10.5px] text-muted-foreground font-medium bg-border/60 rounded-full px-1.5">{cards.length}</span>
+                <div
+                  key={col.key}
+                  className="animate-fade-up w-56 flex flex-col rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(15,27,53,0.04)] overflow-hidden shrink-0"
+                  style={{ animationDelay: colIdx * 50 + "ms" }}
+                >
+                  {/* Column header */}
+                  <div className="px-3.5 pt-3.5 pb-3 border-b border-border">
+                    <div className="flex items-center justify-between">
+                      <span className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold ${col.color}`}>
+                        {col.label}
+                      </span>
+                      <span className="text-[10px] font-black tabular-nums text-muted-foreground/50">
+                        {String(cards.length).padStart(2, "0")}
+                      </span>
+                    </div>
+                    {/* Accent bar */}
+                    <div className={`mt-2.5 h-0.5 w-full rounded-full ${col.accent} opacity-60`} />
                   </div>
-                  <div className="flex flex-col gap-2 overflow-y-auto flex-1 pr-0.5">
+
+                  {/* Cards */}
+                  <div className="flex flex-col gap-2 overflow-y-auto flex-1 p-2.5">
                     {cards.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-border py-6 text-center text-[11px] text-muted-foreground">vazio</div>
+                      <div className="rounded-xl border border-dashed border-border py-6 text-center text-[11px] text-muted-foreground/60">
+                        vazio
+                      </div>
                     ) : (
                       cards.map((c) => (
                         <ConteudoCard

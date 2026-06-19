@@ -49,18 +49,39 @@ type Metrica = {
   clientes: { nome: string } | null;
 };
 
-function KpiCard({ label, value, sub, up }: { label: string; value: string; sub?: string; up?: boolean }) {
+const KPI_RANKS = ["01", "02", "03", "04"];
+
+function KpiCard({
+  rank,
+  label,
+  value,
+  sub,
+  up,
+  delay,
+}: {
+  rank: string;
+  label: string;
+  value: string;
+  sub?: string;
+  up?: boolean;
+  delay: number;
+}) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1.5 text-2xl font-bold tracking-tight">{value}</p>
+    <div
+      className="card-lift animate-fade-up rounded-2xl border border-border bg-card px-5 pt-5 pb-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)] flex flex-col"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <span className="text-[9px] font-black tracking-[0.16em] text-muted-foreground/40 mb-4">{rank}</span>
+      <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{label}</p>
+      <p className="text-[2.4rem] font-black tracking-tight leading-none animate-numeric-pop mt-auto">{value}</p>
       {sub && (
-        <p className={cn("mt-1 flex items-center gap-1 text-xs", up === true ? "text-green-700" : up === false ? "text-red-700" : "text-muted-foreground")}>
+        <p className={cn("mt-2 flex items-center gap-1 text-[11px] font-medium", up === true ? "text-emerald-700" : up === false ? "text-red-600" : "text-muted-foreground")}>
           {up === true && <ArrowUp className="h-3 w-3" />}
           {up === false && <ArrowDown className="h-3 w-3" />}
           {sub}
         </p>
       )}
+      <div className="mt-3 h-0.5 w-full rounded-full bg-emerald-500" />
     </div>
   );
 }
@@ -117,6 +138,9 @@ function RoiAdminPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
+          <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 mb-2">
+            ROI
+          </span>
           <h1 className="text-xl font-bold tracking-tight">ROI da operação</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Receita gerada vs. investimento em mídia</p>
         </div>
@@ -153,33 +177,62 @@ function RoiAdminPage() {
           {/* KPIs */}
           {kpis && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <KpiCard label="ROAS médio" value={kpis.roasMed != null ? `${kpis.roasMed.toFixed(1)}×` : "—"} sub="meta 3,5×" up={kpis.roasMed != null && kpis.roasMed >= 3.5} />
-              <KpiCard label="Investido" value={fmt(kpis.totalInvest)} />
-              <KpiCard label="Leads" value={String(kpis.totalLeads)} up />
-              <KpiCard label="CPL médio" value={kpis.cplMed != null ? fmt(kpis.cplMed) : "—"} />
+              <KpiCard
+                rank={KPI_RANKS[0]}
+                label="ROAS médio"
+                value={kpis.roasMed != null ? `${kpis.roasMed.toFixed(1)}×` : "—"}
+                sub="meta 3,5×"
+                up={kpis.roasMed != null && kpis.roasMed >= 3.5}
+                delay={0}
+              />
+              <KpiCard
+                rank={KPI_RANKS[1]}
+                label="Investido"
+                value={fmt(kpis.totalInvest)}
+                delay={75}
+              />
+              <KpiCard
+                rank={KPI_RANKS[2]}
+                label="Leads"
+                value={String(kpis.totalLeads)}
+                up
+                delay={150}
+              />
+              <KpiCard
+                rank={KPI_RANKS[3]}
+                label="CPL médio"
+                value={kpis.cplMed != null ? fmt(kpis.cplMed) : "—"}
+                delay={225}
+              />
             </div>
           )}
 
-          {/* Bar chart por cliente */}
+          {/* Bar chart por cliente — dark card */}
           {byCliente.length > 0 && (
-            <div className="rounded-xl border border-border bg-card p-4">
-              <p className="text-sm font-semibold mb-3">Investimento × Leads por cliente</p>
-              <div className="h-64">
+            <div
+              className="rounded-2xl overflow-hidden shadow-[0_4px_24px_rgba(11,27,62,0.18)] animate-fade-up"
+              style={{ background: "linear-gradient(135deg, #0B1B3E 0%, #0F2550 100%)", animationDelay: "300ms" }}
+            >
+              <div className="px-6 pt-5 pb-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">visão geral</p>
+                <p className="text-base font-bold text-white">Investimento × Leads por cliente</p>
+              </div>
+              <div className="h-64 px-2 pb-4">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={byCliente} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                    <XAxis dataKey="nome" tick={{ fontSize: 11 }} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+                  <BarChart data={byCliente} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <XAxis dataKey="nome" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.5)" }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.5)" }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.5)" }} axisLine={false} tickLine={false} />
                     <Tooltip
-                      contentStyle={{ fontSize: 12, borderRadius: 8, background: "var(--color-card)", border: "1px solid var(--color-border)", color: "var(--color-foreground)" }}
+                      contentStyle={{ fontSize: 12, borderRadius: 8, background: "#0B1B3E", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
                       formatter={(v: number, name: string) =>
                         name === "Investimento" ? [fmt(v), name] : [v, name]
                       }
                     />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar yAxisId="left" dataKey="investimento" name="Investimento" fill="#1A5FAD" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="right" dataKey="leads" name="Leads" fill="#F6A623" radius={[4, 4, 0, 0]} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: "rgba(255,255,255,0.6)" }} />
+                    <Bar yAxisId="left" dataKey="investimento" name="Investimento" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="right" dataKey="leads" name="Leads" fill="#60C3E8" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -187,33 +240,50 @@ function RoiAdminPage() {
           )}
 
           {/* Tabela detalhada */}
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-border">
-              <p className="text-sm font-semibold">Registros do período</p>
+          <div
+            className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(15,27,53,0.04)] overflow-hidden animate-fade-up"
+            style={{ animationDelay: "375ms" }}
+          >
+            <div className="px-5 py-4 border-b border-border">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Registros do período</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-secondary text-[10.5px] uppercase tracking-wide text-muted-foreground">
-                    <th className="px-4 py-2 text-left font-semibold">Cliente</th>
-                    <th className="px-4 py-2 text-left font-semibold">Data</th>
-                    <th className="px-4 py-2 text-left font-semibold">Plataforma</th>
-                    <th className="px-4 py-2 text-right font-semibold">Investimento</th>
-                    <th className="px-4 py-2 text-right font-semibold">Leads</th>
-                    <th className="px-4 py-2 text-right font-semibold">CPL</th>
-                    <th className="px-4 py-2 text-right font-semibold">ROAS</th>
+                  <tr className="bg-secondary/60 text-[10.5px] uppercase tracking-wide text-muted-foreground">
+                    <th className="px-4 py-2.5 text-left font-semibold w-8">#</th>
+                    <th className="px-4 py-2.5 text-left font-semibold">Cliente</th>
+                    <th className="px-4 py-2.5 text-left font-semibold">Data</th>
+                    <th className="px-4 py-2.5 text-left font-semibold">Plataforma</th>
+                    <th className="px-4 py-2.5 text-right font-semibold">Investimento</th>
+                    <th className="px-4 py-2.5 text-right font-semibold">Leads</th>
+                    <th className="px-4 py-2.5 text-right font-semibold">CPL</th>
+                    <th className="px-4 py-2.5 text-right font-semibold">ROAS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {metricas.map((m) => (
-                    <tr key={m.id} className="hover:bg-secondary/40">
+                  {metricas.map((m, idx) => (
+                    <tr key={m.id} className="hover:bg-secondary/30 transition-colors">
+                      <td className="px-4 py-2.5 text-[10px] font-black text-muted-foreground/30 tabular-nums">
+                        {String(idx + 1).padStart(2, "0")}
+                      </td>
                       <td className="px-4 py-2.5 font-medium">{m.clientes?.nome ?? "—"}</td>
                       <td className="px-4 py-2.5 text-muted-foreground">{m.data}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{m.plataforma}</td>
-                      <td className="px-4 py-2.5 text-right">{fmt(Number(m.investimento))}</td>
-                      <td className="px-4 py-2.5 text-right">{m.leads}</td>
-                      <td className="px-4 py-2.5 text-right">{m.cpl != null ? fmt(Number(m.cpl)) : "—"}</td>
-                      <td className="px-4 py-2.5 text-right font-semibold">{m.roas != null ? `${Number(m.roas).toFixed(1)}×` : "—"}</td>
+                      <td className="px-4 py-2.5">
+                        <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700">
+                          {m.plataforma}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{fmt(Number(m.investimento))}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{m.leads}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{m.cpl != null ? fmt(Number(m.cpl)) : "—"}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
+                        {m.roas != null ? (
+                          <span className={cn(Number(m.roas) >= 3.5 ? "text-emerald-700" : "text-foreground")}>
+                            {Number(m.roas).toFixed(1)}×
+                          </span>
+                        ) : "—"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

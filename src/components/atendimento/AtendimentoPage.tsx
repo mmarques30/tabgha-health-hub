@@ -38,6 +38,38 @@ function loadStoredFilter<T>(key: string, fallback: T): T {
   return raw ? (JSON.parse(raw) as T) : fallback;
 }
 
+function ownerStateDot(ownerState: string | null) {
+  if (ownerState === "human_active") {
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        <span className="text-[10.5px] font-semibold text-emerald-700">Humano</span>
+      </span>
+    );
+  }
+  if (ownerState === "bot") {
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+        <span className="text-[10.5px] font-semibold text-sky-700">Bot</span>
+      </span>
+    );
+  }
+  if (ownerState === "closed") {
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+        <span className="text-[10.5px] font-semibold text-muted-foreground">Fechada</span>
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-700">
+      {ownerState}
+    </span>
+  );
+}
+
 function ChatBubble({
   direction,
   senderType,
@@ -50,12 +82,12 @@ function ChatBubble({
   const outbound = direction === "outbound";
 
   return (
-    <div className={cn("flex", outbound ? "justify-end" : "justify-start")}>
+    <div className={cn("flex animate-fade-up", outbound ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
+          "max-w-[80%] rounded-2xl px-3 py-2 text-sm shadow-[0_1px_3px_rgba(15,27,53,0.04)]",
           outbound && senderType === "human" && "bg-emerald-600 text-white",
-          outbound && senderType !== "human" && "bg-muted text-foreground",
+          outbound && senderType !== "human" && "bg-sky-500/10 text-sky-900 border border-sky-100",
           !outbound && "border border-border bg-card text-foreground",
         )}
       >
@@ -143,7 +175,8 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
   }
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] overflow-hidden rounded-xl border border-border bg-card">
+    <div className="flex h-[calc(100vh-7rem)] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+      {/* Conversation list sidebar */}
       <aside
         className={cn(
           "flex w-full flex-col border-r border-border md:w-80",
@@ -155,7 +188,7 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
             <select
               value={clienteFilter ?? ""}
               onChange={(e) => setClienteFilter(e.target.value || null)}
-              className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full rounded-xl border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="">Todos os clientes</option>
               {clientesOptions.map((c) => (
@@ -175,19 +208,21 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
             placeholder="Buscar nome ou telefone"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            className="rounded-xl"
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto divide-y divide-border">
           {isLoading ? (
             <div className="space-y-2 p-3">
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full rounded-xl" />
+              <Skeleton className="h-16 w-full rounded-xl" />
+              <Skeleton className="h-16 w-full rounded-xl" />
             </div>
           ) : conversations.length === 0 ? (
             <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
           ) : (
-            conversations.map((conversation) => (
+            conversations.map((conversation, i) => (
               <button
                 key={conversation.id}
                 type="button"
@@ -196,18 +231,23 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
                   setMobilePane("chat");
                 }}
                 className={cn(
-                  "flex w-full flex-col gap-1 border-b border-border px-3 py-3 text-left hover:bg-muted/50",
-                  selectedId === conversation.id && "bg-muted",
+                  "animate-fade-up flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-colors hover:bg-secondary/40",
+                  selectedId === conversation.id
+                    ? "bg-sky-50/60 border-l-2 border-sky-500"
+                    : "border-l-2 border-transparent",
                 )}
+                style={{ animationDelay: `${i * 40}ms` }}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">
+                  <span className="truncate text-sm font-semibold">
                     {conversation.contact_name ?? conversation.contact_phone}
                   </span>
-                  <span className="text-xs text-muted-foreground">{conversation.owner_state}</span>
+                  {ownerStateDot(conversation.owner_state)}
                 </div>
                 {isAdmin && conversation.clientes?.nome ? (
-                  <span className="text-xs text-muted-foreground">{conversation.clientes.nome}</span>
+                  <span className="text-[10.5px] font-medium text-muted-foreground">
+                    {conversation.clientes.nome}
+                  </span>
                 ) : null}
               </button>
             ))
@@ -215,31 +255,53 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
         </div>
       </aside>
 
+      {/* Chat area */}
       <section
         className={cn("flex min-w-0 flex-1 flex-col", mobilePane !== "chat" && "hidden md:flex")}
       >
         {!selected ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            Selecione uma conversa
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-sky-700">
+              Atendimento
+            </span>
+            <p className="text-sm">Selecione uma conversa para começar</p>
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            {/* Chat header */}
+            <div
+              className="flex items-center justify-between border-b border-border px-5 py-3"
+              style={{ background: "linear-gradient(135deg, #0B1B3E 0%, #0F2550 100%)" }}
+            >
               <div>
-                <p className="font-medium">{selected.contact_name ?? selected.contact_phone}</p>
-                <p className="text-xs text-muted-foreground">{selected.state}</p>
+                <p className="font-semibold text-white">
+                  {selected.contact_name ?? selected.contact_phone}
+                </p>
+                <p className="mt-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-sky-300/80">
+                  {selected.state}
+                </p>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => void takeConversation(selected)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-sky-400/40 bg-sky-500/10 text-sky-100 hover:bg-sky-500/20 hover:text-white"
+                  onClick={() => void takeConversation(selected)}
+                >
                   Tomar conversa
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => void closeConversation(selected)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-rose-400/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20 hover:text-white"
+                  onClick={() => void closeConversation(selected)}
+                >
                   Encerrar
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="md:hidden"
+                  className="text-white/70 hover:text-white md:hidden"
                   onClick={() => setMobilePane("info")}
                 >
                   Info
@@ -247,9 +309,14 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
               </div>
             </div>
 
-            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+            {/* Messages */}
+            <div className="flex-1 space-y-3 overflow-y-auto bg-secondary/20 p-4">
               {messagesLoading ? (
-                <Skeleton className="h-20 w-full" />
+                <div className="space-y-3">
+                  <Skeleton className="h-12 w-2/3 rounded-2xl" />
+                  <Skeleton className="ml-auto h-12 w-1/2 rounded-2xl" />
+                  <Skeleton className="h-16 w-3/4 rounded-2xl" />
+                </div>
               ) : (
                 messages.map((item) => (
                   <ChatBubble
@@ -263,12 +330,14 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="border-t border-border p-3">
+            {/* Message input */}
+            <div className="border-t border-border bg-card p-3">
               <Textarea
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
-                placeholder="Escreva uma mensagem..."
+                placeholder="Escreva uma mensagem… (Cmd+Enter para enviar)"
                 disabled={selected.state === "closed" || selected.state === "stalled"}
+                className="resize-none rounded-xl text-sm"
                 onKeyDown={(event) => {
                   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                     event.preventDefault();
@@ -277,7 +346,11 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
                 }}
               />
               <div className="mt-2 flex justify-end">
-                <Button onClick={() => void handleSend()} disabled={sending || !message.trim()}>
+                <Button
+                  onClick={() => void handleSend()}
+                  disabled={sending || !message.trim()}
+                  className="rounded-xl bg-sky-600 text-white hover:bg-sky-700"
+                >
                   {sending ? "Enviando..." : "Enviar"}
                 </Button>
               </div>
@@ -286,26 +359,70 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
         )}
       </section>
 
+      {/* Lead info panel */}
       <aside
         className={cn(
-          "hidden w-72 border-l border-border p-4 md:block",
+          "hidden w-72 border-l border-border bg-card md:block",
           mobilePane === "info" && "block md:block",
         )}
       >
         {selected ? (
-          <div className="space-y-3 text-sm">
-            <p className="font-medium">Lead</p>
-            <p>{selected.leads?.nome ?? "Sem lead vinculado"}</p>
-            <p className="text-muted-foreground">
-              {selected.leads?.telefone ?? selected.contact_phone}
+          <div className="animate-fade-up space-y-4 p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Informações do lead
             </p>
-            <p className="font-medium">Origem</p>
-            <p>{selected.origem}</p>
-            <p className="font-medium">Bot score</p>
-            <p>{selected.bot_score ?? 0}</p>
+
+            <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+              <div className="px-4 py-3">
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Nome
+                </p>
+                <p className="text-sm font-medium">{selected.leads?.nome ?? "Sem lead vinculado"}</p>
+              </div>
+              <div className="px-4 py-3">
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Telefone
+                </p>
+                <p className="text-sm">{selected.leads?.telefone ?? selected.contact_phone}</p>
+              </div>
+              <div className="px-4 py-3">
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Origem
+                </p>
+                <p className="text-sm">{selected.origem ?? "—"}</p>
+              </div>
+              <div className="px-4 py-3">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Bot score
+                </p>
+                <p className="animate-numeric-pop text-2xl font-extrabold tracking-tight text-sky-700">
+                  {selected.bot_score ?? 0}
+                </p>
+                <div className="mt-2 h-0.5 w-full rounded-full bg-sky-500/30">
+                  <div
+                    className="h-0.5 rounded-full bg-sky-500 transition-all"
+                    style={{ width: `${Math.min((selected.bot_score ?? 0), 100)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Status atual
+              </p>
+              {ownerStateDot(selected.owner_state)}
+            </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Informações do lead</p>
+          <div className="flex flex-col gap-2 p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Informações do lead
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Selecione uma conversa para ver detalhes.
+            </p>
+          </div>
         )}
       </aside>
     </div>

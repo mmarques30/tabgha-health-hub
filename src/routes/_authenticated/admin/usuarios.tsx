@@ -185,8 +185,8 @@ function UsuariosPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <span className="eyebrow-pill">Configurações</span>
-          <h1 className="mt-2 text-xl font-bold tracking-tight">Equipe</h1>
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">Configurações</span>
+          <h1 className="text-xl font-bold tracking-tight">Equipe</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Gerencie os membros e suas permissões de acesso.
           </p>

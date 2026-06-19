@@ -143,17 +143,17 @@ function AdminDashboard() {
     <div className="px-6 py-6 space-y-4">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="animate-fade-up flex items-end justify-between gap-4">
+      <header className="animate-fade-up flex items-center gap-3">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Operação ao vivo</span>
-          </div>
           <h1 className="text-2xl font-extrabold tracking-tight">Dashboard</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Indicadores em tempo real da operação Tabgha</p>
+        </div>
+        <div className="ml-auto flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          </span>
+          <span className="text-[10px] font-semibold text-emerald-700">ao vivo</span>
         </div>
       </header>
 

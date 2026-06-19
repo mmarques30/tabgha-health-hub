@@ -343,21 +343,17 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   const hasData = !!(cliente.especialidade || cliente.nome);
 
   return (
-    <div className="py-5">
-      {/* AI generation bar */}
-      <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center">
+    <div className="py-5 space-y-4">
+      {/* ── AI generation bar ── */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent p-5 sm:flex-row sm:items-center">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-primary">Gerar diagnóstico com IA</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Claude analisa os dados do cliente e preenche automaticamente perfil, jornada, dores, concorrentes e plano de ação.
+          <p className="text-sm font-bold text-primary">Gerar diagnóstico com IA</p>
+          <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+            Claude analisa os dados do cliente e preenche automaticamente todas as seções.
             {!hasData && " Preencha o Cadastro primeiro para um resultado mais preciso."}
           </p>
         </div>
-        <Button
-          onClick={gerarComIA}
-          disabled={generating}
-          className="shrink-0 gap-2"
-        >
+        <Button onClick={gerarComIA} disabled={generating} className="shrink-0 gap-2">
           {generating
             ? <><Loader2 className="h-4 w-4 animate-spin" />Gerando…</>
             : <><Sparkles className="h-4 w-4" />{d.perfil.especialidade ? "Regenerar" : "Gerar diagnóstico"}</>
@@ -365,60 +361,99 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-x-8 gap-y-0 lg:grid-cols-2">
-        {/* Left column */}
-        <div>
-          <SectionHeader className="mt-0">Perfil do consultório</SectionHeader>
-          <div className="grid grid-cols-2 gap-4">
+      {/* ── Row 1: Perfil + Jornada ── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Perfil */}
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+          <div className="flex items-center gap-2.5 border-b border-blue-100 bg-blue-50/60 px-5 py-3">
+            <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+            <p className="text-[10.5px] font-bold uppercase tracking-widest text-blue-700">Perfil do consultório</p>
+          </div>
+          <div className="p-5 grid grid-cols-2 gap-4">
             <Field label="Especialidade"><Input value={get("perfil", "especialidade")} onChange={setField("perfil", "especialidade")} /></Field>
             <Field label="Cidade"><Input value={get("perfil", "cidade")} onChange={setField("perfil", "cidade")} /></Field>
             <Field label="Tempo de mercado"><Input value={get("perfil", "tempo_mercado")} onChange={setField("perfil", "tempo_mercado")} /></Field>
             <Field label="Ticket médio"><Input value={get("perfil", "ticket_medio")} onChange={setField("perfil", "ticket_medio")} /></Field>
-            <Field label="Público-alvo"><Textarea className="col-span-2" rows={2} value={get("perfil", "publico_alvo")} onChange={setField("perfil", "publico_alvo")} /></Field>
-            <Field label="Diferencial competitivo"><Textarea rows={2} value={get("perfil", "diferencial")} onChange={setField("perfil", "diferencial")} /></Field>
-          </div>
-
-          <SectionHeader>Jornada do paciente</SectionHeader>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Canais de aquisição">
-              <Input value={get("jornada", "canais_aquisicao")} onChange={setField("jornada", "canais_aquisicao")} placeholder="Meta Ads, Indicação, Orgânico…" />
-            </Field>
-            <div className="grid grid-cols-2 gap-3 col-span-1">
-              <Field label="Taxa agendamento"><Input value={get("jornada", "taxa_agendamento")} onChange={setField("jornada", "taxa_agendamento")} placeholder="ex: 40%" /></Field>
-              <Field label="Taxa conversão"><Input value={get("jornada", "taxa_conversao")} onChange={setField("jornada", "taxa_conversao")} placeholder="ex: 25%" /></Field>
+            <div className="col-span-2">
+              <Field label="Público-alvo"><Textarea rows={2} value={get("perfil", "publico_alvo")} onChange={setField("perfil", "publico_alvo")} /></Field>
             </div>
             <div className="col-span-2">
-              <Field label="Descrição do funil"><Textarea rows={3} value={get("jornada", "funil")} onChange={setField("jornada", "funil")} /></Field>
-            </div>
-            <div className="col-span-2">
-              <Field label="Objeções frequentes"><Textarea rows={3} value={get("jornada", "objecoes")} onChange={setField("jornada", "objecoes")} /></Field>
+              <Field label="Diferencial competitivo"><Textarea rows={2} value={get("perfil", "diferencial")} onChange={setField("perfil", "diferencial")} /></Field>
             </div>
           </div>
         </div>
 
-        {/* Right column */}
-        <div>
-          <SectionHeader className="mt-0">Dores identificadas</SectionHeader>
-          <div className="space-y-4">
+        {/* Jornada */}
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+          <div className="flex items-center gap-2.5 border-b border-violet-100 bg-violet-50/60 px-5 py-3">
+            <span className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />
+            <p className="text-[10.5px] font-bold uppercase tracking-widest text-violet-700">Jornada do paciente</p>
+          </div>
+          <div className="p-5 space-y-4">
+            <Field label="Canais de aquisição">
+              <Input value={get("jornada", "canais_aquisicao")} onChange={setField("jornada", "canais_aquisicao")} placeholder="Meta Ads, Indicação, Orgânico…" />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Taxa agendamento"><Input value={get("jornada", "taxa_agendamento")} onChange={setField("jornada", "taxa_agendamento")} placeholder="ex: 40%" /></Field>
+              <Field label="Taxa conversão"><Input value={get("jornada", "taxa_conversao")} onChange={setField("jornada", "taxa_conversao")} placeholder="ex: 25%" /></Field>
+            </div>
+            <Field label="Descrição do funil"><Textarea rows={3} value={get("jornada", "funil")} onChange={setField("jornada", "funil")} /></Field>
+            <Field label="Objeções frequentes"><Textarea rows={3} value={get("jornada", "objecoes")} onChange={setField("jornada", "objecoes")} /></Field>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Row 2: Dores + Concorrentes ── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Dores */}
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+          <div className="flex items-center gap-2.5 border-b border-rose-100 bg-rose-50/60 px-5 py-3">
+            <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+            <p className="text-[10.5px] font-bold uppercase tracking-widest text-rose-700">Dores identificadas</p>
+          </div>
+          <div className="p-5 space-y-4">
             <Field label="Principais dores do paciente"><Textarea rows={3} value={get("dores", "principais")} onChange={setField("dores", "principais")} /></Field>
             <Field label="Dores de marketing"><Textarea rows={3} value={get("dores", "marketing")} onChange={setField("dores", "marketing")} /></Field>
             <Field label="Dores operacionais"><Textarea rows={3} value={get("dores", "operacional")} onChange={setField("dores", "operacional")} /></Field>
           </div>
+        </div>
 
-          <SectionHeader>Concorrentes & posicionamento</SectionHeader>
-          <Field label="Cenário competitivo e estratégia de diferenciação">
-            <Textarea rows={5} value={get("concorrentes")} onChange={setField("concorrentes")} />
-          </Field>
+        {/* Concorrentes */}
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+          <div className="flex items-center gap-2.5 border-b border-amber-100 bg-amber-50/60 px-5 py-3">
+            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+            <p className="text-[10.5px] font-bold uppercase tracking-widest text-amber-700">Concorrentes & posicionamento</p>
+          </div>
+          <div className="p-5">
+            <Field label="Cenário competitivo e estratégia de diferenciação">
+              <Textarea rows={11} value={get("concorrentes")} onChange={setField("concorrentes")} className="resize-none" />
+            </Field>
+          </div>
+        </div>
+      </div>
 
-          <SectionHeader>Plano de ação 90 dias</SectionHeader>
+      {/* ── Row 3: Plano de ação (full-width, destaque) ── */}
+      <div className="rounded-2xl border border-primary/20 overflow-hidden shadow-[0_2px_8px_rgba(26,95,173,0.10)]"
+        style={{ background: "linear-gradient(135deg, rgba(26,95,173,0.04) 0%, rgba(26,95,173,0.01) 100%)" }}>
+        <div className="flex items-center gap-2.5 border-b border-primary/15 bg-primary/8 px-5 py-3">
+          <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
+          <p className="text-[10.5px] font-bold uppercase tracking-widest text-primary">Plano de ação — 90 dias</p>
+        </div>
+        <div className="p-5">
           <Field label="Ações prioritárias com prazo e responsável">
-            <Textarea rows={7} value={get("plano_acao")} onChange={setField("plano_acao")}
-              placeholder={"1. Criar campanha no Meta Ads — 2 semanas\n2. Configurar automação WhatsApp — 1 mês\n…"} />
+            <Textarea
+              rows={6}
+              value={get("plano_acao")}
+              onChange={setField("plano_acao")}
+              placeholder={"1. Criar campanha no Meta Ads — 2 semanas\n2. Configurar automação WhatsApp — 1 mês\n…"}
+              className="resize-none font-mono text-sm"
+            />
           </Field>
         </div>
       </div>
 
-      <div className="mt-6 flex items-center gap-3 border-t border-border pt-5">
+      {/* ── Save bar ── */}
+      <div className="flex items-center gap-3 border-t border-border pt-4">
         <Button onClick={() => save.mutate()} disabled={save.isPending}>
           {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Salvar diagnóstico

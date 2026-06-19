@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Stethoscope, Loader2, ListChecks,
-} from "lucide-react";
+import { Stethoscope, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -31,17 +29,27 @@ function Field({ label, value }: { label: string; value: string | undefined | nu
   );
 }
 
+const SECTION_ACCENTS: Record<string, { dot: string; header: string; text: string; border: string }> = {
+  blue:   { dot: "bg-blue-500",   header: "bg-blue-50/60",   text: "text-blue-700",   border: "border-blue-100" },
+  violet: { dot: "bg-violet-500", header: "bg-violet-50/60", text: "text-violet-700", border: "border-violet-100" },
+  rose:   { dot: "bg-rose-500",   header: "bg-rose-50/60",   text: "text-rose-700",   border: "border-rose-100" },
+  amber:  { dot: "bg-amber-500",  header: "bg-amber-50/60",  text: "text-amber-700",  border: "border-amber-100" },
+};
+
 function Section({
   title,
+  accent = "blue",
   children,
   className,
   delay = 0,
 }: {
   title: string;
+  accent?: keyof typeof SECTION_ACCENTS;
   children: React.ReactNode;
   className?: string;
   delay?: number;
 }) {
+  const a = SECTION_ACCENTS[accent];
   return (
     <div
       className={cn(
@@ -51,8 +59,9 @@ function Section({
       )}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="border-b border-border px-5 py-4">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{title}</p>
+      <div className={cn("flex items-center gap-2.5 border-b px-5 py-3", a.header, a.border)}>
+        <span className={cn("h-2 w-2 rounded-full shrink-0", a.dot)} />
+        <p className={cn("text-[10.5px] font-bold uppercase tracking-widest", a.text)}>{title}</p>
       </div>
       <div className="px-5 py-4 space-y-4">{children}</div>
     </div>
@@ -81,9 +90,9 @@ function PlanoAcaoSection({ plano }: { plano: string }) {
       className="card-lift animate-fade-up rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)] lg:col-span-2"
       style={{ animationDelay: "450ms" }}
     >
-      <div className="flex items-center gap-2 border-b border-primary/15 px-5 py-4">
-        <ListChecks className="h-3.5 w-3.5 text-primary shrink-0" />
-        <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Plano de ação — 90 dias</p>
+      <div className="flex items-center gap-2.5 border-b border-primary/15 bg-primary/5 px-5 py-3">
+        <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
+        <p className="text-[10.5px] font-bold uppercase tracking-widest text-primary">Plano de ação — 90 dias</p>
       </div>
       <div className="px-5 py-4 space-y-2.5">
         {linhas.length > 1 ? linhas.map((linha, i) => (
@@ -144,7 +153,7 @@ function DiagnosticoPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {d.perfil && (
-            <Section title="Perfil do consultório" delay={75}>
+            <Section title="Perfil do consultório" accent="blue" delay={75}>
               <div className="grid grid-cols-2 gap-4">
                 {Object.entries(PERFIL_LABELS).map(([k, l]) => (
                   <div key={k} className={k === "diferencial" || k === "publico_alvo" ? "col-span-2" : ""}>
@@ -156,7 +165,7 @@ function DiagnosticoPage() {
           )}
 
           {d.jornada && (
-            <Section title="Jornada do paciente" delay={150}>
+            <Section title="Jornada do paciente" accent="violet" delay={150}>
               <div className="grid grid-cols-2 gap-4">
                 {["canais_aquisicao", "funil", "objecoes"].map((k) => (
                   <div key={k} className="col-span-2">
@@ -170,7 +179,7 @@ function DiagnosticoPage() {
           )}
 
           {d.dores && (
-            <Section title="Dores identificadas" delay={225}>
+            <Section title="Dores identificadas" accent="rose" delay={225}>
               <div className="space-y-4">
                 {Object.entries(DORES_LABELS).map(([k, l]) => (
                   <Field key={k} label={l} value={d.dores?.[k]} />
@@ -180,7 +189,7 @@ function DiagnosticoPage() {
           )}
 
           {d.concorrentes && (
-            <Section title="Concorrentes & posicionamento" delay={300}>
+            <Section title="Concorrentes & posicionamento" accent="amber" delay={300}>
               <p className="text-sm whitespace-pre-line leading-relaxed">{d.concorrentes}</p>
             </Section>
           )}

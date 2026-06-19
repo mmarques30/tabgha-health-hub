@@ -296,13 +296,13 @@ function EstrategiaPage() {
         </div>
       ) : (
         <div className="flex-1 overflow-x-auto p-5">
-          <div className="flex gap-3 min-w-max h-full">
+          <div className="flex gap-3 h-full" style={{ minWidth: "min(100%, 900px)" }}>
             {COLUMNS.map((col, colIdx) => {
               const cards = byStatus(col.key);
               return (
                 <div
                   key={col.key}
-                  className="animate-fade-up w-56 flex flex-col rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(15,27,53,0.04)] overflow-hidden shrink-0"
+                  className="animate-fade-up flex-1 min-w-[160px] flex flex-col rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(15,27,53,0.04)] overflow-hidden"
                   style={{ animationDelay: colIdx * 50 + "ms" }}
                 >
                   {/* Column header */}

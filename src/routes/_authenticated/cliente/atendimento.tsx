@@ -9,10 +9,13 @@ export const Route = createFileRoute("/_authenticated/cliente/atendimento")({
 function ClienteAtendimento() {
   return (
     <div className="px-6 py-6 space-y-6">
-      <div>
-        <span className="eyebrow-pill">Suporte</span>
-        <h1 className="mt-2 text-xl font-bold tracking-tight">Atendimento WhatsApp</h1>
-      </div>
+      <header className="animate-fade-up">
+        <span className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-sky-700 mb-2">
+          Suporte
+        </span>
+        <h1 className="text-xl font-bold tracking-tight">Atendimento WhatsApp</h1>
+        <p className="mt-0.5 text-xs text-muted-foreground">Conversas e suporte em tempo real</p>
+      </header>
       <AtendimentoPage />
     </div>
   );

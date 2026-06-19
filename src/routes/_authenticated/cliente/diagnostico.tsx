@@ -129,11 +129,13 @@ function DiagnosticoPage() {
   const d = cliente?.diagnostico as DiagnosticoData | null | undefined;
 
   return (
-    <div className="px-6 py-6">
-      <header className="mb-6 animate-fade-up">
-        <span className="eyebrow-pill">Estratégia</span>
-        <h1 className="mt-3 text-xl font-bold tracking-tight">Diagnóstico</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+    <div className="px-6 py-6 space-y-6">
+      <header className="animate-fade-up">
+        <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-primary mb-2">
+          Estratégia
+        </span>
+        <h1 className="text-xl font-bold tracking-tight">Diagnóstico</h1>
+        <p className="mt-0.5 text-xs text-muted-foreground">
           Análise estratégica do {cliente?.especialidade ? `consultório de ${cliente.especialidade}` : "seu consultório"}
         </p>
       </header>
@@ -141,14 +143,29 @@ function DiagnosticoPage() {
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
       ) : !d ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary">
-            <Stethoscope className="h-7 w-7 text-muted-foreground" />
+        <div
+          className="card-lift animate-fade-up rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]"
+          style={{ animationDelay: "75ms" }}
+        >
+          <div className="flex items-center gap-2.5 border-b border-primary/15 bg-primary/5 px-5 py-3">
+            <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
+            <p className="text-[10.5px] font-bold uppercase tracking-widest text-primary">Diagnóstico estratégico</p>
           </div>
-          <h3 className="text-base font-semibold">Diagnóstico em preparação</h3>
-          <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-            A equipe Tabgha está preparando a análise estratégica do seu consultório. Você será notificado quando estiver pronto.
-          </p>
+          <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+            <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/8 ring-1 ring-primary/15">
+              <Stethoscope className="h-6 w-6 text-primary" />
+            </div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Em preparação</p>
+            <h3 className="text-base font-semibold">Diagnóstico em breve</h3>
+            <p className="mt-1.5 max-w-sm text-xs text-muted-foreground leading-relaxed">
+              A equipe Tabgha está preparando a análise estratégica do seu consultório. Você será notificado quando estiver pronto.
+            </p>
+            <div className="mt-6 flex gap-2 items-center">
+              <div className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-pulse" />
+              <div className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: "300ms" }} />
+              <div className="h-1.5 w-1.5 rounded-full bg-primary/80 animate-pulse" style={{ animationDelay: "600ms" }} />
+            </div>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

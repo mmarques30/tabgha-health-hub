@@ -9,12 +9,7 @@ import { useWhatsappConversations } from "@/hooks/useWhatsappConversations";
 import { useWhatsappMessages } from "@/hooks/useWhatsappMessages";
 import { useClientesOptions } from "@/hooks/useClientesOptions";
 import { supabase } from "@/integrations/supabase/client";
-import type {
-  ConversationFilters,
-  InboxTab,
-  MobilePane,
-  WhatsappConversation,
-} from "@/lib/types";
+import type { ConversationFilters, InboxTab, MobilePane, WhatsappConversation } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { sendWhatsappMessage } from "@/functions/whatsapp/send.functions";
 
@@ -163,6 +158,13 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
       .eq("id", conversation.id);
   }
 
+  async function returnToBot(conversation: WhatsappConversation) {
+    await supabase
+      .from("whatsapp_conversations")
+      .update({ owner_state: "bot" })
+      .eq("id", conversation.id);
+  }
+
   async function closeConversation(conversation: WhatsappConversation) {
     await supabase
       .from("whatsapp_conversations")
@@ -192,16 +194,26 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
             >
               <option value="">Todos os clientes</option>
               {clientesOptions.map((c) => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
               ))}
             </select>
           )}
           <Tabs value={tab} onValueChange={(value) => setTab(value as InboxTab)}>
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="awaiting_human" className="text-xs px-1">Aguardando</TabsTrigger>
-              <TabsTrigger value="active" className="text-xs px-1">Ativas</TabsTrigger>
-              <TabsTrigger value="closed" className="text-xs px-1">Fechadas</TabsTrigger>
-              <TabsTrigger value="all" className="text-xs px-1">Todas</TabsTrigger>
+              <TabsTrigger value="awaiting_human" className="text-xs px-1">
+                Aguardando
+              </TabsTrigger>
+              <TabsTrigger value="active" className="text-xs px-1">
+                Ativas
+              </TabsTrigger>
+              <TabsTrigger value="closed" className="text-xs px-1">
+                Fechadas
+              </TabsTrigger>
+              <TabsTrigger value="all" className="text-xs px-1">
+                Todas
+              </TabsTrigger>
             </TabsList>
           </Tabs>
           <Input
@@ -281,14 +293,23 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
                   {selected.state}
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant="outline"
                   className="border-sky-400/40 bg-sky-500/10 text-sky-100 hover:bg-sky-500/20 hover:text-white"
                   onClick={() => void takeConversation(selected)}
                 >
-                  Tomar conversa
+                  Assumir
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-violet-400/40 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20 hover:text-white"
+                  onClick={() => void returnToBot(selected)}
+                  disabled={selected.owner_state === "bot"}
+                >
+                  Devolver pro bot
                 </Button>
                 <Button
                   size="sm"
@@ -377,7 +398,9 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
                 <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                   Nome
                 </p>
-                <p className="text-sm font-medium">{selected.leads?.nome ?? "Sem lead vinculado"}</p>
+                <p className="text-sm font-medium">
+                  {selected.leads?.nome ?? "Sem lead vinculado"}
+                </p>
               </div>
               <div className="px-4 py-3">
                 <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -401,7 +424,7 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
                 <div className="mt-2 h-0.5 w-full rounded-full bg-sky-500/30">
                   <div
                     className="h-0.5 rounded-full bg-sky-500 transition-all"
-                    style={{ width: `${Math.min((selected.bot_score ?? 0), 100)}%` }}
+                    style={{ width: `${Math.min(selected.bot_score ?? 0, 100)}%` }}
                   />
                 </div>
               </div>

@@ -50,13 +50,38 @@ async function resolveClienteId(instanceId: string | undefined) {
     return null
   }
 
+  // Preferência: whatsapp_instances (Onda 1)
+  const { data: instance } = await supabase
+    .from('whatsapp_instances')
+    .select('cliente_id, dados_extras, status')
+    .eq('instance_id', instanceId)
+    .in('status', ['connected', 'connecting'])
+    .limit(1)
+    .maybeSingle()
+
+  if (instance?.cliente_id) {
+    const { data: cliente } = await supabase
+      .from('clientes')
+      .select('id, dados_extras')
+      .eq('id', instance.cliente_id)
+      .maybeSingle()
+
+    if (cliente) {
+      return {
+        ...cliente,
+        instance_dados_extras: instance.dados_extras,
+      }
+    }
+  }
+
+  // Fallback legado: clientes.dados_extras.automacoes.zapi
   const { data } = await supabase
     .from('clientes')
     .select('id, dados_extras')
     .filter('dados_extras->automacoes->zapi->>instance_id', 'eq', instanceId)
     .limit(1)
 
-  return data?.[0] ?? null
+  return data?.[0] ? { ...data[0], instance_dados_extras: null } : null
 }
 
 Deno.serve(async (req) => {
@@ -190,14 +215,19 @@ Deno.serve(async (req) => {
 
     await supabase.from('whatsapp_conversations').update(updates).eq('id', conversationId)
 
-    const agenteAtivo =
-      (cliente.dados_extras as { automacoes?: { zapi?: { agente_ativo?: boolean | string } } })
-        ?.automacoes?.zapi?.agente_ativo === true ||
-      (cliente.dados_extras as { automacoes?: { zapi?: { agente_ativo?: boolean | string } } })
-        ?.automacoes?.zapi?.agente_ativo === 'true'
+    const instanceExtras = cliente.instance_dados_extras as {
+      agente_ativo?: boolean | string
+    } | null
+    const legacyExtras = cliente.dados_extras as {
+      automacoes?: { zapi?: { agente_ativo?: boolean | string } }
+    } | null
+
+    const agenteFlag =
+      instanceExtras?.agente_ativo ?? legacyExtras?.automacoes?.zapi?.agente_ativo
+    const agenteAtivo = agenteFlag === true || agenteFlag === 'true'
 
     if (conversation?.owner_state === 'bot' && agenteAtivo) {
-      // ai-respond edge function will be wired in a follow-up prompt.
+      // ai-respond edge function will be wired in a follow-up prompt (Onda 5).
     }
 
     return json({ ok: true })

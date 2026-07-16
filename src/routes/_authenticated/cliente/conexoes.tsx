@@ -75,15 +75,16 @@ function ConexoesPage() {
 
   const save = useMutation({
     mutationFn: async (values: RedesForm) => {
-      const novasDados = { ...((cliente?.dados_extras as object) ?? {}), redes: values };
-      const { error } = await supabase.from("clientes").update({ dados_extras: novasDados }).eq("id", clienteId!);
+      const { error } = await supabase.rpc("atualizar_redes_cliente", {
+        _redes: values,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Conexões atualizadas.");
       qc.invalidateQueries({ queryKey: ["cliente", "conexoes"] });
     },
-    onError: () => toast.error("Erro ao salvar."),
+    onError: (err: Error) => toast.error(err.message || "Erro ao salvar."),
   });
 
   if (isLoading) return (

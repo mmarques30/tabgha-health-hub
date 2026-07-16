@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as QueroSaberMaisRouteImport } from './routes/quero-saber-mais'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -28,12 +29,18 @@ import { Route as AuthenticatedAdminMetaAdsRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminEstrategiaRouteImport } from './routes/_authenticated/admin/estrategia'
 import { Route as AuthenticatedAdminDiagnosticosRouteImport } from './routes/_authenticated/admin/diagnosticos'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin/dashboard'
+import { Route as AuthenticatedAdminConfigMetaRouteImport } from './routes/_authenticated/admin/config-meta'
 import { Route as AuthenticatedAdminCalendarioRouteImport } from './routes/_authenticated/admin/calendario'
 import { Route as AuthenticatedAdminAutomacoesLeadsRouteImport } from './routes/_authenticated/admin/automacoes-leads'
 import { Route as AuthenticatedAdminAtendimentoRouteImport } from './routes/_authenticated/admin/atendimento'
 import { Route as AuthenticatedAdminClientesIndexRouteImport } from './routes/_authenticated/admin/clientes/index'
 import { Route as AuthenticatedAdminClientesIdRouteImport } from './routes/_authenticated/admin/clientes/$id'
 
+const QueroSaberMaisRoute = QueroSaberMaisRouteImport.update({
+  id: '/quero-saber-mais',
+  path: '/quero-saber-mais',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -142,6 +149,12 @@ const AuthenticatedAdminDashboardRoute =
     path: '/admin/dashboard',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminConfigMetaRoute =
+  AuthenticatedAdminConfigMetaRouteImport.update({
+    id: '/admin/config-meta',
+    path: '/admin/config-meta',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminCalendarioRoute =
   AuthenticatedAdminCalendarioRouteImport.update({
     id: '/admin/calendario',
@@ -176,9 +189,11 @@ const AuthenticatedAdminClientesIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/quero-saber-mais': typeof QueroSaberMaisRoute
   '/admin/atendimento': typeof AuthenticatedAdminAtendimentoRoute
   '/admin/automacoes-leads': typeof AuthenticatedAdminAutomacoesLeadsRoute
   '/admin/calendario': typeof AuthenticatedAdminCalendarioRoute
+  '/admin/config-meta': typeof AuthenticatedAdminConfigMetaRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
   '/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
@@ -201,9 +216,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/quero-saber-mais': typeof QueroSaberMaisRoute
   '/admin/atendimento': typeof AuthenticatedAdminAtendimentoRoute
   '/admin/automacoes-leads': typeof AuthenticatedAdminAutomacoesLeadsRoute
   '/admin/calendario': typeof AuthenticatedAdminCalendarioRoute
+  '/admin/config-meta': typeof AuthenticatedAdminConfigMetaRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
   '/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
@@ -228,9 +245,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/quero-saber-mais': typeof QueroSaberMaisRoute
   '/_authenticated/admin/atendimento': typeof AuthenticatedAdminAtendimentoRoute
   '/_authenticated/admin/automacoes-leads': typeof AuthenticatedAdminAutomacoesLeadsRoute
   '/_authenticated/admin/calendario': typeof AuthenticatedAdminCalendarioRoute
+  '/_authenticated/admin/config-meta': typeof AuthenticatedAdminConfigMetaRoute
   '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
   '/_authenticated/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
@@ -255,9 +274,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/quero-saber-mais'
     | '/admin/atendimento'
     | '/admin/automacoes-leads'
     | '/admin/calendario'
+    | '/admin/config-meta'
     | '/admin/dashboard'
     | '/admin/diagnosticos'
     | '/admin/estrategia'
@@ -280,9 +301,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/quero-saber-mais'
     | '/admin/atendimento'
     | '/admin/automacoes-leads'
     | '/admin/calendario'
+    | '/admin/config-meta'
     | '/admin/dashboard'
     | '/admin/diagnosticos'
     | '/admin/estrategia'
@@ -306,9 +329,11 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/quero-saber-mais'
     | '/_authenticated/admin/atendimento'
     | '/_authenticated/admin/automacoes-leads'
     | '/_authenticated/admin/calendario'
+    | '/_authenticated/admin/config-meta'
     | '/_authenticated/admin/dashboard'
     | '/_authenticated/admin/diagnosticos'
     | '/_authenticated/admin/estrategia'
@@ -333,10 +358,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  QueroSaberMaisRoute: typeof QueroSaberMaisRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/quero-saber-mais': {
+      id: '/quero-saber-mais'
+      path: '/quero-saber-mais'
+      fullPath: '/quero-saber-mais'
+      preLoaderRoute: typeof QueroSaberMaisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -470,6 +503,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/config-meta': {
+      id: '/_authenticated/admin/config-meta'
+      path: '/admin/config-meta'
+      fullPath: '/admin/config-meta'
+      preLoaderRoute: typeof AuthenticatedAdminConfigMetaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/calendario': {
       id: '/_authenticated/admin/calendario'
       path: '/admin/calendario'
@@ -512,6 +552,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminAtendimentoRoute: typeof AuthenticatedAdminAtendimentoRoute
   AuthenticatedAdminAutomacoesLeadsRoute: typeof AuthenticatedAdminAutomacoesLeadsRoute
   AuthenticatedAdminCalendarioRoute: typeof AuthenticatedAdminCalendarioRoute
+  AuthenticatedAdminConfigMetaRoute: typeof AuthenticatedAdminConfigMetaRoute
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
   AuthenticatedAdminDiagnosticosRoute: typeof AuthenticatedAdminDiagnosticosRoute
   AuthenticatedAdminEstrategiaRoute: typeof AuthenticatedAdminEstrategiaRoute
@@ -537,6 +578,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminAutomacoesLeadsRoute:
     AuthenticatedAdminAutomacoesLeadsRoute,
   AuthenticatedAdminCalendarioRoute: AuthenticatedAdminCalendarioRoute,
+  AuthenticatedAdminConfigMetaRoute: AuthenticatedAdminConfigMetaRoute,
   AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
   AuthenticatedAdminDiagnosticosRoute: AuthenticatedAdminDiagnosticosRoute,
   AuthenticatedAdminEstrategiaRoute: AuthenticatedAdminEstrategiaRoute,
@@ -564,7 +606,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  QueroSaberMaisRoute: QueroSaberMaisRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

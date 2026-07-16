@@ -1726,8 +1726,6 @@ function FAQ() {
 
 // ─── CTA / Quero saber mais ───────────────────────────────────────────────────
 
-const TABGHA_CLIENTE_ID = "00000000-0000-0000-0000-000000000001";
-
 const ESPECIALIDADES = ["Ortopedia","Dermatologia","Clínica geral","OPME","Cardiologia","Oftalmologia","Ginecologia","Pediatria","Neurologia","Outro"];
 const VOLUMES = [
   { value: "menos_50",   label: "Menos de 50 pacientes/mês" },
@@ -1754,25 +1752,55 @@ function CTASection() {
     }
     setLoading(true);
     setErro(null);
-    const { supabase } = await import("@/integrations/supabase/client");
-    const { error } = await supabase.from("leads").insert({
-      cliente_id: TABGHA_CLIENTE_ID,
-      nome,
-      email: email || null,
-      telefone: telefone || null,
-      canal: "site",
-      status: "novo",
-      observacoes: JSON.stringify({ especialidade: especialidade || null, volume_estimado: volume || null, origem_form: "landing_quero_saber_mais" }),
-      utm_source: typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("utm_source") : null,
-      utm_medium: typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("utm_medium") : null,
-      utm_campaign: typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("utm_campaign") : null,
-    });
-    setLoading(false);
-    if (error) {
-      setErro("Erro ao enviar. Tente novamente.");
-    } else {
+
+    const params =
+      typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const edgeBase =
+      (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_URL) ||
+      (typeof process !== "undefined" && process.env?.SUPABASE_URL) ||
+      "";
+
+    try {
+      const response = await fetch(`${edgeBase}/functions/v1/lp-submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome,
+          email: email || null,
+          telefone: telefone || null,
+          especialidade: especialidade || null,
+          volume_estimado: volume || null,
+          website: "",
+          utm_source: params?.get("utm_source"),
+          utm_medium: params?.get("utm_medium"),
+          utm_campaign: params?.get("utm_campaign"),
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.ok) {
+        if (payload.error === "rate_limited") {
+          setErro("Aguarde um minuto e tente novamente.");
+        } else {
+          setErro("Erro ao enviar. Tente novamente.");
+        }
+        return;
+      }
+
       setSuccess(true);
-      setNome(""); setEmail(""); setTelefone(""); setEspecialidade(""); setVolume("");
+      setNome("");
+      setEmail("");
+      setTelefone("");
+      setEspecialidade("");
+      setVolume("");
+    } catch {
+      setErro("Erro ao enviar. Tente novamente.");
+    } finally {
+      setLoading(false);
     }
   }
 

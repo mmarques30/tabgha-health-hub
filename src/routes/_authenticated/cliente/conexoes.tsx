@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Json } from "@/integrations/supabase/types";
+import { WhatsappConnectCard } from "@/components/whatsapp/WhatsappConnectCard";
 
 export const Route = createFileRoute("/_authenticated/cliente/conexoes")({
   component: ConexoesPage,
@@ -23,6 +24,7 @@ type RedesForm = {
   site: string;
   linkedin: string;
   tiktok: string;
+  google_review: string;
 };
 
 const CAMPOS: {
@@ -37,6 +39,7 @@ const CAMPOS: {
   { name: "tiktok",     label: "TikTok",              placeholder: "@usuario",                  barColor: "bg-slate-700" },
   { name: "doctoralia", label: "Doctoralia",          placeholder: "URL do perfil",             barColor: "bg-teal-500" },
   { name: "site",       label: "Site / Landing Page", placeholder: "https://…",                barColor: "bg-violet-500" },
+  { name: "google_review", label: "Google Avaliações", placeholder: "https://g.page/r/…/review", barColor: "bg-amber-500" },
 ];
 
 function ConexoesPage() {
@@ -59,7 +62,7 @@ function ConexoesPage() {
   const redes = (cliente?.dados_extras as Record<string, Json> | null)?.redes as Record<string, string> | undefined;
 
   const form = useForm<RedesForm>({
-    defaultValues: { instagram: "", facebook: "", doctoralia: "", site: "", linkedin: "", tiktok: "" },
+    defaultValues: { instagram: "", facebook: "", doctoralia: "", site: "", linkedin: "", tiktok: "", google_review: "" },
   });
 
   useEffect(() => {
@@ -70,6 +73,7 @@ function ConexoesPage() {
       site:       redes.site       ?? "",
       linkedin:   redes.linkedin   ?? "",
       tiktok:     redes.tiktok     ?? "",
+      google_review: redes.google_review ?? "",
     });
   }, [redes, form]);
 
@@ -101,7 +105,7 @@ function ConexoesPage() {
         <span className="eyebrow-pill">Configurações</span>
         <h1 className="mt-3 text-xl font-bold tracking-tight">Conexões</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Links e redes sociais do seu consultório.
+          Conecte o WhatsApp e mantenha as redes do consultório atualizadas.
           {connected > 0 && (
             <span className="ml-2 inline-flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -110,6 +114,12 @@ function ConexoesPage() {
           )}
         </p>
       </header>
+
+      {clienteId ? (
+        <div className="mb-8 animate-fade-up">
+          <WhatsappConnectCard clienteId={clienteId} />
+        </div>
+      ) : null}
 
       <form onSubmit={form.handleSubmit((v) => save.mutate(v))}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

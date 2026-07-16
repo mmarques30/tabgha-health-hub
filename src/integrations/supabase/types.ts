@@ -274,6 +274,7 @@ export type Database = {
           email: string | null
           icp: string | null
           id: string
+          motivo_perda: string | null
           nome: string | null
           observacoes: string | null
           status: string
@@ -290,6 +291,7 @@ export type Database = {
           email?: string | null
           icp?: string | null
           id?: string
+          motivo_perda?: string | null
           nome?: string | null
           observacoes?: string | null
           status?: string
@@ -306,6 +308,7 @@ export type Database = {
           email?: string | null
           icp?: string | null
           id?: string
+          motivo_perda?: string | null
           nome?: string | null
           observacoes?: string | null
           status?: string

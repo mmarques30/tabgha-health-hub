@@ -1,33 +1,90 @@
-// Webhook do Meta Lead Ads.
+// Webhook Meta Lead Ads — captura real via Graph API.
 //
-// Recebe payloads do Facebook/Instagram quando um lead preenche um lead form.
-// Identifica o cliente Tabgha (via page_id) e insere em `leads`.
+// GET  → hub.verify_token (META_WEBHOOK_VERIFY_TOKEN)
+// POST → leadgen events → Graph API → INSERT leads
 //
-// Setup:
-//   1. Subir essa function no Supabase: `supabase functions deploy webhook_meta_lead`
-//   2. Configurar webhook no Meta Business → Webhooks → Leadgen apontando pra
-//      https://<project>.supabase.co/functions/v1/webhook_meta_lead
-//   3. Verify token: usar variável META_WEBHOOK_VERIFY_TOKEN
-//   4. Mapeamento page_id → cliente_id mora em `clientes.dados_extras.meta.page_id`
-//      ou no novo `app_config` chave "meta_page_map".
-//
-// Status: STUB. Implementação real precisa do token Page Access do Meta pra
-// puxar o conteúdo do lead via Graph API.
+// Cliente resolvido por dados_extras.meta.page_id (ou legado meta_page_id).
+// Token: dados_extras.meta.access_token
+// Mapa de campos: app_config.meta_form_map[form_id] ou _default
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// @ts-expect-error Deno global available in edge runtime
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-// @ts-expect-error Deno global available in edge runtime
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-// @ts-expect-error Deno global available in edge runtime
 const VERIFY_TOKEN = Deno.env.get("META_WEBHOOK_VERIFY_TOKEN") ?? "";
+const GRAPH_VERSION = Deno.env.get("META_GRAPH_VERSION") ?? "v19.0";
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-// @ts-expect-error Deno global available in edge runtime
+type FieldData = { name?: string; values?: string[] };
+type FormMap = Record<string, string[] | string>;
+
+function json(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function normalizePhone(phone: string) {
+  return phone.replace(/\D/g, "");
+}
+
+function pickField(fieldData: FieldData[], aliases: string[]): string | null {
+  const lowered = aliases.map((a) => a.toLowerCase());
+  for (const field of fieldData) {
+    const name = (field.name ?? "").toLowerCase();
+    if (lowered.includes(name)) {
+      const value = field.values?.[0]?.trim();
+      if (value) return value;
+    }
+  }
+  return null;
+}
+
+async function resolveCliente(pageId: string) {
+  const { data: byNested } = await supabase
+    .from("clientes")
+    .select("id, dados_extras")
+    .filter("dados_extras->meta->>page_id", "eq", pageId)
+    .limit(1)
+    .maybeSingle();
+
+  if (byNested) return byNested;
+
+  const { data: byLegacy } = await supabase
+    .from("clientes")
+    .select("id, dados_extras")
+    .filter("dados_extras->>meta_page_id", "eq", pageId)
+    .limit(1)
+    .maybeSingle();
+
+  return byLegacy ?? null;
+}
+
+async function loadFormMap(formId: string | undefined): Promise<FormMap> {
+  const { data } = await supabase
+    .from("app_config")
+    .select("valor")
+    .eq("chave", "meta_form_map")
+    .maybeSingle();
+
+  const maps = (data?.valor ?? {}) as Record<string, FormMap>;
+  if (formId && maps[formId]) return maps[formId];
+  return maps._default ?? {
+    nome: ["full_name", "name", "nome"],
+    telefone: ["phone_number", "phone", "telefone"],
+    email: ["email"],
+  };
+}
+
+function aliasesFor(map: FormMap, key: string): string[] {
+  const raw = map[key];
+  if (!raw) return [];
+  return Array.isArray(raw) ? raw : [raw];
+}
+
 Deno.serve(async (req: Request) => {
-  // Meta exige GET com hub.challenge na criação do webhook.
   if (req.method === "GET") {
     const url = new URL(req.url);
     const mode = url.searchParams.get("hub.mode");
@@ -40,62 +97,156 @@ Deno.serve(async (req: Request) => {
   }
 
   if (req.method !== "POST") {
-    return new Response("method not allowed", { status: 405 });
+    return json({ ok: false, error: "method_not_allowed" }, 405);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ ok: false, error: "invalid_json" }, 200);
   }
 
   try {
-    const body = await req.json();
-    // Meta envia entries[].changes[].value com leadgen_id + page_id.
-    const entries = body.entry ?? [];
+    const entries = (body.entry as Array<Record<string, unknown>>) ?? [];
     let inseridos = 0;
 
     for (const entry of entries) {
-      const changes = entry.changes ?? [];
+      const changes = (entry.changes as Array<Record<string, unknown>>) ?? [];
       for (const change of changes) {
         if (change.field !== "leadgen") continue;
-        const pageId = change.value?.page_id;
-        const leadgenId = change.value?.leadgen_id;
+
+        const value = (change.value ?? {}) as {
+          page_id?: string;
+          leadgen_id?: string;
+          form_id?: string;
+          created_time?: string;
+          ad_id?: string;
+          campaign_id?: string;
+        };
+
+        const pageId = value.page_id ?? (entry.id as string | undefined);
+        const leadgenId = value.leadgen_id;
         if (!pageId || !leadgenId) continue;
 
-        // Mapear page_id pra cliente_id — lookup em clientes.dados_extras.
-        const { data: matches } = await supabase
-          .from("clientes")
-          .select("id, dados_extras")
-          .filter(
-            "dados_extras->>meta_page_id" as never,
-            "eq" as never,
-            String(pageId) as never,
-          );
-        const clienteId = matches?.[0]?.id;
-        if (!clienteId) {
-          console.warn("Lead Meta sem cliente mapeado", { pageId, leadgenId });
+        const cliente = await resolveCliente(String(pageId));
+        if (!cliente) {
+          await supabase.from("webhook_errors").insert({
+            source: "meta_lead",
+            payload: { pageId, leadgenId, change },
+            error: "cliente não encontrado para page_id",
+          });
           continue;
         }
 
-        // TODO: buscar dados do lead na Graph API (precisa token).
-        // Por enquanto registramos o evento com placeholders.
-        await supabase.from("leads").insert({
-          cliente_id: clienteId,
-          nome: "Lead Meta (sync pendente)",
-          canal: "facebook",
-          origem: `leadgen:${leadgenId}`,
-          utm_source: "meta_ads",
-          status: "novo",
+        const meta = (cliente.dados_extras as {
+          meta?: { access_token?: string };
+        } | null)?.meta;
+        const accessToken = meta?.access_token;
+        if (!accessToken) {
+          await supabase.from("webhook_errors").insert({
+            source: "meta_lead",
+            cliente_id: cliente.id,
+            payload: { pageId, leadgenId },
+            error: "access_token Meta ausente em dados_extras.meta",
+          });
+          continue;
+        }
+
+        const graphUrl =
+          `https://graph.facebook.com/${GRAPH_VERSION}/${leadgenId}` +
+          `?access_token=${encodeURIComponent(accessToken)}` +
+          `&fields=field_data,created_time,ad_id,campaign_id,form_id`;
+
+        const graphRes = await fetch(graphUrl);
+        if (!graphRes.ok) {
+          const text = await graphRes.text();
+          await supabase.from("webhook_errors").insert({
+            source: "meta_lead",
+            cliente_id: cliente.id,
+            payload: { pageId, leadgenId, status: graphRes.status, text },
+            error: `Graph API error ${graphRes.status}`,
+          });
+          continue;
+        }
+
+        const leadPayload = (await graphRes.json()) as {
+          field_data?: FieldData[];
+          ad_id?: string;
+          campaign_id?: string;
+          form_id?: string;
+        };
+
+        const formId = leadPayload.form_id ?? value.form_id;
+        const formMap = await loadFormMap(formId);
+        const fieldData = leadPayload.field_data ?? [];
+
+        const nome =
+          pickField(fieldData, aliasesFor(formMap, "nome")) ?? "Lead Meta";
+        const telefoneRaw = pickField(fieldData, aliasesFor(formMap, "telefone"));
+        const email = pickField(fieldData, aliasesFor(formMap, "email"));
+        const telefone = telefoneRaw ? normalizePhone(telefoneRaw) : null;
+
+        const adId = leadPayload.ad_id ?? value.ad_id ?? null;
+        const campaignId = leadPayload.campaign_id ?? value.campaign_id ?? null;
+
+        const { data: lead, error: insertError } = await supabase
+          .from("leads")
+          .insert({
+            cliente_id: cliente.id,
+            nome,
+            telefone,
+            email,
+            canal: "meta",
+            utm_source: "facebook",
+            utm_campaign: campaignId,
+            status: "novo",
+            observacoes: [
+              adId ? `Ad ${adId}` : null,
+              formId ? `form ${formId}` : null,
+              `leadgen ${leadgenId}`,
+            ]
+              .filter(Boolean)
+              .join(" | "),
+          })
+          .select("id")
+          .single();
+
+        if (insertError) {
+          await supabase.from("webhook_errors").insert({
+            source: "meta_lead",
+            cliente_id: cliente.id,
+            payload: { leadgenId, insertError },
+            error: insertError.message,
+          });
+          continue;
+        }
+
+        await supabase.from("automation_logs").insert({
+          cliente_id: cliente.id,
+          action: "meta_lead_captured",
+          metadata: {
+            lead_id: lead.id,
+            leadgen_id: leadgenId,
+            page_id: pageId,
+            form_id: formId,
+            ad_id: adId,
+            campaign_id: campaignId,
+          },
         });
+
         inseridos += 1;
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, inseridos }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ ok: true, inseridos });
   } catch (err) {
-    return new Response(
-      JSON.stringify({
-        ok: false,
-        error: err instanceof Error ? err.message : String(err),
-      }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    console.error("webhook_meta_lead error", err);
+    await supabase.from("webhook_errors").insert({
+      source: "meta_lead",
+      payload: body,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return json({ ok: false, error: "handled" }, 200);
   }
 });

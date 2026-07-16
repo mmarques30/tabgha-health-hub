@@ -32,6 +32,7 @@ import {
   Eye,
   X,
   ShieldCheck,
+  Package,
 } from "lucide-react";
 
 type NavItem = {
@@ -106,6 +107,7 @@ const CLIENTE_NAV: NavGroup[] = [
     group: "Marketing",
     items: [
       { to: "/cliente/conteudo",   label: "Conteúdo",    icon: FileText,        perm: "cliente.conteudo" },
+      { to: "/cliente/entregas",   label: "Entregas",    icon: Package,         perm: "cliente.entregas" },
       { to: "/cliente/meta-ads",   label: "Meta Ads",    icon: Megaphone,       perm: "cliente.meta_ads" },
       { to: "/cliente/calendario", label: "Calendário",  icon: Calendar,        perm: "cliente.calendario" },
     ],

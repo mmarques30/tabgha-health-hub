@@ -94,6 +94,7 @@ function ClienteDashboard() {
       value: counts?.leads ?? 0,
       accent: "bg-primary",
       delay: 0,
+      to: "/cliente/leads" as const,
     },
     {
       rank: "02",
@@ -101,6 +102,7 @@ function ClienteDashboard() {
       value: counts?.novos_mes ?? 0,
       accent: "bg-emerald-500",
       delay: 75,
+      to: "/cliente/leads" as const,
     },
     {
       rank: "03",
@@ -108,6 +110,7 @@ function ClienteDashboard() {
       value: counts?.entregas_pendentes ?? 0,
       accent: (counts?.entregas_pendentes ?? 0) > 0 ? "bg-amber-500" : "bg-primary",
       delay: 150,
+      to: "/cliente/entregas" as const,
     },
   ];
 
@@ -124,8 +127,9 @@ function ClienteDashboard() {
       {/* KPI cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {kpiCards.map((card) => (
-          <div
+          <Link
             key={card.rank}
+            to={card.to}
             className="card-lift animate-fade-up rounded-2xl border border-border bg-card px-5 pt-5 pb-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)] flex flex-col"
             style={{ animationDelay: `${card.delay}ms` }}
           >
@@ -141,7 +145,7 @@ function ClienteDashboard() {
               </p>
             )}
             <div className={cn("mt-3 h-0.5 w-full rounded-full", card.accent)} />
-          </div>
+          </Link>
         ))}
       </div>
 
@@ -157,8 +161,8 @@ function ClienteDashboard() {
                 </span>
               )}
             </div>
-            <Link to="/cliente/calendario" className="flex items-center gap-1 text-xs text-primary hover:underline">
-              Calendário <ArrowRight className="h-3 w-3" />
+            <Link to="/cliente/conteudo" className="flex items-center gap-1 text-xs text-primary hover:underline">
+              Revisar <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
           {loadingAprovacoes ? (

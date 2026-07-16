@@ -165,6 +165,7 @@ export type Database = {
           cliente_id: string
           criado_em: string
           data_postagem: string | null
+          feedback_cliente: string | null
           id: string
           rede: string | null
           roteiro: string | null
@@ -179,6 +180,7 @@ export type Database = {
           cliente_id: string
           criado_em?: string
           data_postagem?: string | null
+          feedback_cliente?: string | null
           id?: string
           rede?: string | null
           roteiro?: string | null
@@ -193,6 +195,7 @@ export type Database = {
           cliente_id?: string
           criado_em?: string
           data_postagem?: string | null
+          feedback_cliente?: string | null
           id?: string
           rede?: string | null
           roteiro?: string | null
@@ -721,6 +724,14 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      responder_conteudo: {
+        Args: { _aprovada: boolean; _feedback?: string; _id: string }
+        Returns: undefined
+      }
+      atualizar_redes_cliente: {
+        Args: { _redes: Json }
+        Returns: undefined
       }
       responder_entrega: {
         Args: { _aprovada: boolean; _id: string; _resposta: string }

@@ -38,18 +38,21 @@ function AprovacaoModal({ conteudo, onClose }: { conteudo: Tables<"conteudos">; 
 
   const aprovar = useMutation({
     mutationFn: async (aprovado: boolean) => {
-      // Atualiza o conteudo diretamente (RLS valida que é do próprio cliente)
-      const { error } = await supabase.from("conteudos")
-        .update({ status: aprovado ? "agendado" : "roteiro" })
-        .eq("id", conteudo.id).eq("cliente_id", profile!.cliente_id!);
+      if (!profile?.cliente_id) throw new Error("Cliente não vinculado.");
+      const { error } = await supabase.rpc("responder_conteudo", {
+        _id: conteudo.id,
+        _aprovada: aprovado,
+        _feedback: feedback.trim() || null,
+      });
       if (error) throw error;
     },
     onSuccess: (_, aprovado) => {
       toast.success(aprovado ? "Conteúdo aprovado!" : "Conteúdo devolvido para revisão.");
       qc.invalidateQueries({ queryKey: ["cliente", "conteudos"] });
+      qc.invalidateQueries({ queryKey: ["cliente", "dashboard"] });
       onClose();
     },
-    onError: () => toast.error("Erro ao processar resposta."),
+    onError: (err: Error) => toast.error(err.message || "Erro ao processar resposta."),
   });
 
   return (

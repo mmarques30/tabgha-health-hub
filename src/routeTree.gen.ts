@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedClienteRoiRouteImport } from './routes/_authenticated/cliente/roi'
 import { Route as AuthenticatedClienteMetaAdsRouteImport } from './routes/_authenticated/cliente/meta-ads'
 import { Route as AuthenticatedClienteLeadsRouteImport } from './routes/_authenticated/cliente/leads'
+import { Route as AuthenticatedClienteEntregasRouteImport } from './routes/_authenticated/cliente/entregas'
 import { Route as AuthenticatedClienteDiagnosticoRouteImport } from './routes/_authenticated/cliente/diagnostico'
 import { Route as AuthenticatedClienteDashboardRouteImport } from './routes/_authenticated/cliente/dashboard'
 import { Route as AuthenticatedClienteConteudoRouteImport } from './routes/_authenticated/cliente/conteudo'
@@ -71,6 +72,12 @@ const AuthenticatedClienteLeadsRoute =
   AuthenticatedClienteLeadsRouteImport.update({
     id: '/cliente/leads',
     path: '/cliente/leads',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClienteEntregasRoute =
+  AuthenticatedClienteEntregasRouteImport.update({
+    id: '/cliente/entregas',
+    path: '/cliente/entregas',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedClienteDiagnosticoRoute =
@@ -214,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/cliente/conteudo': typeof AuthenticatedClienteConteudoRoute
   '/cliente/dashboard': typeof AuthenticatedClienteDashboardRoute
   '/cliente/diagnostico': typeof AuthenticatedClienteDiagnosticoRoute
+  '/cliente/entregas': typeof AuthenticatedClienteEntregasRoute
   '/cliente/leads': typeof AuthenticatedClienteLeadsRoute
   '/cliente/meta-ads': typeof AuthenticatedClienteMetaAdsRoute
   '/cliente/roi': typeof AuthenticatedClienteRoiRoute
@@ -242,6 +250,7 @@ export interface FileRoutesByTo {
   '/cliente/conteudo': typeof AuthenticatedClienteConteudoRoute
   '/cliente/dashboard': typeof AuthenticatedClienteDashboardRoute
   '/cliente/diagnostico': typeof AuthenticatedClienteDiagnosticoRoute
+  '/cliente/entregas': typeof AuthenticatedClienteEntregasRoute
   '/cliente/leads': typeof AuthenticatedClienteLeadsRoute
   '/cliente/meta-ads': typeof AuthenticatedClienteMetaAdsRoute
   '/cliente/roi': typeof AuthenticatedClienteRoiRoute
@@ -272,6 +281,7 @@ export interface FileRoutesById {
   '/_authenticated/cliente/conteudo': typeof AuthenticatedClienteConteudoRoute
   '/_authenticated/cliente/dashboard': typeof AuthenticatedClienteDashboardRoute
   '/_authenticated/cliente/diagnostico': typeof AuthenticatedClienteDiagnosticoRoute
+  '/_authenticated/cliente/entregas': typeof AuthenticatedClienteEntregasRoute
   '/_authenticated/cliente/leads': typeof AuthenticatedClienteLeadsRoute
   '/_authenticated/cliente/meta-ads': typeof AuthenticatedClienteMetaAdsRoute
   '/_authenticated/cliente/roi': typeof AuthenticatedClienteRoiRoute
@@ -302,6 +312,7 @@ export interface FileRouteTypes {
     | '/cliente/conteudo'
     | '/cliente/dashboard'
     | '/cliente/diagnostico'
+    | '/cliente/entregas'
     | '/cliente/leads'
     | '/cliente/meta-ads'
     | '/cliente/roi'
@@ -330,6 +341,7 @@ export interface FileRouteTypes {
     | '/cliente/conteudo'
     | '/cliente/dashboard'
     | '/cliente/diagnostico'
+    | '/cliente/entregas'
     | '/cliente/leads'
     | '/cliente/meta-ads'
     | '/cliente/roi'
@@ -359,6 +371,7 @@ export interface FileRouteTypes {
     | '/_authenticated/cliente/conteudo'
     | '/_authenticated/cliente/dashboard'
     | '/_authenticated/cliente/diagnostico'
+    | '/_authenticated/cliente/entregas'
     | '/_authenticated/cliente/leads'
     | '/_authenticated/cliente/meta-ads'
     | '/_authenticated/cliente/roi'
@@ -422,6 +435,13 @@ declare module '@tanstack/react-router' {
       path: '/cliente/leads'
       fullPath: '/cliente/leads'
       preLoaderRoute: typeof AuthenticatedClienteLeadsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/cliente/entregas': {
+      id: '/_authenticated/cliente/entregas'
+      path: '/cliente/entregas'
+      fullPath: '/cliente/entregas'
+      preLoaderRoute: typeof AuthenticatedClienteEntregasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/cliente/diagnostico': {
@@ -586,6 +606,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClienteConteudoRoute: typeof AuthenticatedClienteConteudoRoute
   AuthenticatedClienteDashboardRoute: typeof AuthenticatedClienteDashboardRoute
   AuthenticatedClienteDiagnosticoRoute: typeof AuthenticatedClienteDiagnosticoRoute
+  AuthenticatedClienteEntregasRoute: typeof AuthenticatedClienteEntregasRoute
   AuthenticatedClienteLeadsRoute: typeof AuthenticatedClienteLeadsRoute
   AuthenticatedClienteMetaAdsRoute: typeof AuthenticatedClienteMetaAdsRoute
   AuthenticatedClienteRoiRoute: typeof AuthenticatedClienteRoiRoute
@@ -613,6 +634,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedClienteConteudoRoute: AuthenticatedClienteConteudoRoute,
   AuthenticatedClienteDashboardRoute: AuthenticatedClienteDashboardRoute,
   AuthenticatedClienteDiagnosticoRoute: AuthenticatedClienteDiagnosticoRoute,
+  AuthenticatedClienteEntregasRoute: AuthenticatedClienteEntregasRoute,
   AuthenticatedClienteLeadsRoute: AuthenticatedClienteLeadsRoute,
   AuthenticatedClienteMetaAdsRoute: AuthenticatedClienteMetaAdsRoute,
   AuthenticatedClienteRoiRoute: AuthenticatedClienteRoiRoute,

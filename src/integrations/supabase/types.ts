@@ -483,6 +483,56 @@ export type Database = {
           },
         ]
       }
+      whatsapp_instances: {
+        Row: {
+          atualizado_em: string
+          cliente_id: string
+          criado_em: string
+          dados_extras: Json | null
+          id: string
+          instance_id: string | null
+          last_connected_at: string | null
+          phone: string | null
+          provider: string
+          status: string
+          token: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          cliente_id: string
+          criado_em?: string
+          dados_extras?: Json | null
+          id?: string
+          instance_id?: string | null
+          last_connected_at?: string | null
+          phone?: string | null
+          provider: string
+          status?: string
+          token?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          cliente_id?: string
+          criado_em?: string
+          dados_extras?: Json | null
+          id?: string
+          instance_id?: string | null
+          last_connected_at?: string | null
+          phone?: string | null
+          provider?: string
+          status?: string
+          token?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instances_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_conversations: {
         Row: {
           atualizado_em: string
@@ -635,6 +685,7 @@ export type Database = {
       }
       assert_current_admin: { Args: never; Returns: undefined }
       bootstrap_admin: { Args: { _email: string }; Returns: string }
+      close_stalled_conversations: { Args: never; Returns: number }
       current_cliente_id: { Args: never; Returns: string }
       get_or_create_conversation: {
         Args: {

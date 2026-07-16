@@ -26,14 +26,47 @@ function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
 }
 
-function extractZapiConfig(dadosExtras: Json | null): ZapiConfig {
+function extractLegacyZapiConfig(dadosExtras: Json | null): ZapiConfig | null {
   const zapi = (dadosExtras as { automacoes?: { zapi?: ZapiConfig } })?.automacoes?.zapi;
 
   if (!zapi?.instance_id || !zapi?.token) {
-    throw new Error("ZAPI não configurada para este cliente");
+    return null;
   }
 
   return zapi;
+}
+
+async function resolveZapiConfig(
+  supabase: AuthContext["supabase"],
+  clienteId: string,
+  dadosExtras: Json | null,
+): Promise<ZapiConfig> {
+  const { data: instance } = await supabase
+    .from("whatsapp_instances")
+    .select("instance_id, token, dados_extras, status")
+    .eq("cliente_id", clienteId)
+    .eq("status", "connected")
+    .maybeSingle();
+
+  if (instance?.instance_id && instance?.token) {
+    const extras = (instance.dados_extras ?? {}) as {
+      client_token?: string;
+      base_url?: string;
+    };
+    return {
+      instance_id: instance.instance_id,
+      token: instance.token,
+      client_token: extras.client_token,
+      base_url: extras.base_url,
+    };
+  }
+
+  const legacy = extractLegacyZapiConfig(dadosExtras);
+  if (legacy) {
+    return legacy;
+  }
+
+  throw new Error("ZAPI não configurada para este cliente");
 }
 
 async function ensurePhoneExists(
@@ -87,7 +120,7 @@ type SendInput = z.infer<typeof sendWhatsappInput>;
 type SendOutput = { ok: true; message_id: string; zapi_message_id: string | null };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const sendWhatsappMessage = ((createServerFn({ method: "POST" }) as any)
+export const sendWhatsappMessage = (createServerFn({ method: "POST" }) as any)
   .middleware([requireRoleAuth])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   .handler(async (ctx: any) => {
@@ -118,7 +151,7 @@ export const sendWhatsappMessage = ((createServerFn({ method: "POST" }) as any)
 
     let zapi: ZapiConfig;
     try {
-      zapi = extractZapiConfig(cliente.dados_extras);
+      zapi = await resolveZapiConfig(auth.supabase, conversation.cliente_id, cliente.dados_extras);
     } catch {
       throw new Error(`Cliente ${cliente.nome} não tem Z-API configurada`);
     }
@@ -186,4 +219,4 @@ export const sendWhatsappMessage = ((createServerFn({ method: "POST" }) as any)
       message_id: message.id,
       zapi_message_id: zapiMessageId,
     };
-  })) as (input: { data: SendInput }) => Promise<SendOutput>;
+  }) as (input: { data: SendInput }) => Promise<SendOutput>;

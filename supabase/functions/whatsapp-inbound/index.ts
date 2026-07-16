@@ -227,7 +227,27 @@ Deno.serve(async (req) => {
     const agenteAtivo = agenteFlag === true || agenteFlag === 'true'
 
     if (conversation?.owner_state === 'bot' && agenteAtivo) {
-      // ai-respond edge function will be wired in a follow-up prompt (Onda 5).
+      // Fire-and-forget: não bloqueia o ACK do webhook ZAPI
+      const aiUrl = `${SUPABASE_URL}/functions/v1/ai-respond`
+      void fetch(aiUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${SERVICE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          cliente_id: cliente.id,
+        }),
+      }).catch(async (err) => {
+        console.error('ai-respond invoke failed', err)
+        await supabase.from('webhook_errors').insert({
+          source: 'ai_respond',
+          cliente_id: cliente.id,
+          payload: { conversation_id: conversationId },
+          error: err instanceof Error ? err.message : String(err),
+        })
+      })
     }
 
     return json({ ok: true })

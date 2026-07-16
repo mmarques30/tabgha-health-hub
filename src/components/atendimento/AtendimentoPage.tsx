@@ -42,6 +42,14 @@ function ownerStateDot(ownerState: string | null) {
       </span>
     );
   }
+  if (ownerState === "human_alert") {
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+        <span className="text-[10.5px] font-semibold text-amber-700">Aguardando humano</span>
+      </span>
+    );
+  }
   if (ownerState === "bot") {
     return (
       <span className="flex items-center gap-1.5">
@@ -428,6 +436,32 @@ export function AtendimentoPage({ isAdmin = false }: AtendimentoPageProps) {
                   />
                 </div>
               </div>
+              {selected.bot_notes && Object.keys(selected.bot_notes).length > 0 ? (
+                <div className="px-4 py-3">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Notas do Pietro
+                  </p>
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    {[
+                      "resumo",
+                      "intencao",
+                      "urgencia",
+                      "fit",
+                      "capacidade",
+                      "last_handoff_reason",
+                    ].map((key) => {
+                      const value = selected.bot_notes?.[key];
+                      if (value == null || value === "") return null;
+                      return (
+                        <p key={key}>
+                          <span className="font-semibold text-foreground">{key}: </span>
+                          {String(value)}
+                        </p>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="rounded-xl border border-border bg-secondary/30 px-4 py-3">

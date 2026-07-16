@@ -13,11 +13,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Link } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Json, Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_authenticated/admin/clientes/$id")({
   component: ClienteFichaPage,
@@ -635,33 +636,102 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
   const qc = useQueryClient();
   const extras = (cliente.dados_extras ?? {}) as Record<string, unknown>;
   const agenteIa = (extras.agente_ia ?? {}) as Record<string, string>;
+  const automacoes = (extras.automacoes ?? {}) as Record<string, unknown>;
+  const zapi = (automacoes.zapi ?? {}) as Record<string, unknown>;
 
   const [metodo, setMetodo] = useState(agenteIa.metodo_qualificacao ?? "");
+  const [agenteAtivo, setAgenteAtivo] = useState(
+    zapi.agente_ativo === true || zapi.agente_ativo === "true",
+  );
   const [json, setJson] = useState(JSON.stringify(extras, null, 2));
   const [jsonError, setJsonError] = useState("");
 
   const saveMetodo = useMutation({
     mutationFn: async () => {
       let base: Record<string, unknown>;
-      try { base = JSON.parse(json); } catch { throw new Error("JSON inválido."); }
-      const novoExtras = { ...base, agente_ia: { ...(base.agente_ia as object ?? {}), metodo_qualificacao: metodo || null } };
-      const { error } = await supabase.from("clientes").update({ dados_extras: novoExtras }).eq("id", cliente.id);
+      try {
+        base = JSON.parse(json);
+      } catch {
+        throw new Error("JSON inválido.");
+      }
+      const baseAutomacoes = (base.automacoes ?? {}) as Record<string, unknown>;
+      const baseZapi = (baseAutomacoes.zapi ?? {}) as Record<string, unknown>;
+      const novoExtras = {
+        ...base,
+        agente_ia: {
+          ...((base.agente_ia as object) ?? {}),
+          metodo_qualificacao: metodo || null,
+        },
+        automacoes: {
+          ...baseAutomacoes,
+          zapi: {
+            ...baseZapi,
+            agente_ativo: agenteAtivo,
+          },
+        },
+      };
+
+      const { error } = await supabase
+        .from("clientes")
+        .update({ dados_extras: novoExtras as Json })
+        .eq("id", cliente.id);
       if (error) throw error;
+
+      const { data: instance } = await supabase
+        .from("whatsapp_instances")
+        .select("id, dados_extras")
+        .eq("cliente_id", cliente.id)
+        .eq("status", "connected")
+        .maybeSingle();
+
+      if (instance) {
+        const instanceExtras = {
+          ...((instance.dados_extras as Record<string, unknown> | null) ?? {}),
+          agente_ativo: agenteAtivo,
+        };
+        const { error: instanceError } = await supabase
+          .from("whatsapp_instances")
+          .update({ dados_extras: instanceExtras as Json })
+          .eq("id", instance.id);
+        if (instanceError) throw instanceError;
+      }
+
+      setJson(JSON.stringify(novoExtras, null, 2));
     },
-    onSuccess: () => { toast.success("Método salvo."); qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] }); setJsonError(""); },
-    onError: (e: Error) => { toast.error(e.message); setJsonError(e.message); },
+    onSuccess: () => {
+      toast.success("Agente salvo.");
+      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
+      setJsonError("");
+    },
+    onError: (e: Error) => {
+      toast.error(e.message);
+      setJsonError(e.message);
+    },
   });
 
   const saveJson = useMutation({
     mutationFn: async () => {
       let parsed: unknown;
-      try { parsed = JSON.parse(json); } catch { throw new Error("JSON inválido."); }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase.from("clientes").update({ dados_extras: parsed as any }).eq("id", cliente.id);
+      try {
+        parsed = JSON.parse(json);
+      } catch {
+        throw new Error("JSON inválido.");
+      }
+      const { error } = await supabase
+        .from("clientes")
+        .update({ dados_extras: parsed as Json })
+        .eq("id", cliente.id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("JSON salvo."); qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] }); setJsonError(""); },
-    onError: (e: Error) => { toast.error(e.message); setJsonError(e.message); },
+    onSuccess: () => {
+      toast.success("JSON salvo.");
+      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
+      setJsonError("");
+    },
+    onError: (e: Error) => {
+      toast.error(e.message);
+      setJsonError(e.message);
+    },
   });
 
   return (
@@ -671,9 +741,18 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
         <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
           <div className="flex items-center gap-2.5 border-b border-sky-100 bg-sky-50/60 px-5 py-3">
             <span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-sky-700">Método de qualificação do agente</p>
+            <p className="text-[10.5px] font-bold uppercase tracking-widest text-sky-700">Pietro · Agente WhatsApp</p>
           </div>
           <div className="p-5 space-y-3">
+            <div className="flex items-center justify-between rounded-xl border border-border bg-secondary/30 px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium">Agente ativo</p>
+                <p className="text-xs text-muted-foreground">
+                  Quando ligado, o bot responde conversas com owner_state=bot.
+                </p>
+              </div>
+              <Switch checked={agenteAtivo} onCheckedChange={setAgenteAtivo} />
+            </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Cole a metodologia que o agente deve seguir nas conversas.
               Se vazio, usa o padrão genérico (intenção, urgência, fit, capacidade financeira).
@@ -688,7 +767,7 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
             {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
             <Button size="sm" onClick={() => saveMetodo.mutate()} disabled={saveMetodo.isPending} className="gap-2">
               {saveMetodo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Salvar método
+              Salvar agente
             </Button>
           </div>
         </div>

@@ -10,6 +10,7 @@ export type WhatsappConversation = {
   state: string;
   step_count: number;
   bot_score: number | null;
+  bot_notes?: Record<string, unknown> | null;
   owner_state: string | null;
   last_inbound_at: string | null;
   last_outbound_at: string | null;

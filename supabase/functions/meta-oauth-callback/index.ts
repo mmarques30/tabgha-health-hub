@@ -12,12 +12,9 @@ const META_APP_ID = Deno.env.get("META_APP_ID") ?? "";
 const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
 const GRAPH_VERSION = Deno.env.get("META_GRAPH_VERSION") ?? "v19.0";
 const REDIRECT_URI =
-  Deno.env.get("META_OAUTH_REDIRECT_URI") ??
-  `${SUPABASE_URL}/functions/v1/meta-oauth-callback`;
-const SUCCESS_URL =
-  Deno.env.get("META_OAUTH_SUCCESS_URL") ?? "/admin/config-meta?meta=connected";
-const ERROR_URL =
-  Deno.env.get("META_OAUTH_ERROR_URL") ?? "/admin/config-meta?meta=error";
+  Deno.env.get("META_OAUTH_REDIRECT_URI") ?? `${SUPABASE_URL}/functions/v1/meta-oauth-callback`;
+const SUCCESS_URL = Deno.env.get("META_OAUTH_SUCCESS_URL") ?? "/admin/config-meta?meta=connected";
+const ERROR_URL = Deno.env.get("META_OAUTH_ERROR_URL") ?? "/admin/config-meta?meta=error";
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -80,6 +77,24 @@ async function fetchPage(token: string) {
   return data.data?.[0] ?? null;
 }
 
+async function fetchAdAccount(token: string) {
+  const url =
+    `https://graph.facebook.com/${GRAPH_VERSION}/me/adaccounts` +
+    `?fields=id,name,account_id` +
+    `&access_token=${encodeURIComponent(token)}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    return null;
+  }
+  const data = (await res.json()) as {
+    data?: Array<{ id?: string; account_id?: string }>;
+  };
+
+  const first = data.data?.[0];
+  return first?.account_id ?? first?.id?.replace(/^act_/, "") ?? null;
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
@@ -106,6 +121,7 @@ Deno.serve(async (req) => {
 
     const pageToken = page?.access_token ?? longLived.access_token;
     const pageId = page?.id ?? null;
+    const adAccountId = await fetchAdAccount(longLived.access_token);
     const expiresAt = longLived.expires_in
       ? new Date(Date.now() + longLived.expires_in * 1000).toISOString()
       : null;
@@ -129,6 +145,7 @@ Deno.serve(async (req) => {
         user_access_token: longLived.access_token,
         page_id: pageId,
         page_name: page?.name ?? null,
+        ad_account_id: adAccountId,
         expires_at: expiresAt,
         connected_at: new Date().toISOString(),
       },
@@ -144,7 +161,12 @@ Deno.serve(async (req) => {
     await supabase.from("automation_logs").insert({
       cliente_id: state,
       action: "meta_oauth_connected",
-      metadata: { page_id: pageId, page_name: page?.name ?? null, expires_at: expiresAt },
+      metadata: {
+        page_id: pageId,
+        page_name: page?.name ?? null,
+        ad_account_id: adAccountId,
+        expires_at: expiresAt,
+      },
     });
 
     return redirect(

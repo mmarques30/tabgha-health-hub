@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Link2Off, Loader2, Unplug } from "lucide-react";
+import { ExternalLink, Link2Off, Loader2, Save, Unplug } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useClientesOptions } from "@/hooks/useClientesOptions";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,13 +20,15 @@ type MetaExtras = {
   access_token?: string;
   page_id?: string;
   page_name?: string;
+  ad_account_id?: string;
   expires_at?: string;
   connected_at?: string;
 };
 
 const META_APP_ID = import.meta.env.VITE_META_APP_ID as string | undefined;
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) as
-  string | undefined;
+  | string
+  | undefined;
 
 function buildOAuthUrl(clienteId: string) {
   if (!META_APP_ID || !SUPABASE_URL) return null;
@@ -45,6 +48,8 @@ function ConfigMetaPage() {
   const { data: clientes = [], isLoading: loadingClientes } = useClientesOptions();
   const [clienteId, setClienteId] = useState<string>("");
   const [disconnecting, setDisconnecting] = useState(false);
+  const [savingAccount, setSavingAccount] = useState(false);
+  const [adAccountId, setAdAccountId] = useState("");
 
   useEffect(() => {
     if (!clienteId && clientes[0]?.id) {
@@ -85,8 +90,38 @@ function ConfigMetaPage() {
     return extras.meta ?? null;
   }, [cliente]);
 
+  useEffect(() => {
+    setAdAccountId(meta?.ad_account_id ?? "");
+  }, [meta?.ad_account_id]);
+
   const oauthUrl = clienteId ? buildOAuthUrl(clienteId) : null;
   const connected = Boolean(meta?.access_token && meta?.page_id);
+
+  async function saveAdAccount() {
+    if (!clienteId || !cliente) return;
+    setSavingAccount(true);
+    try {
+      const extras = ((cliente.dados_extras as Record<string, unknown> | null) ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const nextMeta = {
+        ...((extras.meta as Record<string, unknown> | undefined) ?? {}),
+        ad_account_id: adAccountId.trim() || null,
+      };
+      const { error } = await supabase
+        .from("clientes")
+        .update({ dados_extras: { ...extras, meta: nextMeta } as Json })
+        .eq("id", clienteId);
+      if (error) throw error;
+      toast.success("Ad Account ID salvo.");
+      void queryClient.invalidateQueries({ queryKey: ["cliente-meta", clienteId] });
+    } catch {
+      toast.error("Não foi possível salvar o Ad Account ID.");
+    } finally {
+      setSavingAccount(false);
+    }
+  }
 
   async function disconnect() {
     if (!clienteId || !cliente) return;
@@ -114,8 +149,8 @@ function ConfigMetaPage() {
         <span className="eyebrow-pill">Aquisição</span>
         <h1 className="mt-2 text-2xl font-bold tracking-tight">Conectar Meta Business</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Autorize o app da IAplicada com scopes de leads e ads. O token fica só no backend — nunca
-          no frontend.
+          Autorize o app da IAplicada e informe o <strong>Ad Account ID</strong> para habilitar o
+          sync diário de métricas.
         </p>
       </header>
 
@@ -160,6 +195,30 @@ function ConfigMetaPage() {
                 </p>
               ) : null}
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="adAccount">Ad Account ID (sem act_)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="adAccount"
+                  value={adAccountId}
+                  onChange={(e) => setAdAccountId(e.target.value)}
+                  placeholder="123456789012345"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => void saveAdAccount()}
+                  disabled={savingAccount}
+                >
+                  {savingAccount ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-2">
               {oauthUrl ? (
                 <Button asChild variant="outline" className="rounded-xl">
@@ -218,6 +277,9 @@ function ConfigMetaPage() {
             </li>
             <li>
               Verify token = secret <code>META_WEBHOOK_VERIFY_TOKEN</code>
+            </li>
+            <li>
+              Rodar sync diário com edge <code>sync_ads_metrics</code>
             </li>
           </ol>
         </div>

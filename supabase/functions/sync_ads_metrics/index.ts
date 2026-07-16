@@ -1,98 +1,185 @@
-// Sync diário de métricas Meta Ads + Google Ads → metricas_ads.
-//
-// Pra cada cliente com tokens configurados em clientes.dados_extras, busca as
-// métricas do dia anterior nas plataformas e upserta em metricas_ads.
-//
-// Roda diariamente via supabase cron:
-//   SELECT cron.schedule('sync-ads-metrics', '0 6 * * *',
-//     $$SELECT net.http_post(
-//       url := 'https://<project>.functions.supabase.co/sync_ads_metrics',
-//       headers := jsonb_build_object('Authorization', 'Bearer <anon_key>')
-//     )$$);
-//
-// Status: STUB. Plug das APIs Meta Marketing e Google Ads precisa dos tokens
-// OAuth de cada cliente — credenciais ficam em clientes.dados_extras.
-// Por enquanto a function só registra que rodou e responde 200.
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// @ts-expect-error Deno global available in edge runtime
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-// @ts-expect-error Deno global available in edge runtime
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const GRAPH_VERSION = Deno.env.get("META_GRAPH_VERSION") ?? "v19.0";
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-type DadosExtras = {
-  meta?: { access_token?: string; ad_account_id?: string };
-  google?: { refresh_token?: string; customer_id?: string };
+type MetaConfig = {
+  access_token?: string;
+  ad_account_id?: string;
 };
 
-async function syncMetaForClient(
-  _clienteId: string,
-  _config: NonNullable<DadosExtras["meta"]>,
-  _ontem: string,
-) {
-  // TODO: chamar Graph API /act_{ad_account_id}/insights
-  // params: time_range[since/until] = ontem, fields = spend, clicks, impressions,
-  //   actions[lead], action_values[lead] (atribuição)
-  // upsert em metricas_ads (cliente_id, data, plataforma='meta', campanha, ...).
-  return { inseridos: 0, erro: "not implemented" };
+type ClienteRow = {
+  id: string;
+  dados_extras?: { meta?: MetaConfig };
+};
+
+function json(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
-async function syncGoogleForClient(
-  _clienteId: string,
-  _config: NonNullable<DadosExtras["google"]>,
-  _ontem: string,
-) {
-  // TODO: chamar Google Ads API customers/{customer_id}/googleAds:search
-  // SELECT segments.date, metrics.cost_micros, metrics.clicks,
-  //   metrics.impressions, metrics.conversions, metrics.conversions_value
-  // upsert em metricas_ads (cliente_id, data, plataforma='google', ...).
-  return { inseridos: 0, erro: "not implemented" };
+function parseLeads(
+  actions: Array<{ action_type?: string; value?: string }> | null | undefined,
+): number {
+  const accepted = new Set([
+    "lead",
+    "onsite_conversion.lead_grouped",
+    "offsite_conversion.fb_pixel_lead",
+  ]);
+  return (actions ?? []).reduce((acc, item) => {
+    if (item.action_type && accepted.has(item.action_type)) {
+      return acc + Number(item.value ?? 0);
+    }
+    return acc;
+  }, 0);
 }
 
-// @ts-expect-error Deno global available in edge runtime
-Deno.serve(async (_req: Request) => {
+async function fetchMetaInsights(
+  accessToken: string,
+  adAccountId: string,
+  date: string,
+): Promise<Array<Record<string, unknown>>> {
+  const path = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
+  const url =
+    `https://graph.facebook.com/${GRAPH_VERSION}/${path}/insights` +
+    `?access_token=${encodeURIComponent(accessToken)}` +
+    `&level=campaign` +
+    `&fields=campaign_name,spend,impressions,clicks,actions,action_values` +
+    `&time_range=${encodeURIComponent(JSON.stringify({ since: date, until: date }))}` +
+    `&limit=200`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Meta API ${response.status}: ${await response.text()}`);
+  }
+
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>;
+  };
+  return payload.data ?? [];
+}
+
+async function upsertMetrica(clienteId: string, date: string, row: Record<string, unknown>) {
+  const campaign = String(row.campaign_name ?? "Sem nome");
+  const investimento = Number(row.spend ?? 0);
+  const leads = parseLeads(
+    (row.actions as Array<{ action_type?: string; value?: string }> | undefined) ?? [],
+  );
+  const clicks = Number(row.clicks ?? 0);
+
+  const { error } = await supabase.from("metricas_ads").upsert(
+    {
+      cliente_id: clienteId,
+      data: date,
+      plataforma: "meta",
+      campanha: campaign,
+      investimento,
+      leads,
+      conversoes: leads,
+      cpl: leads > 0 ? investimento / leads : null,
+      cpa: leads > 0 ? investimento / leads : null,
+      roas: null,
+    },
+    { onConflict: "cliente_id,data,plataforma,campanha" },
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return { campanha: campaign, investimento, leads, clicks };
+}
+
+async function syncMetaForClient(cliente: ClienteRow, date: string) {
+  const config = cliente.dados_extras?.meta;
+  const accessToken = config?.access_token;
+  const adAccountId = config?.ad_account_id;
+
+  if (!accessToken || !adAccountId) {
+    return { inseridos: 0, skipped: true, motivo: "meta_not_configured" };
+  }
+
   try {
-    const ontem = new Date();
-    ontem.setDate(ontem.getDate() - 1);
-    const ontemISO = ontem.toISOString().slice(0, 10);
+    const rows = await fetchMetaInsights(accessToken, adAccountId, date);
+    let inseridos = 0;
+    for (const row of rows) {
+      await upsertMetrica(cliente.id, date, row);
+      inseridos += 1;
+    }
+
+    await supabase.from("automation_logs").insert({
+      cliente_id: cliente.id,
+      action: "meta_ads_synced",
+      metadata: {
+        data: date,
+        campanhas: inseridos,
+      },
+    });
+
+    return { inseridos, campanhas: rows.length };
+  } catch (error) {
+    await supabase.from("webhook_errors").insert({
+      source: "meta_ads_sync",
+      cliente_id: cliente.id,
+      payload: { date, retry_in_minutes: 30, max_attempts: 3 },
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return {
+      inseridos: 0,
+      erro: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method !== "POST" && req.method !== "GET") {
+    return json({ ok: false, error: "method_not_allowed" }, 405);
+  }
+
+  try {
+    let date = new Date();
+    date.setDate(date.getDate() - 1);
+
+    if (req.method === "POST") {
+      try {
+        const body = (await req.json()) as { date?: string };
+        if (body.date) {
+          date = new Date(`${body.date}T00:00:00Z`);
+        }
+      } catch {
+        // body opcional
+      }
+    }
+
+    const dateISO = date.toISOString().slice(0, 10);
 
     const { data: clientes, error } = await supabase
       .from("clientes")
       .select("id, dados_extras")
       .eq("status", "ativo");
+
     if (error) throw error;
 
-    const resultados: Array<{
-      cliente: string;
-      meta?: { inseridos: number; erro?: string };
-      google?: { inseridos: number; erro?: string };
-    }> = [];
-
-    for (const c of clientes ?? []) {
-      const dx = (c as { id: string; dados_extras?: DadosExtras }).dados_extras ?? {};
-      const out: (typeof resultados)[number] = { cliente: c.id };
-      if (dx.meta?.access_token) {
-        out.meta = await syncMetaForClient(c.id, dx.meta, ontemISO);
-      }
-      if (dx.google?.refresh_token) {
-        out.google = await syncGoogleForClient(c.id, dx.google, ontemISO);
-      }
-      resultados.push(out);
+    const resultados: Array<Record<string, unknown>> = [];
+    for (const cliente of (clientes ?? []) as ClienteRow[]) {
+      const metaResult = await syncMetaForClient(cliente, dateISO);
+      resultados.push({ cliente: cliente.id, meta: metaResult });
     }
 
-    return new Response(JSON.stringify({ ok: true, data: ontemISO, resultados }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    return new Response(
-      JSON.stringify({
+    return json({ ok: true, data: dateISO, resultados });
+  } catch (error) {
+    return json(
+      {
         ok: false,
-        error: err instanceof Error ? err.message : String(err),
-      }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+        error: error instanceof Error ? error.message : String(error),
+      },
+      500,
     );
   }
 });

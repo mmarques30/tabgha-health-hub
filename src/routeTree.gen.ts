@@ -26,6 +26,7 @@ import { Route as AuthenticatedClienteAtendimentoRouteImport } from './routes/_a
 import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin/usuarios'
 import { Route as AuthenticatedAdminRoiRouteImport } from './routes/_authenticated/admin/roi'
 import { Route as AuthenticatedAdminMetaAdsRouteImport } from './routes/_authenticated/admin/meta-ads'
+import { Route as AuthenticatedAdminLeadsRouteImport } from './routes/_authenticated/admin/leads'
 import { Route as AuthenticatedAdminEstrategiaRouteImport } from './routes/_authenticated/admin/estrategia'
 import { Route as AuthenticatedAdminDiagnosticosRouteImport } from './routes/_authenticated/admin/diagnosticos'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin/dashboard'
@@ -131,6 +132,11 @@ const AuthenticatedAdminMetaAdsRoute =
     path: '/admin/meta-ads',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminLeadsRoute = AuthenticatedAdminLeadsRouteImport.update({
+  id: '/admin/leads',
+  path: '/admin/leads',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAdminEstrategiaRoute =
   AuthenticatedAdminEstrategiaRouteImport.update({
     id: '/admin/estrategia',
@@ -197,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
   '/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
+  '/admin/leads': typeof AuthenticatedAdminLeadsRoute
   '/admin/meta-ads': typeof AuthenticatedAdminMetaAdsRoute
   '/admin/roi': typeof AuthenticatedAdminRoiRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
@@ -224,6 +231,7 @@ export interface FileRoutesByTo {
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
   '/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
+  '/admin/leads': typeof AuthenticatedAdminLeadsRoute
   '/admin/meta-ads': typeof AuthenticatedAdminMetaAdsRoute
   '/admin/roi': typeof AuthenticatedAdminRoiRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
@@ -253,6 +261,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
   '/_authenticated/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
+  '/_authenticated/admin/leads': typeof AuthenticatedAdminLeadsRoute
   '/_authenticated/admin/meta-ads': typeof AuthenticatedAdminMetaAdsRoute
   '/_authenticated/admin/roi': typeof AuthenticatedAdminRoiRoute
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
@@ -282,6 +291,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/diagnosticos'
     | '/admin/estrategia'
+    | '/admin/leads'
     | '/admin/meta-ads'
     | '/admin/roi'
     | '/admin/usuarios'
@@ -309,6 +319,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/diagnosticos'
     | '/admin/estrategia'
+    | '/admin/leads'
     | '/admin/meta-ads'
     | '/admin/roi'
     | '/admin/usuarios'
@@ -337,6 +348,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/dashboard'
     | '/_authenticated/admin/diagnosticos'
     | '/_authenticated/admin/estrategia'
+    | '/_authenticated/admin/leads'
     | '/_authenticated/admin/meta-ads'
     | '/_authenticated/admin/roi'
     | '/_authenticated/admin/usuarios'
@@ -482,6 +494,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminMetaAdsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/leads': {
+      id: '/_authenticated/admin/leads'
+      path: '/admin/leads'
+      fullPath: '/admin/leads'
+      preLoaderRoute: typeof AuthenticatedAdminLeadsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/estrategia': {
       id: '/_authenticated/admin/estrategia'
       path: '/admin/estrategia'
@@ -556,6 +575,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
   AuthenticatedAdminDiagnosticosRoute: typeof AuthenticatedAdminDiagnosticosRoute
   AuthenticatedAdminEstrategiaRoute: typeof AuthenticatedAdminEstrategiaRoute
+  AuthenticatedAdminLeadsRoute: typeof AuthenticatedAdminLeadsRoute
   AuthenticatedAdminMetaAdsRoute: typeof AuthenticatedAdminMetaAdsRoute
   AuthenticatedAdminRoiRoute: typeof AuthenticatedAdminRoiRoute
   AuthenticatedAdminUsuariosRoute: typeof AuthenticatedAdminUsuariosRoute
@@ -582,6 +602,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
   AuthenticatedAdminDiagnosticosRoute: AuthenticatedAdminDiagnosticosRoute,
   AuthenticatedAdminEstrategiaRoute: AuthenticatedAdminEstrategiaRoute,
+  AuthenticatedAdminLeadsRoute: AuthenticatedAdminLeadsRoute,
   AuthenticatedAdminMetaAdsRoute: AuthenticatedAdminMetaAdsRoute,
   AuthenticatedAdminRoiRoute: AuthenticatedAdminRoiRoute,
   AuthenticatedAdminUsuariosRoute: AuthenticatedAdminUsuariosRoute,

@@ -670,7 +670,15 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      vw_funil_lead_cliente: {
+        Row: {
+          cliente_id: string | null
+          horas_no_estagio: number | null
+          status: string | null
+          total: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_create_cliente: {
@@ -689,6 +697,14 @@ export type Database = {
       assert_current_admin: { Args: never; Returns: undefined }
       bootstrap_admin: { Args: { _email: string }; Returns: string }
       close_stalled_conversations: { Args: never; Returns: number }
+      log_ticket_converted: {
+        Args: { _lead_id: string; _ticket: number }
+        Returns: undefined
+      }
+      mover_lead_status: {
+        Args: { _lead_id: string; _motivo?: string; _novo: string }
+        Returns: undefined
+      }
       current_cliente_id: { Args: never; Returns: string }
       get_or_create_conversation: {
         Args: {

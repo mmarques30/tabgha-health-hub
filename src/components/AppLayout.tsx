@@ -73,6 +73,7 @@ const ADMIN_NAV: NavGroup[] = [
     group: "Aquisição",
     items: [
       { to: "/admin/automacoes-leads", label: "Automações de leads",  icon: Zap,             perm: "admin.operacao" },
+      { to: "/admin/leads",            label: "Funil de leads",       icon: Users,           perm: "admin.operacao" },
       { to: "/admin/meta-ads",         label: "Meta Ads",             icon: Megaphone,       perm: "admin.meta_ads" },
       { to: "/admin/config-meta",      label: "Conectar Meta BM",     icon: Link2,           perm: "admin.meta_ads" },
     ],

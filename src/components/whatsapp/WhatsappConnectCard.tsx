@@ -1,0 +1,197 @@
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, QrCode, RefreshCw, Unplug, Wifi } from "lucide-react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+
+type WhatsappConnectCardProps = {
+  clienteId: string;
+  compact?: boolean;
+};
+
+type ConnectResponse = {
+  ok: boolean;
+  provisioned?: boolean;
+  status?: string;
+  phone?: string | null;
+  qr_image?: string | null;
+  message?: string;
+  error?: string;
+};
+
+async function callConnect(action: "status" | "qr" | "disconnect", clienteId: string) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+
+  const base = import.meta.env.VITE_SUPABASE_URL as string;
+  const res = await fetch(`${base}/functions/v1/whatsapp-connect`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ action, cliente_id: clienteId }),
+  });
+
+  const json = (await res.json()) as ConnectResponse;
+  if (!res.ok || json.ok === false) {
+    throw new Error(json.error || json.message || "Falha na conexão WhatsApp");
+  }
+  return json;
+}
+
+export function WhatsappConnectCard({ clienteId, compact = false }: WhatsappConnectCardProps) {
+  const qc = useQueryClient();
+  const [qrImage, setQrImage] = useState<string | null>(null);
+
+  const statusQuery = useQuery({
+    queryKey: ["whatsapp-connect", clienteId],
+    enabled: Boolean(clienteId),
+    refetchInterval: (query) => {
+      const status = (query.state.data as ConnectResponse | undefined)?.status;
+      return status === "connecting" ? 8_000 : 30_000;
+    },
+    queryFn: () => callConnect("status", clienteId),
+  });
+
+  const qrMutation = useMutation({
+    mutationFn: () => callConnect("qr", clienteId),
+    onSuccess: (data) => {
+      setQrImage(data.qr_image ?? null);
+      void qc.invalidateQueries({ queryKey: ["whatsapp-connect", clienteId] });
+      if (!data.qr_image) {
+        toast.message("QR indisponível no momento. Tente de novo em alguns segundos.");
+      }
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: () => callConnect("disconnect", clienteId),
+    onSuccess: () => {
+      setQrImage(null);
+      toast.success("WhatsApp desconectado.");
+      void qc.invalidateQueries({ queryKey: ["whatsapp-connect", clienteId] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  useEffect(() => {
+    if (statusQuery.data?.status === "connected") {
+      setQrImage(null);
+    }
+  }, [statusQuery.data?.status]);
+
+  const status = statusQuery.data?.status ?? "disconnected";
+  const provisioned = statusQuery.data?.provisioned ?? false;
+  const connected = status === "connected";
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">
+            WhatsApp
+          </p>
+          <p className="mt-1 text-sm font-medium">
+            {connected
+              ? `Conectado${statusQuery.data?.phone ? ` · ${statusQuery.data.phone}` : ""}`
+              : provisioned
+                ? "Pronto para conectar"
+                : "Aguardando provisionamento"}
+          </p>
+          {!compact ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Escaneie o QR Code com o WhatsApp do consultório (Aparelhos conectados).
+            </p>
+          ) : null}
+        </div>
+        <span
+          className={
+            connected
+              ? "inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700"
+              : "inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700"
+          }
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500"}`}
+          />
+          {connected ? "Online" : status}
+        </span>
+      </div>
+
+      {!provisioned ? (
+        <p className="rounded-xl border border-dashed border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
+          {statusQuery.data?.message ??
+            "A Tabgha ainda não provisionou a instância Z-API deste cliente."}
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {qrImage ? (
+            <div className="flex justify-center rounded-xl border border-border bg-white p-3">
+              <img src={qrImage} alt="QR Code WhatsApp" className="h-48 w-48 object-contain" />
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            {!connected ? (
+              <Button
+                size="sm"
+                className="gap-2"
+                onClick={() => qrMutation.mutate()}
+                disabled={qrMutation.isPending}
+              >
+                {qrMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <QrCode className="h-4 w-4" />
+                )}
+                {qrImage ? "Atualizar QR" : "Gerar QR Code"}
+              </Button>
+            ) : null}
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              onClick={() => void statusQuery.refetch()}
+              disabled={statusQuery.isFetching}
+            >
+              {statusQuery.isFetching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Atualizar status
+            </Button>
+
+            {connected ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 border-rose-200 text-rose-700 hover:bg-rose-50"
+                onClick={() => disconnectMutation.mutate()}
+                disabled={disconnectMutation.isPending}
+              >
+                {disconnectMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Unplug className="h-4 w-4" />
+                )}
+                Desconectar
+              </Button>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Wifi className="h-3.5 w-3.5" />
+                Após escanear, o status muda para Online
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

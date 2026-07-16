@@ -383,6 +383,51 @@ export type Database = {
           },
         ]
       }
+      nurture_jobs: {
+        Row: {
+          atualizado_em: string
+          cliente_id: string
+          criado_em: string
+          id: string
+          kind: string
+          last_error: string | null
+          last_sent_at: string | null
+          lead_id: string
+          metadata: Json
+          next_run_at: string
+          status: string
+          step: number
+        }
+        Insert: {
+          atualizado_em?: string
+          cliente_id: string
+          criado_em?: string
+          id?: string
+          kind: string
+          last_error?: string | null
+          last_sent_at?: string | null
+          lead_id: string
+          metadata?: Json
+          next_run_at?: string
+          status?: string
+          step?: number
+        }
+        Update: {
+          atualizado_em?: string
+          cliente_id?: string
+          criado_em?: string
+          id?: string
+          kind?: string
+          last_error?: string | null
+          last_sent_at?: string | null
+          lead_id?: string
+          metadata?: Json
+          next_run_at?: string
+          status?: string
+          step?: number
+        }
+        Relationships: []
+      }
       phone_cache: {
         Row: {
           checked_at: string

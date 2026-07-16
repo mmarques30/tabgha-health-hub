@@ -39,6 +39,73 @@ function ClienteDashboard() {
     },
   });
 
+  const { data: onboarding } = useQuery({
+    queryKey: ["cliente", "dashboard", "onboarding", clienteId],
+    enabled: !!clienteId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const [{ data: cliente }, { data: instance }, conteudosPendentes] = await Promise.all([
+        supabase
+          .from("clientes")
+          .select("status, diagnostico, dados_extras")
+          .eq("id", clienteId!)
+          .single(),
+        supabase
+          .from("whatsapp_instances")
+          .select("status")
+          .eq("cliente_id", clienteId!)
+          .eq("status", "connected")
+          .maybeSingle(),
+        supabase
+          .from("conteudos")
+          .select("id", { count: "exact", head: true })
+          .eq("cliente_id", clienteId!)
+          .eq("status", "aprovacao"),
+      ]);
+
+      const redes = ((cliente?.dados_extras as Record<string, unknown> | null)?.redes ??
+        {}) as Record<string, string>;
+      const hasRedes = Boolean(
+        redes.instagram || redes.facebook || redes.site || redes.google_review,
+      );
+      const steps = [
+        {
+          id: "diagnostico",
+          label: "Diagnóstico preenchido",
+          done: Boolean(cliente?.diagnostico),
+          to: "/cliente/diagnostico" as const,
+        },
+        {
+          id: "whatsapp",
+          label: "WhatsApp conectado",
+          done: Boolean(instance),
+          to: "/cliente/conexoes" as const,
+        },
+        {
+          id: "redes",
+          label: "Redes / Google review",
+          done: hasRedes,
+          to: "/cliente/conexoes" as const,
+        },
+        {
+          id: "conteudo",
+          label: "Sem conteúdo pendente",
+          done: (conteudosPendentes.count ?? 0) === 0,
+          to: "/cliente/conteudo" as const,
+        },
+      ];
+
+      const doneCount = steps.filter((s) => s.done).length;
+      return {
+        status: cliente?.status ?? null,
+        steps,
+        doneCount,
+        total: steps.length,
+        complete: doneCount === steps.length,
+      };
+    },
+  });
+
   const { data: proximos, isLoading: loadingAgendamentos } = useQuery({
     queryKey: ["cliente", "dashboard", "agendamentos", clienteId],
     enabled: !!clienteId,
@@ -123,6 +190,39 @@ function ClienteDashboard() {
         <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-xs text-muted-foreground mt-0.5">Visão geral da sua operação de marketing</p>
       </header>
+
+      {onboarding && !onboarding.complete ? (
+        <div className="animate-fade-up rounded-2xl border border-sky-100 bg-sky-50/70 p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-sky-700">Onboarding</p>
+              <p className="mt-1 text-sm font-medium">
+                Complete a configuração do consultório ({onboarding.doneCount}/{onboarding.total})
+              </p>
+            </div>
+            <Link to="/cliente/conexoes" className="text-xs text-primary hover:underline">
+              Ir para conexões
+            </Link>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {onboarding.steps.map((step) => (
+              <Link
+                key={step.id}
+                to={step.to}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors",
+                  step.done
+                    ? "border-emerald-100 bg-emerald-50/80 text-emerald-800"
+                    : "border-border bg-card text-foreground hover:bg-secondary/40",
+                )}
+              >
+                <CheckCircle2 className={cn("h-4 w-4", step.done ? "text-emerald-600" : "text-muted-foreground/40")} />
+                {step.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* KPI cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

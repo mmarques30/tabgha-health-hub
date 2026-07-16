@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, ArrowLeft, Sparkles, Save, RefreshCw, ChevronDown, Stethoscope } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { Json, Tables } from "@/integrations/supabase/types";
+import { WhatsappConnectCard } from "@/components/whatsapp/WhatsappConnectCard";
 
 export const Route = createFileRoute("/_authenticated/admin/clientes/$id")({
   component: ClienteFichaPage,
@@ -734,9 +735,89 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
     },
   });
 
+  const [instanceId, setInstanceId] = useState("");
+  const [instanceToken, setInstanceToken] = useState("");
+  const [clientToken, setClientToken] = useState("");
+
+  const { data: wppInstance } = useQuery({
+    queryKey: ["admin", "cliente", cliente.id, "wpp-instance"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("whatsapp_instances")
+        .select("id, instance_id, token, status, dados_extras")
+        .eq("cliente_id", cliente.id)
+        .order("atualizado_em", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  useEffect(() => {
+    if (!wppInstance) return;
+    setInstanceId(wppInstance.instance_id ?? "");
+    setInstanceToken(wppInstance.token ?? "");
+    const extras = (wppInstance.dados_extras ?? {}) as Record<string, string>;
+    setClientToken(extras.client_token ?? "");
+  }, [wppInstance]);
+
+  const saveInstance = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        cliente_id: cliente.id,
+        provider: "zapi" as const,
+        instance_id: instanceId.trim() || null,
+        token: instanceToken.trim() || null,
+        status: instanceId.trim() && instanceToken.trim() ? "disconnected" : "disconnected",
+        dados_extras: {
+          ...((wppInstance?.dados_extras as object) ?? {}),
+          client_token: clientToken.trim() || null,
+        },
+      };
+      if (wppInstance?.id) {
+        const { error } = await supabase.from("whatsapp_instances").update(payload).eq("id", wppInstance.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("whatsapp_instances").insert(payload);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Instância WhatsApp salva.");
+      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id, "wpp-instance"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="py-5 space-y-4">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="space-y-4">
+          <WhatsappConnectCard clienteId={cliente.id} />
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)] space-y-3">
+            <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
+              Provisionar Z-API (admin)
+            </p>
+            <div className="space-y-2">
+              <Label>Instance ID</Label>
+              <Input value={instanceId} onChange={(e) => setInstanceId(e.target.value)} placeholder="3A..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Token</Label>
+              <Input value={instanceToken} onChange={(e) => setInstanceToken(e.target.value)} placeholder="token da instância" />
+            </div>
+            <div className="space-y-2">
+              <Label>Client-Token (opcional)</Label>
+              <Input value={clientToken} onChange={(e) => setClientToken(e.target.value)} placeholder="security token da conta Z-API" />
+            </div>
+            <Button size="sm" onClick={() => saveInstance.mutate()} disabled={saveInstance.isPending} className="gap-2">
+              {saveInstance.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar instância
+            </Button>
+          </div>
+        </div>
+
         {/* ── Método de qualificação ── */}
         <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
           <div className="flex items-center gap-2.5 border-b border-sky-100 bg-sky-50/60 px-5 py-3">
@@ -771,29 +852,29 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
             </Button>
           </div>
         </div>
+      </div>
 
-        {/* ── JSON avançado ── */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50/60 px-5 py-3">
-            <span className="h-2 w-2 rounded-full bg-slate-400 shrink-0" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-slate-600">JSON Avançado</p>
-          </div>
-          <div className="p-5 space-y-3">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Redes sociais, automações (<span className="font-mono text-[11px]">meta_page_id</span>, <span className="font-mono text-[11px]">zapi_instance_id</span>), GA4, webhooks, etc.
-            </p>
-            <Textarea
-              className="font-mono text-xs resize-none"
-              rows={10}
-              value={json}
-              onChange={(e) => { setJson(e.target.value); setJsonError(""); }}
-            />
-            {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
-            <Button size="sm" variant="outline" onClick={() => saveJson.mutate()} disabled={saveJson.isPending} className="gap-2">
-              {saveJson.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Salvar JSON
-            </Button>
-          </div>
+      {/* ── JSON avançado ── */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+        <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50/60 px-5 py-3">
+          <span className="h-2 w-2 rounded-full bg-slate-400 shrink-0" />
+          <p className="text-[10.5px] font-bold uppercase tracking-widest text-slate-600">JSON Avançado</p>
+        </div>
+        <div className="p-5 space-y-3">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Redes sociais, automações (<span className="font-mono text-[11px]">meta_page_id</span>, <span className="font-mono text-[11px]">zapi_instance_id</span>), GA4, webhooks, etc.
+          </p>
+          <Textarea
+            className="font-mono text-xs resize-none"
+            rows={8}
+            value={json}
+            onChange={(e) => { setJson(e.target.value); setJsonError(""); }}
+          />
+          {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
+          <Button size="sm" variant="outline" onClick={() => saveJson.mutate()} disabled={saveJson.isPending} className="gap-2">
+            {saveJson.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Salvar JSON
+          </Button>
         </div>
       </div>
     </div>

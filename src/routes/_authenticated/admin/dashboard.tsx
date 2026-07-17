@@ -5,7 +5,10 @@ import { ArrowRight, Loader2, TrendingUp } from "lucide-react";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -19,8 +22,25 @@ import {
   defaultAnalyticsFilters,
   type AnalyticsFiltersValue,
 } from "@/components/analytics/AnalyticsFilters";
+import {
+  FunnelBars,
+  InsightStack,
+  Panel,
+  RankedBarChart,
+  StatusChips,
+  StoryBanner,
+} from "@/components/analytics/InsightPanel";
 import { SubTabs } from "@/components/analytics/SubTabs";
 import { useClientesOptions } from "@/hooks/useClientesOptions";
+import {
+  buildFunnelInsights,
+  buildHeadline,
+  buildRankingInsights,
+  countByStatus,
+  fmtMoneyCompact,
+  funnelStages,
+  insightFromGap,
+} from "@/lib/analytics-insights";
 import { calcCaq } from "@/lib/analytics-range";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,7 +86,11 @@ function ChartTooltip({
 }
 
 function fmtMoney(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  return v.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  });
 }
 
 function AdminDashboard() {
@@ -88,8 +112,7 @@ function AdminDashboard() {
   });
 
   const categorias = useMemo(
-    () =>
-      [...new Set(clientesFull.map((c) => c.especialidade).filter(Boolean) as string[])].sort(),
+    () => [...new Set(clientesFull.map((c) => c.especialidade).filter(Boolean) as string[])].sort(),
     [clientesFull],
   );
 
@@ -110,7 +133,9 @@ function AdminDashboard() {
 
       let metricasQ = supabase
         .from("metricas_ads")
-        .select("cliente_id, investimento, leads, plataforma, campanha, clientes(nome, especialidade)")
+        .select(
+          "cliente_id, data, investimento, leads, plataforma, campanha, clientes(nome, especialidade)",
+        )
         .gte("data", since)
         .lte("data", until);
       if (filters.clienteId) metricasQ = metricasQ.eq("cliente_id", filters.clienteId);
@@ -125,7 +150,10 @@ function AdminDashboard() {
 
       const [clientesRes, leadsRes, metricasRes, entregasRes, conteudosRes, saudeRes] =
         await Promise.all([
-          supabase.from("clientes").select("id", { count: "exact", head: true }).eq("status", "ativo"),
+          supabase
+            .from("clientes")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "ativo"),
           leadsQ,
           metricasQ,
           entregasQ,
@@ -148,12 +176,17 @@ function AdminDashboard() {
       let entregas = entregasRes.data ?? [];
 
       if (filters.categoria) {
-        leads = leads.filter((l) => (l.clientes as { especialidade?: string } | null)?.especialidade === filters.categoria);
+        leads = leads.filter(
+          (l) =>
+            (l.clientes as { especialidade?: string } | null)?.especialidade === filters.categoria,
+        );
         metricas = metricas.filter(
-          (m) => (m.clientes as { especialidade?: string } | null)?.especialidade === filters.categoria,
+          (m) =>
+            (m.clientes as { especialidade?: string } | null)?.especialidade === filters.categoria,
         );
         entregas = entregas.filter(
-          (e) => (e.clientes as { especialidade?: string } | null)?.especialidade === filters.categoria,
+          (e) =>
+            (e.clientes as { especialidade?: string } | null)?.especialidade === filters.categoria,
         );
       }
 
@@ -165,6 +198,22 @@ function AdminDashboard() {
       const leadsTimeline = Object.entries(dayMap)
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([date, count]) => ({ date: date.slice(5), count }));
+
+      const investDayMap: Record<string, { investimento: number; leadsAds: number }> = {};
+      for (const m of metricas) {
+        const d = String(m.data).slice(0, 10);
+        const prev = investDayMap[d] ?? { investimento: 0, leadsAds: 0 };
+        prev.investimento += Number(m.investimento ?? 0);
+        prev.leadsAds += Number(m.leads ?? 0);
+        investDayMap[d] = prev;
+      }
+      const investTimeline = Object.entries(investDayMap)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, row]) => ({
+          date: date.slice(5),
+          investimento: Math.round(row.investimento),
+          leadsAds: row.leadsAds,
+        }));
 
       const invest = metricas.reduce((s, m) => s + Number(m.investimento ?? 0), 0);
       const leadsAds = metricas.reduce((s, m) => s + Number(m.leads ?? 0), 0);
@@ -207,7 +256,10 @@ function AdminDashboard() {
         }))
         .sort((a, b) => b.investimento - a.investimento);
 
-      const entregasByCliente = new Map<string, { nome: string; pendente: number; total: number }>();
+      const entregasByCliente = new Map<
+        string,
+        { nome: string; pendente: number; total: number }
+      >();
       for (const e of entregas) {
         const nome =
           (e.clientes as { nome?: string } | null)?.nome ?? String(e.cliente_id).slice(0, 8);
@@ -278,9 +330,37 @@ function AdminDashboard() {
         })),
         oportunidades,
         saudeCarteira,
+        leadStatuses: leads.map((l) => ({
+          status: l.status as string,
+          canal: l.canal as string | null,
+        })),
+        investTimeline,
+        perdidos: leads.filter((l) => l.status === "perdido").length,
+        convertidos: leads.filter((l) => l.status === "convertido").length,
       };
     },
   });
+
+  const headline = buildHeadline({
+    invest: data?.invest ?? 0,
+    leadsCrm: data?.leadsPeriodo ?? 0,
+    leadsAds: data?.leadsAds ?? 0,
+    caq: data?.caq ?? null,
+    convertidos: data?.convertidos ?? 0,
+    perdidos: data?.perdidos ?? 0,
+  });
+  const funnel = funnelStages(data?.leadStatuses ?? []);
+  const statusBreakdown = countByStatus(data?.leadStatuses ?? []);
+  const funnelInsights = buildFunnelInsights(data?.leadStatuses ?? []);
+  const rankingInsights = buildRankingInsights(
+    (data?.performance ?? []).map((r) => ({
+      nome: r.nome,
+      investimento: r.investimento,
+      leads: r.leadsCrm > 0 ? r.leadsCrm : r.leadsAds,
+      caq: r.caq,
+    })),
+  );
+  const adsCrmGap = insightFromGap(data?.leadsAds ?? 0, data?.leadsPeriodo ?? 0);
 
   const stageCounts = {
     briefing: data?.conteudosPendentes.filter((c) => c.status === "briefing").length ?? 0,
@@ -295,7 +375,7 @@ function AdminDashboard() {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Dashboard</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Performance, entregas e oportunidades com filtros de período e cliente
+            Visão gerencial em linguagem clara — o que está acontecendo na operação
           </p>
         </div>
         <AnalyticsFilters
@@ -320,6 +400,11 @@ function AdminDashboard() {
 
       {tab === "visao" ? (
         <>
+          {!isLoading ? <StoryBanner {...headline} /> : null}
+          {adsCrmGap ? (
+            <InsightStack items={[{ title: "Ads × funil", body: adsCrmGap, tone: "info" }]} />
+          ) : null}
+
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               {
@@ -359,7 +444,12 @@ function AdminDashboard() {
                 <span className="mb-4 text-[9px] font-black tracking-[0.16em] text-muted-foreground/40">
                   {card.rank}
                 </span>
-                <p className={cn("text-[2rem] font-black leading-none tracking-tighter", card.accent)}>
+                <p
+                  className={cn(
+                    "text-[2rem] font-black leading-none tracking-tighter",
+                    card.accent,
+                  )}
+                >
                   {isLoading ? (
                     <span className="inline-block h-9 w-16 animate-pulse rounded-lg bg-secondary align-middle" />
                   ) : (
@@ -372,6 +462,70 @@ function AdminDashboard() {
                 <div className={cn("mt-4 h-0.5 w-full rounded-full", card.bar)} />
               </div>
             ))}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Panel
+              title="Investimento × leads Ads"
+              subtitle="Quanto entrou de mídia e quantos leads o Ads reportou"
+              tone="soft"
+            >
+              {(data?.investTimeline ?? []).length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Sem mídia no período
+                </p>
+              ) : (
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data!.investTimeline}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="rgba(15,27,53,0.06)"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 9, fill: "#64748b" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        tick={{ fontSize: 9, fill: "#64748b" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        tick={{ fontSize: 9, fill: "#64748b" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip />
+                      <Legend />
+                      <Bar
+                        yAxisId="left"
+                        dataKey="investimento"
+                        name="Invest. (R$)"
+                        fill="#0369a1"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        yAxisId="right"
+                        dataKey="leadsAds"
+                        name="Leads Ads"
+                        fill="#7dd3fc"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Panel>
+            <Panel title="Funil em uma olhada" subtitle="Para explicar ao médico sem jargão">
+              <FunnelBars stages={funnel} />
+            </Panel>
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_300px]">
@@ -401,14 +555,21 @@ function AdminDashboard() {
               ) : (
                 <div className="h-48 px-2 pb-4">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data!.leadsTimeline} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                    <AreaChart
+                      data={data!.leadsTimeline}
+                      margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
+                    >
                       <defs>
                         <linearGradient id="gradLeadsLight" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#0284c7" stopOpacity={0.28} />
                           <stop offset="100%" stopColor="#0284c7" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,27,53,0.06)" vertical={false} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="rgba(15,27,53,0.06)"
+                        vertical={false}
+                      />
                       <XAxis
                         dataKey="date"
                         tick={{ fontSize: 9, fill: "#64748b" }}
@@ -442,7 +603,9 @@ function AdminDashboard() {
               <div className="mb-5 flex items-start justify-between">
                 <div>
                   <p className="text-sm font-bold">Pipeline editorial</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">{stageTotal} em produção</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {stageTotal} em produção
+                  </p>
                 </div>
                 <Link
                   to="/admin/estrategia"
@@ -453,9 +616,24 @@ function AdminDashboard() {
               </div>
               <div className="flex-1 space-y-4">
                 {[
-                  { key: "briefing", label: "Briefing", count: stageCounts.briefing, color: "bg-slate-400" },
-                  { key: "roteiro", label: "Roteiro", count: stageCounts.roteiro, color: "bg-primary" },
-                  { key: "producao", label: "Produção", count: stageCounts.producao, color: "bg-amber-400" },
+                  {
+                    key: "briefing",
+                    label: "Briefing",
+                    count: stageCounts.briefing,
+                    color: "bg-slate-400",
+                  },
+                  {
+                    key: "roteiro",
+                    label: "Roteiro",
+                    count: stageCounts.roteiro,
+                    color: "bg-primary",
+                  },
+                  {
+                    key: "producao",
+                    label: "Produção",
+                    count: stageCounts.producao,
+                    color: "bg-amber-400",
+                  },
                 ].map(({ key, label, count, color }) => {
                   const pct = stageTotal > 0 ? Math.round((count / stageTotal) * 100) : 0;
                   return (
@@ -515,21 +693,29 @@ function AdminDashboard() {
                           >
                             {c.nome}
                           </Link>
-                          <p className="text-[10.5px] text-muted-foreground">{c.especialidade ?? "—"}</p>
+                          <p className="text-[10.5px] text-muted-foreground">
+                            {c.especialidade ?? "—"}
+                          </p>
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-1.5">
                             <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", st.dot)} />
-                            <span className={cn("text-[11px] font-semibold", st.text)}>{st.label}</span>
+                            <span className={cn("text-[11px] font-semibold", st.text)}>
+                              {st.label}
+                            </span>
                           </div>
                         </td>
                         <td className="px-4 py-3.5 text-right text-base font-extrabold tabular-nums text-sky-800">
                           {c.mes}
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className="text-[11px] font-bold tabular-nums text-emerald-600">{pct}%</span>
+                          <span className="text-[11px] font-bold tabular-nums text-emerald-600">
+                            {pct}%
+                          </span>
                         </td>
-                        <td className={cn("px-4 py-3.5 text-[11.5px]", ultimoLeadColor(c.ultimoLead))}>
+                        <td
+                          className={cn("px-4 py-3.5 text-[11.5px]", ultimoLeadColor(c.ultimoLead))}
+                        >
                           {c.ultimoLead
                             ? formatDistanceToNow(new Date(c.ultimoLead), {
                                 addSuffix: true,
@@ -548,97 +734,192 @@ function AdminDashboard() {
       ) : null}
 
       {tab === "performance" ? (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-secondary/50 text-[10px] uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-2.5 text-left">Cliente</th>
-                <th className="px-4 py-2.5 text-right">Investimento</th>
-                <th className="px-4 py-2.5 text-right">Leads Ads</th>
-                <th className="px-4 py-2.5 text-right">Leads CRM</th>
-                <th className="px-4 py-2.5 text-right">CAQ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {(data?.performance ?? []).length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                    Sem performance no filtro. Sincronize Marketing Pago.
-                  </td>
+        <div className="space-y-4">
+          <InsightStack items={rankingInsights} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Panel
+              title="Investimento por clínica"
+              subtitle="Quem está recebendo mais mídia"
+              tone="soft"
+            >
+              <RankedBarChart
+                data={(data?.performance ?? []).slice(0, 8).map((r) => ({
+                  name: r.nome.length > 18 ? `${r.nome.slice(0, 16)}…` : r.nome,
+                  value: Math.round(r.investimento),
+                }))}
+                formatValue={(v) => fmtMoneyCompact(v)}
+              />
+            </Panel>
+            <Panel
+              title="CAQ por clínica"
+              subtitle="Quanto custa cada lead — menor é melhor"
+              tone="soft"
+            >
+              <RankedBarChart
+                data={(data?.performance ?? [])
+                  .filter((r) => r.caq != null)
+                  .sort((a, b) => (a.caq ?? 0) - (b.caq ?? 0))
+                  .slice(0, 8)
+                  .map((r) => ({
+                    name: r.nome.length > 18 ? `${r.nome.slice(0, 16)}…` : r.nome,
+                    value: Math.round(r.caq ?? 0),
+                  }))}
+                color={["#10b981", "#34d399", "#60a5fa", "#0369a1", "#f59e0b", "#f43f5e"]}
+                formatValue={(v) => fmtMoneyCompact(v)}
+              />
+            </Panel>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-secondary/50 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <th className="px-4 py-2.5 text-left">Cliente</th>
+                  <th className="px-4 py-2.5 text-right">Investimento</th>
+                  <th className="px-4 py-2.5 text-right">Leads Ads</th>
+                  <th className="px-4 py-2.5 text-right">Leads CRM</th>
+                  <th className="px-4 py-2.5 text-right">CAQ</th>
                 </tr>
-              ) : (
-                data!.performance.map((row) => (
-                  <tr key={row.id} className="hover:bg-secondary/30">
-                    <td className="px-4 py-3 font-medium">{row.nome}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{fmtMoney(row.investimento)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{row.leadsAds}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{row.leadsCrm}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {row.caq != null ? fmtMoney(row.caq) : "—"}
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(data?.performance ?? []).length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                      Sem performance no filtro. Sincronize Marketing Pago.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  data!.performance.map((row) => (
+                    <tr key={row.id} className="hover:bg-secondary/30">
+                      <td className="px-4 py-3 font-medium">{row.nome}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {fmtMoney(row.investimento)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">{row.leadsAds}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{row.leadsCrm}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {row.caq != null ? fmtMoney(row.caq) : "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
 
       {tab === "entregas" ? (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-secondary/50 text-[10px] uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-2.5 text-left">Cliente</th>
-                <th className="px-4 py-2.5 text-right">Pendentes</th>
-                <th className="px-4 py-2.5 text-right">Total recentes</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {(data?.entregasByCliente ?? []).length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="px-4 py-10 text-center text-muted-foreground">
-                    Nenhuma entrega no filtro.
-                  </td>
+        <div className="space-y-4">
+          <InsightStack
+            items={[
+              {
+                title:
+                  (data?.entregasPendentes ?? 0) > 0
+                    ? "Há entregas esperando resposta"
+                    : "Fila de entregas sob controle",
+                body:
+                  (data?.entregasPendentes ?? 0) > 0
+                    ? `${data!.entregasPendentes} itens pendentes ou em revisão. Clínicas com backlog alto precisam de prioridade da operação.`
+                    : "Nenhuma entrega crítica no filtro atual — bom momento para acelerar novos conteúdos.",
+                tone: (data?.entregasPendentes ?? 0) > 0 ? "warn" : "good",
+              },
+            ]}
+          />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Panel title="Backlog por clínica" subtitle="Pendentes + em revisão" tone="soft">
+              <RankedBarChart
+                data={(data?.entregasByCliente ?? [])
+                  .sort((a, b) => b.pendente - a.pendente)
+                  .slice(0, 8)
+                  .map((r) => ({
+                    name: r.nome.length > 18 ? `${r.nome.slice(0, 16)}…` : r.nome,
+                    value: r.pendente,
+                  }))}
+                color="#f59e0b"
+              />
+            </Panel>
+            <Panel title="Volume recente" subtitle="Total de entregas no recorte">
+              <RankedBarChart
+                data={(data?.entregasByCliente ?? [])
+                  .sort((a, b) => b.total - a.total)
+                  .slice(0, 8)
+                  .map((r) => ({
+                    name: r.nome.length > 18 ? `${r.nome.slice(0, 16)}…` : r.nome,
+                    value: r.total,
+                  }))}
+                color="#0284c7"
+              />
+            </Panel>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-secondary/50 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <th className="px-4 py-2.5 text-left">Cliente</th>
+                  <th className="px-4 py-2.5 text-right">Pendentes</th>
+                  <th className="px-4 py-2.5 text-right">Total recentes</th>
                 </tr>
-              ) : (
-                data!.entregasByCliente.map((row) => (
-                  <tr key={row.id} className="hover:bg-secondary/30">
-                    <td className="px-4 py-3 font-medium">{row.nome}</td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-amber-700">
-                      {row.pendente}
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(data?.entregasByCliente ?? []).length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-10 text-center text-muted-foreground">
+                      Nenhuma entrega no filtro.
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums">{row.total}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  data!.entregasByCliente.map((row) => (
+                    <tr key={row.id} className="hover:bg-secondary/30">
+                      <td className="px-4 py-3 font-medium">{row.nome}</td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-amber-700">
+                        {row.pendente}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">{row.total}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
 
       {tab === "oportunidades" ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              { label: "Mapeadas", value: data?.oportunidades.total ?? 0 },
-              { label: "Novas", value: data?.oportunidades.novos ?? 0 },
-              { label: "Em qualificação", value: data?.oportunidades.qualificacao ?? 0 },
-              { label: "Convertidas", value: data?.oportunidades.convertidos ?? 0 },
-            ].map((card) => (
-              <div
-                key={card.label}
-                className="rounded-2xl border border-border bg-card px-5 py-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)]"
-              >
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {card.label}
-                </p>
-                <p className="mt-2 text-3xl font-black text-sky-800">{card.value}</p>
-              </div>
-            ))}
+          <StoryBanner
+            title={
+              (data?.oportunidades.total ?? 0) === 0
+                ? "Nenhuma oportunidade no filtro"
+                : `${data!.oportunidades.total} oportunidades em jogo`
+            }
+            body={
+              (data?.oportunidades.total ?? 0) === 0
+                ? "Sem leads neste recorte. Ajuste período ou confirme captura (Meta/WhatsApp)."
+                : `${data!.oportunidades.novos} ainda novos, ${data!.oportunidades.qualificacao} em conversa/qualificação e ${data!.oportunidades.convertidos} já convertidos. O funil abaixo mostra onde a equipe deve agir.`
+            }
+            tone={
+              (data?.oportunidades.novos ?? 0) > (data?.oportunidades.convertidos ?? 0) * 3
+                ? "warn"
+                : "info"
+            }
+          />
+          <InsightStack items={funnelInsights} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Panel title="Funil completo" subtitle="Da entrada ao paciente" tone="soft">
+              <FunnelBars stages={funnel} />
+            </Panel>
+            <Panel title="Distribuição por status" subtitle="Onde cada lead está agora">
+              <StatusChips items={statusBreakdown} />
+            </Panel>
           </div>
           <Link
             to="/admin/leads"
+            search={{
+              periodo: 30,
+              canal: "",
+              cliente: filters.clienteId ?? "",
+              q: "",
+            }}
             className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline"
           >
             Abrir funil de leads <ArrowRight className="h-3.5 w-3.5" />

@@ -101,7 +101,7 @@ export async function moverLeadStatus(
   const { error } = await supabase.rpc("mover_lead_status", {
     _lead_id: leadId,
     _novo: novo,
-    _motivo: motivo ?? null,
+    _motivo: motivo ?? undefined,
   });
   if (error) throw error;
 }

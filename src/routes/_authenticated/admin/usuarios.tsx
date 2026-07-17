@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { PermissionPicker } from "@/components/PermissionPicker";
 import { createUserWithRole } from "@/functions/usuarios/createUserWithRole.functions";
+import { useClientesOptions } from "@/hooks/useClientesOptions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -83,6 +84,7 @@ function initials(nome: string | null): string {
 function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [permissoes, setPermissoes] = useState<string[]>(["*"]);
   const queryClient = useQueryClient();
+  const { data: clientes = [] } = useClientesOptions();
 
   const form = useForm<AddUserForm>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,12 +92,20 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
     defaultValues: { nome: "", email: "", role: "admin", cliente_id: null },
   });
 
+  const role = form.watch("role");
+
   const mutation = useMutation({
     mutationFn: (data: AddUserForm) =>
-      createUserWithRole({ data: { ...data, permissoes } }),
+      createUserWithRole({
+        data: {
+          ...data,
+          cliente_id: data.role === "cliente" ? data.cliente_id : null,
+          permissoes: data.role === "admin" ? permissoes : ["*"],
+        },
+      }),
     onSuccess: () => {
-      toast.success("Usuário criado. Email de acesso enviado.");
-      queryClient.invalidateQueries({ queryKey: ["admin", "team"] });
+      toast.success("Usuário criado.");
+      void queryClient.invalidateQueries({ queryKey: ["admin", "team"] });
       onClose();
       form.reset();
       setPermissoes(["*"]);
@@ -111,7 +121,13 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
         </DialogHeader>
 
         <form
-          onSubmit={form.handleSubmit((d) => mutation.mutate(d as AddUserForm))}
+          onSubmit={form.handleSubmit((d) => {
+            if (d.role === "cliente" && !d.cliente_id) {
+              toast.error("Selecione o cliente para o acesso ao portal.");
+              return;
+            }
+            mutation.mutate(d as AddUserForm);
+          })}
           className="space-y-4 py-2"
         >
           <div className="space-y-1">
@@ -133,20 +149,45 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
           <div className="space-y-1">
             <Label>Perfil</Label>
             <Select
-              value={form.watch("role")}
-              onValueChange={(v) => form.setValue("role", v as "admin" | "cliente")}
+              value={role}
+              onValueChange={(v) => {
+                form.setValue("role", v as "admin" | "cliente");
+                if (v === "admin") form.setValue("cliente_id", null);
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Admin — equipe interna</SelectItem>
-                <SelectItem value="cliente">Cliente — médico</SelectItem>
+                <SelectItem value="cliente">Cliente — médico (portal)</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {form.watch("role") === "admin" && (
+          {role === "cliente" ? (
+            <div className="space-y-1">
+              <Label>Cliente vinculado</Label>
+              <Select
+                value={form.watch("cliente_id") ?? ""}
+                onValueChange={(v) => form.setValue("cliente_id", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o consultório…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Sem esse vínculo, o portal do médico fica vazio.
+              </p>
+            </div>
+          ) : (
             <div className="space-y-2">
               <Label>Permissões</Label>
               <PermissionPicker value={permissoes} onChange={setPermissoes} />

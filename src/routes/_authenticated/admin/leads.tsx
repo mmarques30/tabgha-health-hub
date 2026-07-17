@@ -28,7 +28,8 @@ function AdminLeadsPage() {
   useEffect(() => {
     if (!search.cliente && clientes[0]?.id) {
       void navigate({
-        search: (prev) => ({ ...prev, cliente: clientes[0].id }),
+        to: ".",
+        search: (prev: typeof search) => ({ ...prev, cliente: clientes[0].id }),
         replace: true,
       });
     }
@@ -48,7 +49,8 @@ function AdminLeadsPage() {
 
   function updateSearch(patch: Partial<typeof search>) {
     void navigate({
-      search: (prev) => ({ ...prev, ...patch }),
+      to: ".",
+      search: (prev: typeof search) => ({ ...prev, ...patch }),
     });
   }
 

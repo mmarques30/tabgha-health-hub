@@ -28,6 +28,7 @@ function AdminLeadsPage() {
   useEffect(() => {
     if (!search.cliente && clientes[0]?.id) {
       void navigate({
+        to: ".",
         search: (prev) => ({ ...prev, cliente: clientes[0].id }),
         replace: true,
       });

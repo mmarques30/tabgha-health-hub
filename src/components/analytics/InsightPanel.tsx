@@ -121,8 +121,15 @@ export function InsightCallout({
 
 export function InsightStack({ items }: { items: PlainInsight[] }) {
   if (items.length === 0) return null;
+  // 1 insight = largura total (evita card “cortado”); 2+ ficam lado a lado.
+  const cols =
+    items.length === 1
+      ? "grid-cols-1"
+      : items.length === 2
+        ? "grid-cols-1 md:grid-cols-2"
+        : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <div className={cn("grid gap-3", cols)}>
       {items.map((item) => (
         <InsightCallout key={item.title + item.body.slice(0, 24)} {...item} />
       ))}

@@ -21,16 +21,28 @@ type ConnectResponse = {
   error?: string;
 };
 
+function normalizeQrImage(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  if (raw.startsWith("data:") || raw.startsWith("http://") || raw.startsWith("https://")) {
+    return raw;
+  }
+  const cleaned = raw.replace(/^data:image\/\w+;base64,/, "");
+  return `data:image/png;base64,${cleaned}`;
+}
+
 async function callConnect(action: "status" | "qr" | "disconnect", clienteId: string) {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
   if (!token) throw new Error("Sessão expirada. Faça login novamente.");
 
   const base = import.meta.env.VITE_SUPABASE_URL as string;
+  const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+
   const res = await fetch(`${base}/functions/v1/whatsapp-connect`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
+      ...(anon ? { apikey: anon } : {}),
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ action, cliente_id: clienteId }),
@@ -60,7 +72,7 @@ export function WhatsappConnectCard({ clienteId, compact = false }: WhatsappConn
   const qrMutation = useMutation({
     mutationFn: () => callConnect("qr", clienteId),
     onSuccess: (data) => {
-      setQrImage(data.qr_image ?? null);
+      setQrImage(normalizeQrImage(data.qr_image));
       void qc.invalidateQueries({ queryKey: ["whatsapp-connect", clienteId] });
       if (!data.qr_image) {
         toast.message("QR indisponível no momento. Tente de novo em alguns segundos.");
@@ -126,7 +138,7 @@ export function WhatsappConnectCard({ clienteId, compact = false }: WhatsappConn
       {!provisioned ? (
         <p className="rounded-xl border border-dashed border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
           {statusQuery.data?.message ??
-            "A Tabgha ainda não provisionou a instância Z-API deste cliente."}
+            "A Tabgha ainda não provisionou a instância Z-API deste cliente. No admin: Clientes → ficha → Conexões → preencher Instance ID e Token."}
         </p>
       ) : (
         <div className="space-y-3">

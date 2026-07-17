@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Loader2, Users } from "lucide-react";
+import { Loader2, UserPlus, Users } from "lucide-react";
 
 import { EmptyState } from "@/components/EmptyState";
+import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { FunilHeader, KanbanBoard } from "@/components/crm/KanbanBoard";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLeads } from "@/hooks/useLeads";
 import { useAuth } from "@/lib/auth";
@@ -24,6 +26,7 @@ function LeadsPage() {
   const search = Route.useSearch();
   const clienteId = profile?.cliente_id;
   const [localSearch, setLocalSearch] = useState(search.q);
+  const [showCreate, setShowCreate] = useState(false);
 
   const filters = useMemo(
     () => ({
@@ -48,12 +51,23 @@ function LeadsPage() {
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-6 py-5">
         <span className="eyebrow-pill">Captação</span>
-        <div className="mt-2 flex items-baseline gap-3">
-          <h1 className="text-xl font-bold tracking-tight">Leads</h1>
-          <span className="text-sm text-muted-foreground">{leads.length} no período</span>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-xl font-bold tracking-tight">Leads</h1>
+            <span className="text-sm text-muted-foreground">{leads.length} no período</span>
+          </div>
+          <Button
+            size="sm"
+            className="gap-2"
+            disabled={!clienteId}
+            onClick={() => setShowCreate(true)}
+          >
+            <UserPlus className="h-4 w-4" />
+            Novo lead
+          </Button>
         </div>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Arraste cards entre colunas. Motivo é obrigatório ao marcar como perdido.
+          Inclua leads manualmente ou receba via Meta, LP e WhatsApp. Arraste cards entre colunas.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -73,6 +87,8 @@ function LeadsPage() {
             className="rounded-xl border border-input bg-background px-3 py-1.5 text-sm"
           >
             <option value="">Todos os canais</option>
+            <option value="manual">Manual</option>
+            <option value="indicação">Indicação</option>
             <option value="meta">Meta</option>
             <option value="whatsapp">WhatsApp</option>
             <option value="lp">Landing page</option>
@@ -100,7 +116,10 @@ function LeadsPage() {
           <EmptyState
             icon={<Users className="h-6 w-6" />}
             title="Nenhum lead no filtro"
-            description="Os leads chegam via anúncios Meta, LP e WhatsApp."
+            description="Crie um lead manualmente ou aguarde entradas via Meta, LP e WhatsApp."
+            action={
+              clienteId ? { label: "Novo lead", onClick: () => setShowCreate(true) } : undefined
+            }
           />
         </div>
       ) : (
@@ -114,6 +133,14 @@ function LeadsPage() {
           </div>
         </div>
       )}
+
+      {clienteId ? (
+        <CreateLeadDialog
+          open={showCreate}
+          onClose={() => setShowCreate(false)}
+          clienteId={clienteId}
+        />
+      ) : null}
     </div>
   );
 }

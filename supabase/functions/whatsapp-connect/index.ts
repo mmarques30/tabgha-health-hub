@@ -183,11 +183,19 @@ Deno.serve(async (req) => {
     if (action === "qr") {
       await admin.from("whatsapp_instances").update({ status: "connecting" }).eq("id", inst.id);
       const qr = await zapiGet(inst, "qr-code/image");
-      const image =
+      let image =
         (typeof qr.value === "string" && qr.value) ||
         (typeof qr.qrcode === "string" && qr.qrcode) ||
         (typeof qr.base64 === "string" && qr.base64) ||
         null;
+      if (
+        image &&
+        !image.startsWith("data:") &&
+        !image.startsWith("http://") &&
+        !image.startsWith("https://")
+      ) {
+        image = `data:image/png;base64,${image.replace(/^data:image\/\w+;base64,/, "")}`;
+      }
 
       return json({
         ok: true,

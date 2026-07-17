@@ -78,7 +78,12 @@ type AddUserForm = {
 
 function initials(nome: string | null): string {
   if (!nome) return "?";
-  return nome.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
+  return nome
+    .split(" ")
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
 }
 
 function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -103,8 +108,24 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
           permissoes: data.role === "admin" ? permissoes : ["*"],
         },
       }),
-    onSuccess: () => {
-      toast.success("Usuário criado.");
+    onSuccess: (result) => {
+      if (result.reused_existing) {
+        toast.success("Email já existia — perfil atualizado.");
+      } else {
+        toast.success("Usuário criado.");
+      }
+      if (result.temporary_password) {
+        toast.message("Senha temporária (copie agora)", {
+          description: result.temporary_password,
+          duration: 20_000,
+        });
+      }
+      if (result.recovery_link) {
+        toast.message("Link de recuperação", {
+          description: result.recovery_link,
+          duration: 20_000,
+        });
+      }
       void queryClient.invalidateQueries({ queryKey: ["admin", "team"] });
       onClose();
       form.reset();
@@ -226,7 +247,9 @@ function UsuariosPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">Configurações</span>
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">
+            Configurações
+          </span>
           <h1 className="text-xl font-bold tracking-tight">Equipe</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Gerencie os membros e suas permissões de acesso.
@@ -254,7 +277,9 @@ function UsuariosPage() {
               <p className="text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground">
                 {kpi.label}
               </p>
-              <p className={`text-3xl font-extrabold tracking-tight animate-numeric-pop mt-1 ${kpi.color}`}>
+              <p
+                className={`text-3xl font-extrabold tracking-tight animate-numeric-pop mt-1 ${kpi.color}`}
+              >
                 {kpi.value}
               </p>
             </div>

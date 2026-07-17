@@ -51,11 +51,12 @@ async function resolveClienteId(instanceId: string | undefined) {
   }
 
   // Preferência: whatsapp_instances (Onda 1)
+  // Aceita qualquer status com instance_id — credenciais válidas bastam para roteamento.
+  // Status disconnected/error ainda recebe webhook se a Z-API estiver apontada para cá.
   const { data: instance } = await supabase
     .from('whatsapp_instances')
     .select('cliente_id, dados_extras, status')
     .eq('instance_id', instanceId)
-    .in('status', ['connected', 'connecting'])
     .limit(1)
     .maybeSingle()
 

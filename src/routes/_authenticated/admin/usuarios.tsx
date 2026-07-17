@@ -9,9 +9,11 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { PermissionPicker } from "@/components/PermissionPicker";
+import { CredentialsDialog, type AccessCredentials } from "@/components/usuarios/CredentialsDialog";
 import { createUserWithRole } from "@/functions/usuarios/createUserWithRole.functions";
 import { updateMemberAccess } from "@/functions/usuarios/updateMemberAccess.functions";
 import { summarizePermissions } from "@/lib/permissions";
+import { useAuth } from "@/lib/auth";
 import { useClientesOptions } from "@/hooks/useClientesOptions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,26 +50,29 @@ type TeamMember = {
   cliente_nome: string | null;
 };
 
+/** Fetch rápido: profiles + roles + mapa de clientes em paralelo (sem join aninhado). */
 async function fetchTeam(): Promise<TeamMember[]> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, nome, email, permissoes, cliente_id, clientes(nome), user_roles(role)")
-    .order("nome");
+  const [profilesRes, rolesRes, clientesRes] = await Promise.all([
+    supabase.from("profiles").select("id, nome, email, permissoes, cliente_id").order("nome"),
+    supabase.from("user_roles").select("user_id, role"),
+    supabase.from("clientes").select("id, nome"),
+  ]);
 
-  if (error) throw new Error(error.message);
+  if (profilesRes.error) throw new Error(profilesRes.error.message);
+  if (rolesRes.error) throw new Error(rolesRes.error.message);
 
-  return (data ?? []).map((p) => {
-    const clienteJoin = p.clientes as unknown as { nome: string } | null;
-    return {
-      id: p.id,
-      nome: p.nome,
-      email: p.email,
-      role: (p.user_roles as unknown as { role: string }[] | null)?.[0]?.role ?? null,
-      permissoes: p.permissoes ?? [],
-      cliente_id: p.cliente_id,
-      cliente_nome: clienteJoin?.nome ?? null,
-    };
-  });
+  const roleByUser = new Map((rolesRes.data ?? []).map((r) => [r.user_id, r.role as string]));
+  const nomeByCliente = new Map((clientesRes.data ?? []).map((c) => [c.id, c.nome]));
+
+  return (profilesRes.data ?? []).map((p) => ({
+    id: p.id,
+    nome: p.nome,
+    email: p.email,
+    role: roleByUser.get(p.id) ?? null,
+    permissoes: p.permissoes ?? [],
+    cliente_id: p.cliente_id,
+    cliente_nome: p.cliente_id ? (nomeByCliente.get(p.cliente_id) ?? null) : null,
+  }));
 }
 
 const addUserSchema = z.object({
@@ -96,7 +101,15 @@ function initials(nome: string | null, email: string | null): string {
   return "?";
 }
 
-function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function AddUserDialog({
+  open,
+  onClose,
+  onCredentials,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCredentials: (c: AccessCredentials) => void;
+}) {
   const [permissoes, setPermissoes] = useState<string[]>(["*"]);
   const queryClient = useQueryClient();
   const { data: clientes = [] } = useClientesOptions();
@@ -104,7 +117,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
   const form = useForm<AddUserForm>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(addUserSchema) as any,
-    defaultValues: { nome: "", email: "", role: "admin", cliente_id: null },
+    defaultValues: { nome: "", email: "", role: "cliente", cliente_id: null },
   });
 
   const role = form.watch("role");
@@ -119,26 +132,16 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
         },
       }),
     onSuccess: (result) => {
-      if (result.reused_existing) {
-        toast.success("Email já existia — perfil atualizado.");
-      } else {
-        toast.success("Usuário criado.");
-      }
-      if (result.temporary_password) {
-        toast.message("Senha temporária (copie agora)", {
-          description: result.temporary_password,
-          duration: 20_000,
-        });
-      }
-      if (result.recovery_link) {
-        toast.message("Link de recuperação", {
-          description: result.recovery_link,
-          duration: 20_000,
-        });
-      }
+      toast.success(result.reused_existing ? "Senha redefinida." : "Usuário criado.");
+      onCredentials({
+        email: result.email,
+        temporary_password: result.temporary_password,
+        reused_existing: result.reused_existing,
+        role: result.role,
+      });
       void queryClient.invalidateQueries({ queryKey: ["admin", "team"] });
       onClose();
-      form.reset();
+      form.reset({ nome: "", email: "", role: "cliente", cliente_id: null });
       setPermissoes(["*"]);
     },
     onError: (err: Error) => toast.error(err.message),
@@ -154,7 +157,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
         <form
           onSubmit={form.handleSubmit((d) => {
             if (d.role === "cliente" && !d.cliente_id) {
-              toast.error("Selecione o cliente para o acesso ao portal.");
+              toast.error("Selecione o consultório vinculado.");
               return;
             }
             if (permissoes.length === 0) {
@@ -165,6 +168,11 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
           })}
           className="space-y-4 py-2"
         >
+          <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+            Isso cria o <strong>login</strong> (email + senha). O cadastro de consultório fica em
+            Clientes. Depois do salvar, a senha temporária aparece para você copiar.
+          </p>
+
           <div className="space-y-1">
             <Label>Nome</Label>
             <Input placeholder="Nome completo" {...form.register("nome")} />
@@ -174,8 +182,8 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
 
           <div className="space-y-1">
-            <Label>Email</Label>
-            <Input type="email" placeholder="email@tabgha.com.br" {...form.register("email")} />
+            <Label>Email de login</Label>
+            <Input type="email" placeholder="email@exemplo.com" {...form.register("email")} />
             {form.formState.errors.email && (
               <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
             )}
@@ -195,21 +203,21 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">Admin — equipe interna</SelectItem>
-                <SelectItem value="cliente">Cliente — médico (portal)</SelectItem>
+                <SelectItem value="cliente">Cliente — portal do médico</SelectItem>
+                <SelectItem value="admin">Admin — equipe Tabgha</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {role === "cliente" && (
             <div className="space-y-1">
-              <Label>Cliente vinculado</Label>
+              <Label>Consultório vinculado</Label>
               <Select
                 value={form.watch("cliente_id") ?? ""}
                 onValueChange={(v) => form.setValue("cliente_id", v)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o consultório…" />
+                  <SelectValue placeholder="Selecione o cliente…" />
                 </SelectTrigger>
                 <SelectContent>
                   {clientes.map((c) => (
@@ -219,14 +227,11 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground">
-                Sem esse vínculo, o portal do médico fica vazio.
-              </p>
             </div>
           )}
 
           <div className="space-y-2">
-            <Label>Permissões {role === "cliente" ? "do portal" : "do admin"}</Label>
+            <Label>Telas liberadas ({role === "cliente" ? "portal" : "admin"})</Label>
             <PermissionPicker
               value={permissoes}
               onChange={setPermissoes}
@@ -240,7 +245,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Criar usuário
+              Criar acesso
             </Button>
           </DialogFooter>
         </form>
@@ -251,6 +256,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
 
 function EditAccessDialog({ member, onClose }: { member: TeamMember; onClose: () => void }) {
   const queryClient = useQueryClient();
+  const { user, refresh } = useAuth();
   const { data: clientes = [] } = useClientesOptions();
   const [nome, setNome] = useState(member.nome ?? "");
   const [clienteId, setClienteId] = useState<string | null>(member.cliente_id);
@@ -261,11 +267,9 @@ function EditAccessDialog({ member, onClose }: { member: TeamMember; onClose: ()
   const mutation = useMutation({
     mutationFn: () => {
       if (member.role === "cliente" && !clienteId) {
-        throw new Error("Selecione o cliente vinculado.");
+        throw new Error("Selecione o consultório vinculado.");
       }
-      if (permissoes.length === 0) {
-        throw new Error("Selecione ao menos uma permissão.");
-      }
+      if (permissoes.length === 0) throw new Error("Selecione ao menos uma permissão.");
       return updateMemberAccess({
         data: {
           id: member.id,
@@ -275,9 +279,10 @@ function EditAccessDialog({ member, onClose }: { member: TeamMember; onClose: ()
         },
       });
     },
-    onSuccess: () => {
-      toast.success("Acessos atualizados.");
+    onSuccess: async () => {
+      toast.success("Acessos atualizados. O usuário precisa recarregar a página (ou relogar).");
       void queryClient.invalidateQueries({ queryKey: ["admin", "team"] });
+      if (user?.id === member.id) await refresh();
       onClose();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -300,19 +305,15 @@ function EditAccessDialog({ member, onClose }: { member: TeamMember; onClose: ()
 
           <div className="space-y-1">
             <Label>Nome</Label>
-            <Input
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Nome completo"
-            />
+            <Input value={nome} onChange={(e) => setNome(e.target.value)} />
           </div>
 
           {member.role === "cliente" && (
             <div className="space-y-1">
-              <Label>Cliente vinculado</Label>
+              <Label>Consultório vinculado</Label>
               <Select value={clienteId ?? ""} onValueChange={(v) => setClienteId(v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o consultório…" />
+                  <SelectValue placeholder="Selecione…" />
                 </SelectTrigger>
                 <SelectContent>
                   {clientes.map((c) => (
@@ -326,7 +327,7 @@ function EditAccessDialog({ member, onClose }: { member: TeamMember; onClose: ()
           )}
 
           <div className="space-y-2">
-            <Label>Permissões {member.role === "cliente" ? "do portal" : "do admin"}</Label>
+            <Label>Telas liberadas</Label>
             <PermissionPicker
               value={permissoes}
               onChange={setPermissoes}
@@ -352,11 +353,17 @@ function EditAccessDialog({ member, onClose }: { member: TeamMember; onClose: ()
 function UsuariosPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
+  const [credentials, setCredentials] = useState<AccessCredentials | null>(null);
 
-  const { data: team = [], isLoading } = useQuery({
+  const {
+    data: team = [],
+    isLoading,
+    isFetching,
+    error,
+  } = useQuery({
     queryKey: ["admin", "team"],
     queryFn: fetchTeam,
-    staleTime: 60_000,
+    staleTime: 15_000,
   });
 
   const admins = team.filter((m) => m.role === "admin");
@@ -370,8 +377,9 @@ function UsuariosPage() {
             Configurações
           </span>
           <h1 className="text-xl font-bold tracking-tight">Usuários & acessos</h1>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Cadastro de membros, vínculo com consultórios e permissões do menu atual.
+          <p className="mt-0.5 text-xs text-muted-foreground max-w-xl">
+            Aqui ficam os <strong>logins</strong>. Criar um consultório em Clientes não libera
+            portal — é preciso gerar o acesso (email + senha) e vincular ao consultório.
           </p>
         </div>
         <Button onClick={() => setShowAdd(true)}>
@@ -385,25 +393,27 @@ function UsuariosPage() {
           {[
             { label: "Total de membros", value: team.length, color: "text-slate-700" },
             { label: "Admins", value: admins.length, color: "text-primary" },
-            { label: "Clientes", value: clientesMembers.length, color: "text-sky-700" },
+            { label: "Portais cliente", value: clientesMembers.length, color: "text-sky-700" },
           ].map((kpi, i) => (
             <div
               key={kpi.label}
-              className="card-lift animate-fade-up rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]"
+              className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]"
               style={{ animationDelay: i * 75 + "ms" }}
             >
               <p className="text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground">
                 {kpi.label}
               </p>
-              <p
-                className={`text-3xl font-extrabold tracking-tight animate-numeric-pop mt-1 ${kpi.color}`}
-              >
+              <p className={`mt-1 text-3xl font-extrabold tracking-tight ${kpi.color}`}>
                 {kpi.value}
               </p>
             </div>
           ))}
         </div>
       )}
+
+      {error ? (
+        <p className="text-sm text-destructive">Erro ao carregar: {(error as Error).message}</p>
+      ) : null}
 
       {isLoading ? (
         <div className="flex justify-center py-16">
@@ -412,52 +422,53 @@ function UsuariosPage() {
       ) : team.length === 0 ? (
         <EmptyState
           icon={<Users className="h-6 w-6" />}
-          title="Nenhum membro cadastrado"
-          description="Adicione o primeiro membro da equipe."
+          title="Nenhum login cadastrado"
+          description="Crie o primeiro acesso (admin ou portal do médico)."
           action={{ label: "Adicionar membro", onClick: () => setShowAdd(true) }}
         />
       ) : (
         <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
-            Membros
-          </p>
-          <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Membros {isFetching ? "· atualizando…" : ""}
+            </p>
+          </div>
+          <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
             {team.map((member, i) => (
               <div
                 key={member.id}
-                className="flex items-center gap-4 px-5 py-4 hover:bg-secondary/30 transition-colors animate-fade-up"
-                style={{ animationDelay: i * 50 + "ms" }}
+                className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-secondary/30"
               >
-                <span className="text-[10px] font-black text-muted-foreground/30 tabular-nums w-5 shrink-0">
+                <span className="w-5 shrink-0 text-[10px] font-black tabular-nums text-muted-foreground/30">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <Avatar>
-                  <AvatarFallback className="text-xs bg-slate-100 text-slate-700">
+                  <AvatarFallback className="bg-slate-100 text-xs text-slate-700">
                     {initials(member.nome, member.email)}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{member.nome ?? "—"}</p>
-                  <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{member.nome ?? "—"}</p>
+                  <p className="truncate text-xs text-muted-foreground">{member.email}</p>
                   {member.role === "cliente" && (
-                    <p className="text-[11px] text-sky-700 mt-0.5 truncate">
+                    <p className="mt-0.5 truncate text-[11px] text-sky-700">
                       {member.cliente_nome
-                        ? `Vinculado: ${member.cliente_nome}`
+                        ? `Portal: ${member.cliente_nome}`
                         : "Sem consultório vinculado"}
                     </p>
                   )}
                 </div>
-                <div className="hidden sm:flex flex-col items-end gap-1 max-w-[200px]">
-                  {member.role === "admin" ? (
-                    <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-700">
-                      Admin
-                    </span>
-                  ) : (
-                    <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-sky-50 text-sky-700">
-                      Cliente
-                    </span>
-                  )}
-                  <Badge variant="outline" className="text-[10px] font-normal truncate max-w-full">
+                <div className="hidden max-w-[200px] flex-col items-end gap-1 sm:flex">
+                  <span
+                    className={
+                      member.role === "admin"
+                        ? "rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700"
+                        : "rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700"
+                    }
+                  >
+                    {member.role === "admin" ? "Admin" : "Cliente"}
+                  </span>
+                  <Badge variant="outline" className="max-w-full truncate text-[10px] font-normal">
                     {summarizePermissions(member.permissoes, member.role)}
                   </Badge>
                 </div>
@@ -467,7 +478,7 @@ function UsuariosPage() {
                   size="icon"
                   className="shrink-0"
                   onClick={() => setEditing(member)}
-                  aria-label={`Editar acessos de ${member.email ?? member.nome ?? "membro"}`}
+                  aria-label={`Editar ${member.email ?? ""}`}
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -477,10 +488,15 @@ function UsuariosPage() {
         </div>
       )}
 
-      <AddUserDialog open={showAdd} onClose={() => setShowAdd(false)} />
+      <AddUserDialog
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        onCredentials={setCredentials}
+      />
       {editing && (
         <EditAccessDialog key={editing.id} member={editing} onClose={() => setEditing(null)} />
       )}
+      <CredentialsDialog credentials={credentials} onClose={() => setCredentials(null)} />
     </div>
   );
 }

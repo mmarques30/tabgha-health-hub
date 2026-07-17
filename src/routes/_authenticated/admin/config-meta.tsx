@@ -144,135 +144,142 @@ function ConfigMetaPage() {
   }
 
   return (
-    <div className="px-6 py-6">
-      <header className="mb-8 animate-fade-up">
+    <div className="w-full min-h-full px-6 py-6 lg:px-8">
+      <header className="mb-8 w-full animate-fade-up">
         <span className="eyebrow-pill">Aquisição</span>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight">Conectar Meta Business</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+        <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+          Conectar Meta Business
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
           Autorize o app da IAplicada e informe o <strong>Ad Account ID</strong> para habilitar o
           sync diário de métricas.
         </p>
       </header>
 
-      <div className="max-w-xl space-y-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <div className="space-y-2">
-          <Label htmlFor="cliente">Cliente</Label>
-          {loadingClientes ? (
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          ) : (
-            <select
-              id="cliente"
-              value={clienteId}
-              onChange={(e) => setClienteId(e.target.value)}
-              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
-            >
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {isLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Carregando…
+      <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)] lg:items-start">
+        <section className="w-full space-y-6 rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+          <div className="space-y-2">
+            <Label htmlFor="cliente">Cliente</Label>
+            {loadingClientes ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : (
+              <select
+                id="cliente"
+                value={clienteId}
+                onChange={(e) => setClienteId(e.target.value)}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+              >
+                {clientes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
-        ) : connected ? (
-          <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
-                Conectado
-              </p>
-              <p className="mt-1 text-sm font-medium text-slate-900">
-                {meta?.page_name ?? "Página Meta"} · page_id {meta?.page_id}
-              </p>
-              {meta?.expires_at ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Expira em {new Date(meta.expires_at).toLocaleString("pt-BR")}
-                </p>
-              ) : null}
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="adAccount">Ad Account ID (sem act_)</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="adAccount"
-                  value={adAccountId}
-                  onChange={(e) => setAdAccountId(e.target.value)}
-                  placeholder="123456789012345"
-                />
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando…
+            </div>
+          ) : connected ? (
+            <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                  Conectado
+                </p>
+                <p className="mt-1 text-sm font-medium text-slate-900">
+                  {meta?.page_name ?? "Página Meta"} · page_id {meta?.page_id}
+                </p>
+                {meta?.expires_at ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Expira em {new Date(meta.expires_at).toLocaleString("pt-BR")}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="adAccount">Ad Account ID (sem act_)</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="adAccount"
+                    value={adAccountId}
+                    onChange={(e) => setAdAccountId(e.target.value)}
+                    placeholder="123456789012345"
+                    className="w-full"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => void saveAdAccount()}
+                    disabled={savingAccount}
+                    className="shrink-0"
+                  >
+                    {savingAccount ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {oauthUrl ? (
+                  <Button asChild variant="outline" className="rounded-xl">
+                    <a href={oauthUrl}>
+                      Reconectar
+                      <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                ) : null}
                 <Button
                   variant="outline"
-                  onClick={() => void saveAdAccount()}
-                  disabled={savingAccount}
+                  className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50"
+                  disabled={disconnecting}
+                  onClick={() => void disconnect()}
                 >
-                  {savingAccount ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                  {disconnecting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
-                    <Save className="h-4 w-4" />
+                    <Unplug className="mr-2 h-4 w-4" />
                   )}
+                  Desconectar
                 </Button>
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-2">
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-dashed border-border bg-secondary/30 p-5 text-sm text-muted-foreground">
+                <Link2Off className="mb-2 h-5 w-5" />
+                Nenhuma conexão Meta para este cliente. Clique em conectar e autorize a BM da
+                clínica.
+              </div>
               {oauthUrl ? (
-                <Button asChild variant="outline" className="rounded-xl">
+                <Button asChild className="rounded-xl bg-sky-600 hover:bg-sky-700">
                   <a href={oauthUrl}>
-                    Reconectar
+                    Conectar Meta Business
                     <ExternalLink className="ml-2 h-3.5 w-3.5" />
                   </a>
                 </Button>
-              ) : null}
-              <Button
-                variant="outline"
-                className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50"
-                disabled={disconnecting}
-                onClick={() => void disconnect()}
-              >
-                {disconnecting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Unplug className="mr-2 h-4 w-4" />
-                )}
-                Desconectar
-              </Button>
+              ) : (
+                <p className="text-sm text-amber-700">
+                  Configure <code>VITE_META_APP_ID</code> e os secrets <code>META_APP_ID</code> /{" "}
+                  <code>META_APP_SECRET</code> no Supabase para habilitar o OAuth.
+                </p>
+              )}
             </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-dashed border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
-              <Link2Off className="mb-2 h-5 w-5" />
-              Nenhuma conexão Meta para este cliente. Clique em conectar e autorize a BM da clínica.
-            </div>
-            {oauthUrl ? (
-              <Button asChild className="rounded-xl bg-sky-600 hover:bg-sky-700">
-                <a href={oauthUrl}>
-                  Conectar Meta Business
-                  <ExternalLink className="ml-2 h-3.5 w-3.5" />
-                </a>
-              </Button>
-            ) : (
-              <p className="text-sm text-amber-700">
-                Configure <code>VITE_META_APP_ID</code> e os secrets <code>META_APP_ID</code> /{" "}
-                <code>META_APP_SECRET</code> no Supabase para habilitar o OAuth.
-              </p>
-            )}
-          </div>
-        )}
+          )}
+        </section>
 
-        <div className="rounded-xl border border-border bg-secondary/20 p-4 text-xs leading-relaxed text-muted-foreground">
-          <p className="font-semibold text-foreground">Setup Meta (Mariana)</p>
-          <ol className="mt-2 list-decimal space-y-1 pl-4">
+        <aside className="w-full rounded-2xl border border-border bg-card p-6 text-sm leading-relaxed text-muted-foreground shadow-sm sm:p-8">
+          <p className="text-sm font-semibold text-foreground">Setup Meta</p>
+          <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm">
             <li>App em developers.facebook.com (conta IAplicada)</li>
             <li>
               Produto Webhooks · subscribe <code>leadgen</code>
             </li>
-            <li>
+            <li className="break-all">
               Callback: <code>{SUPABASE_URL}/functions/v1/webhook_meta_lead</code>
             </li>
             <li>
@@ -282,7 +289,7 @@ function ConfigMetaPage() {
               Rodar sync diário com edge <code>sync_ads_metrics</code>
             </li>
           </ol>
-        </div>
+        </aside>
       </div>
     </div>
   );

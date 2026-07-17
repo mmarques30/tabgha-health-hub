@@ -10,6 +10,10 @@ import {
   ChevronDown,
   Stethoscope,
   Trash2,
+  Mic,
+  MicOff,
+  FileText,
+  Upload,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -454,11 +458,57 @@ function parseDiag(raw: unknown): DiagnosticoData {
   };
 }
 
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult:
+    | ((ev: {
+        resultIndex: number;
+        results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>;
+      }) => void)
+    | null;
+  onerror: ((ev: { error: string }) => void) | null;
+  onend: (() => void) | null;
+};
+
+function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
+  const w = window as unknown as {
+    SpeechRecognition?: new () => SpeechRecognitionLike;
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+async function invokeDiagnosticoEdge(body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke("gerar_diagnostico", { body });
+  const payload = data as {
+    error?: string;
+    detail?: string;
+    diagnostico?: unknown;
+    plano_acao?: string;
+  } | null;
+  if (error) {
+    throw new Error(payload?.error || error.message || "Falha ao chamar a IA.");
+  }
+  if (payload?.error) {
+    throw new Error(payload.error);
+  }
+  return payload;
+}
+
 // ── Tab: Diagnóstico ──────────────────────────────────────────────────────────
 function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   const qc = useQueryClient();
   const [d, setD] = useState<DiagnosticoData>(() => parseDiag(cliente.diagnostico));
   const [generating, setGenerating] = useState(false);
+  const [structuringActions, setStructuringActions] = useState(false);
+  const [transcricao, setTranscricao] = useState("");
+  const [genError, setGenError] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [recInstance, setRecInstance] = useState<SpeechRecognitionLike | null>(null);
 
   function setField(sec: keyof DiagnosticoData, key?: string) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -474,32 +524,133 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
     return (d[sec] as string) ?? "";
   }
 
+  async function onTranscriptFile(file: File | null) {
+    if (!file) return;
+    const ok = file.type.startsWith("text/") || /\.(txt|md|markdown|csv|json)$/i.test(file.name);
+    if (!ok) {
+      toast.error("Envie um arquivo de texto (.txt, .md, .csv). PDF/Word em breve.");
+      return;
+    }
+    try {
+      const text = await file.text();
+      setTranscricao((prev) => (prev ? `${prev.trim()}\n\n${text.trim()}` : text.trim()));
+      toast.success(`Arquivo “${file.name}” carregado.`);
+    } catch {
+      toast.error("Não foi possível ler o arquivo.");
+    }
+  }
+
   async function gerarComIA() {
     setGenerating(true);
+    setGenError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("gerar_diagnostico", {
-        body: {
-          nome: cliente.nome,
-          especialidade: cliente.especialidade ?? d.perfil.especialidade,
-          cidade: d.perfil.cidade || undefined,
-          publico_alvo: d.perfil.publico_alvo || undefined,
-          ticket_medio: d.perfil.ticket_medio || undefined,
-          tempo_mercado: d.perfil.tempo_mercado || undefined,
-          diferencial: d.perfil.diferencial || undefined,
-          canais_aquisicao: d.jornada.canais_aquisicao || undefined,
-        },
+      if (!transcricao.trim()) {
+        setGenError(
+          "Cole a transcrição da reunião (ou anexe um .txt/.md) antes de gerar. Assim o diagnóstico fica fiel ao que foi falado.",
+        );
+        return;
+      }
+      const payload = await invokeDiagnosticoEdge({
+        mode: "diagnostico",
+        nome: cliente.nome,
+        especialidade: cliente.especialidade ?? d.perfil.especialidade,
+        cidade: d.perfil.cidade || undefined,
+        publico_alvo: d.perfil.publico_alvo || undefined,
+        ticket_medio: d.perfil.ticket_medio || undefined,
+        tempo_mercado: d.perfil.tempo_mercado || undefined,
+        diferencial: d.perfil.diferencial || undefined,
+        canais_aquisicao: d.jornada.canais_aquisicao || undefined,
+        transcricao: transcricao.trim(),
+        diagnostico_atual: d,
       });
-      if (error) throw error;
-      if (data?.diagnostico) {
-        setD(parseDiag(data.diagnostico));
-        toast.success("Diagnóstico gerado! Revise e salve.");
+      if (payload?.diagnostico) {
+        setD(parseDiag(payload.diagnostico));
+        toast.success("Diagnóstico gerado a partir da reunião. Revise e salve.");
+      } else {
+        throw new Error("A IA não retornou o diagnóstico.");
       }
     } catch (e) {
-      toast.error("Erro ao gerar diagnóstico. Verifique a ANTHROPIC_API_KEY no Supabase.");
+      const msg =
+        e instanceof Error
+          ? e.message
+          : "Erro ao gerar diagnóstico. Verifique a ANTHROPIC_API_KEY no Supabase.";
+      setGenError(msg);
+      toast.error(msg);
       console.error(e);
     } finally {
       setGenerating(false);
     }
+  }
+
+  async function estruturarAcoesComIA() {
+    const notas = get("plano_acao").trim();
+    if (!notas) {
+      toast.error("Fale ou digite as próximas ações antes de estruturar.");
+      return;
+    }
+    setStructuringActions(true);
+    try {
+      const payload = await invokeDiagnosticoEdge({
+        mode: "acoes",
+        nome: cliente.nome,
+        especialidade: cliente.especialidade ?? d.perfil.especialidade,
+        cidade: d.perfil.cidade || undefined,
+        notas_acoes: notas,
+        transcricao: transcricao.trim() || undefined,
+      });
+      if (payload?.plano_acao) {
+        setD((prev) => ({ ...prev, plano_acao: payload.plano_acao! }));
+        toast.success("Próximas ações estruturadas. Revise e salve.");
+      } else {
+        throw new Error("A IA não retornou as ações.");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao estruturar ações.");
+    } finally {
+      setStructuringActions(false);
+    }
+  }
+
+  function toggleDictation() {
+    const Ctor = getSpeechRecognition();
+    if (!Ctor) {
+      toast.error("Seu navegador não suporta ditado por áudio. Use Chrome ou Edge.");
+      return;
+    }
+    if (listening && recInstance) {
+      recInstance.stop();
+      setListening(false);
+      return;
+    }
+    const rec = new Ctor();
+    rec.lang = "pt-BR";
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onresult = (ev) => {
+      let chunk = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const row = ev.results[i];
+        if (row.isFinal) chunk += row[0].transcript;
+      }
+      if (chunk.trim()) {
+        setD((prev) => {
+          const base = (prev.plano_acao ?? "").trim();
+          const next = base ? `${base} ${chunk.trim()}` : chunk.trim();
+          return { ...prev, plano_acao: next };
+        });
+      }
+    };
+    rec.onerror = (ev) => {
+      setListening(false);
+      if (ev.error !== "aborted") {
+        toast.error(`Áudio: ${ev.error}`);
+      }
+    };
+    rec.onend = () => setListening(false);
+    setRecInstance(rec);
+    rec.start();
+    setListening(true);
+    toast.message("Ouvindo… fale as próximas ações. Clique de novo para parar.");
   }
 
   const save = useMutation({
@@ -517,32 +668,71 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
     onError: (e: Error) => toast.error(e.message || "Erro ao salvar."),
   });
 
-  const hasData = !!(cliente.especialidade || cliente.nome);
-
   return (
-    <div className="py-5 space-y-4">
-      {/* ── AI generation bar ── */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent p-5 sm:flex-row sm:items-center">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-primary">Gerar diagnóstico com IA</p>
-          <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
-            Claude analisa os dados do cliente e preenche automaticamente todas as seções.
-            {!hasData && " Preencha o Cadastro primeiro para um resultado mais preciso."}
+    <div className="space-y-4 py-5">
+      {/* ── AI generation: transcrição → diagnóstico ── */}
+      <div className="space-y-3 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-primary">Gerar diagnóstico com IA</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+              Cole a transcrição da reunião (ou anexe um documento de texto). A IA preenche perfil,
+              jornada, dores, concorrentes e plano de ação — você só revisa e salva.
+            </p>
+          </div>
+          <Button
+            onClick={() => void gerarComIA()}
+            disabled={generating}
+            className="shrink-0 gap-2"
+          >
+            {generating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Gerando…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                {d.perfil.especialidade ? "Regenerar diagnóstico" : "Gerar diagnóstico"}
+              </>
+            )}
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+              <FileText className="h-3.5 w-3.5 text-primary" />
+              Transcrição da reunião
+            </Label>
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-secondary/50">
+              <Upload className="h-3.5 w-3.5" />
+              Anexar .txt / .md
+              <input
+                type="file"
+                accept=".txt,.md,.markdown,.csv,text/plain"
+                className="hidden"
+                onChange={(e) => void onTranscriptFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+          </div>
+          <Textarea
+            rows={7}
+            value={transcricao}
+            onChange={(e) => setTranscricao(e.target.value)}
+            placeholder="Cole aqui a transcrição do discovery / reunião estratégica com o médico…"
+            className="resize-y font-mono text-xs leading-relaxed"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Fonte principal da IA. Sem isso, o botão avisa e não inventa diagnóstico genérico.
           </p>
         </div>
-        <Button onClick={gerarComIA} disabled={generating} className="shrink-0 gap-2">
-          {generating ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Gerando…
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4" />
-              {d.perfil.especialidade ? "Regenerar" : "Gerar diagnóstico"}
-            </>
-          )}
-        </Button>
+
+        {genError ? (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {genError}
+          </div>
+        ) : null}
       </div>
 
       {/* ── Row 1: Perfil + Jornada ── */}
@@ -706,29 +896,62 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
 
       {/* ── Row 3: Plano de ação (full-width, destaque) ── */}
       <div
-        className="rounded-2xl border border-primary/20 overflow-hidden shadow-[0_2px_8px_rgba(26,95,173,0.10)]"
+        className="overflow-hidden rounded-2xl border border-primary/20 shadow-[0_2px_8px_rgba(26,95,173,0.10)]"
         style={{
           background: "linear-gradient(135deg, rgba(26,95,173,0.04) 0%, rgba(26,95,173,0.01) 100%)",
         }}
       >
-        <div className="flex items-center gap-2.5 border-b border-primary/15 bg-primary/8 px-5 py-3">
-          <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
-          <p className="text-[10.5px] font-bold uppercase tracking-widest text-primary">
-            Plano de ação — 90 dias
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/15 bg-primary/8 px-5 py-3">
+          <div className="flex items-center gap-2.5">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
+            <p className="text-[10.5px] font-bold uppercase tracking-widest text-primary">
+              Próximas ações — 90 dias
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={listening ? "destructive" : "outline"}
+              className="gap-1.5"
+              onClick={toggleDictation}
+            >
+              {listening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+              {listening ? "Parar áudio" : "Falar ações"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="gap-1.5"
+              disabled={structuringActions}
+              onClick={() => void estruturarAcoesComIA()}
+            >
+              {structuringActions ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              Estruturar com IA
+            </Button>
+          </div>
         </div>
-        <div className="p-5">
-          <Field label="Ações prioritárias com prazo e responsável">
+        <div className="space-y-2 p-5">
+          <Field label="Fale ou digite as próximas ações — depois clique em Estruturar com IA">
             <Textarea
               rows={6}
               value={get("plano_acao")}
               onChange={setField("plano_acao")}
               placeholder={
-                "1. Criar campanha no Meta Ads — 2 semanas\n2. Configurar automação WhatsApp — 1 mês\n…"
+                "Ex. (ditado): preciso subir campanha de joelho, revisar WhatsApp, alinhar conteúdo com o doutor…\n\nDepois a IA transforma em:\n1. Criar campanha Meta — 2 semanas — Tabgha\n2. …"
               }
               className="resize-none font-mono text-sm"
             />
           </Field>
+          <p className="text-[11px] text-muted-foreground">
+            O microfone usa o ditado do navegador (Chrome/Edge). A IA organiza em ações numeradas
+            por cliente.
+          </p>
         </div>
       </div>
 

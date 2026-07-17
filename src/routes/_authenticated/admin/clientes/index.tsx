@@ -54,10 +54,11 @@ function NovoClienteDialog({ open, onClose }: { open: boolean; onClose: () => vo
     mutationFn: (data: NewClientForm) => createClientWithAccess({ data }),
     onSuccess: () => {
       toast.success("Cliente criado.");
-      qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
-      onClose(); form.reset();
+      void qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
+      onClose();
+      form.reset();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message || "Não foi possível criar o cliente."),
   });
 
   return (

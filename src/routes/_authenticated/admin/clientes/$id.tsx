@@ -1,20 +1,49 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, ArrowLeft, Sparkles, Save, RefreshCw, ChevronDown, Stethoscope } from "lucide-react";
+import {
+  Loader2,
+  ArrowLeft,
+  Sparkles,
+  Save,
+  RefreshCw,
+  ChevronDown,
+  Stethoscope,
+  Trash2,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
+import {
+  deleteClienteAdmin,
+  updateClienteAdmin,
+} from "@/functions/clientes/createClientWithAccess.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Link } from "@tanstack/react-router";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -66,6 +95,18 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
     },
   });
 
+  useEffect(() => {
+    form.reset({
+      nome: cliente.nome,
+      email: cliente.email ?? "",
+      telefone: cliente.telefone ?? "",
+      cnpj: cliente.cnpj ?? "",
+      razao_social: cliente.razao_social ?? "",
+      especialidade: cliente.especialidade ?? "",
+      status: cliente.status,
+    });
+  }, [cliente, form]);
+
   const { data: quickStats } = useQuery({
     queryKey: ["admin", "cliente", cliente.id, "quick-stats"],
     staleTime: 120_000,
@@ -87,14 +128,25 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("clientes").update(form.getValues()).eq("id", cliente.id);
-      if (error) throw error;
+      const values = form.getValues();
+      if (!values.nome.trim()) throw new Error("Nome é obrigatório.");
+      await updateClienteAdmin({
+        id: cliente.id,
+        nome: values.nome,
+        email: values.email,
+        telefone: values.telefone,
+        cnpj: values.cnpj,
+        razao_social: values.razao_social,
+        especialidade: values.especialidade,
+        status: values.status,
+      });
     },
     onSuccess: () => {
       toast.success("Dados atualizados.");
-      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
+      void qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
+      void qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
     },
-    onError: () => toast.error("Erro ao salvar."),
+    onError: (e: Error) => toast.error(e.message || "Erro ao salvar."),
   });
 
   const extras = (cliente.dados_extras ?? {}) as Record<string, unknown>;
@@ -339,7 +391,7 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
       toast.success("Diagnóstico salvo.");
       qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
     },
-    onError: () => toast.error("Erro ao salvar."),
+    onError: (e: Error) => toast.error(e.message || "Erro ao salvar."),
   });
 
   const hasData = !!(cliente.especialidade || cliente.nome);
@@ -884,6 +936,8 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 function ClienteFichaPage() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
 
   const { data: cliente, isLoading } = useQuery({
     queryKey: ["admin", "cliente", id],
@@ -893,6 +947,16 @@ function ClienteFichaPage() {
       if (error) throw error;
       return data;
     },
+  });
+
+  const excluir = useMutation({
+    mutationFn: () => deleteClienteAdmin(id),
+    onSuccess: () => {
+      toast.success("Cliente excluído.");
+      void qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
+      void navigate({ to: "/admin/clientes" });
+    },
+    onError: (e: Error) => toast.error(e.message || "Não foi possível excluir."),
   });
 
   if (isLoading) return (
@@ -910,6 +974,8 @@ function ClienteFichaPage() {
     inativo: "bg-slate-100 text-slate-600 border-slate-200",
   };
 
+  const isTabghaSeed = cliente.id === "00000000-0000-0000-0000-000000000001";
+
   return (
     <div className="px-6 py-6">
       {/* Page header */}
@@ -924,6 +990,43 @@ function ClienteFichaPage() {
         <span className={cn("shrink-0 rounded-full border px-3 py-1 text-xs font-semibold capitalize", statusColor[cliente.status] ?? "bg-muted text-muted-foreground")}>
           {cliente.status}
         </span>
+        {!isTabghaSeed ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 border-rose-200 text-rose-700 hover:bg-rose-50"
+                disabled={excluir.isPending}
+              >
+                {excluir.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Excluir
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir cliente?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Isso remove <strong>{cliente.nome}</strong> e dados vinculados (leads, conteúdos,
+                  etc.). Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-rose-600 hover:bg-rose-700"
+                  onClick={() => excluir.mutate()}
+                >
+                  Excluir definitivamente
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null}
       </div>
 
       <Tabs defaultValue="cadastro">

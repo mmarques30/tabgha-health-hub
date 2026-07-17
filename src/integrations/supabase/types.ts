@@ -277,7 +277,6 @@ export type Database = {
           email: string | null
           icp: string | null
           id: string
-          motivo_perda: string | null
           nome: string | null
           observacoes: string | null
           status: string
@@ -294,7 +293,6 @@ export type Database = {
           email?: string | null
           icp?: string | null
           id?: string
-          motivo_perda?: string | null
           nome?: string | null
           observacoes?: string | null
           status?: string
@@ -311,7 +309,6 @@ export type Database = {
           email?: string | null
           icp?: string | null
           id?: string
-          motivo_perda?: string | null
           nome?: string | null
           observacoes?: string | null
           status?: string
@@ -426,7 +423,22 @@ export type Database = {
           status?: string
           step?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nurture_jobs_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_jobs_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       phone_cache: {
         Row: {
@@ -534,56 +546,6 @@ export type Database = {
           },
         ]
       }
-      whatsapp_instances: {
-        Row: {
-          atualizado_em: string
-          cliente_id: string
-          criado_em: string
-          dados_extras: Json | null
-          id: string
-          instance_id: string | null
-          last_connected_at: string | null
-          phone: string | null
-          provider: string
-          status: string
-          token: string | null
-        }
-        Insert: {
-          atualizado_em?: string
-          cliente_id: string
-          criado_em?: string
-          dados_extras?: Json | null
-          id?: string
-          instance_id?: string | null
-          last_connected_at?: string | null
-          phone?: string | null
-          provider: string
-          status?: string
-          token?: string | null
-        }
-        Update: {
-          atualizado_em?: string
-          cliente_id?: string
-          criado_em?: string
-          dados_extras?: Json | null
-          id?: string
-          instance_id?: string | null
-          last_connected_at?: string | null
-          phone?: string | null
-          provider?: string
-          status?: string
-          token?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_instances_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       whatsapp_conversations: {
         Row: {
           atualizado_em: string
@@ -659,6 +621,56 @@ export type Database = {
           },
         ]
       }
+      whatsapp_instances: {
+        Row: {
+          atualizado_em: string
+          cliente_id: string
+          criado_em: string
+          dados_extras: Json | null
+          id: string
+          instance_id: string | null
+          last_connected_at: string | null
+          phone: string | null
+          provider: string
+          status: string
+          token: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          cliente_id: string
+          criado_em?: string
+          dados_extras?: Json | null
+          id?: string
+          instance_id?: string | null
+          last_connected_at?: string | null
+          phone?: string | null
+          provider: string
+          status?: string
+          token?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          cliente_id?: string
+          criado_em?: string
+          dados_extras?: Json | null
+          id?: string
+          instance_id?: string | null
+          last_connected_at?: string | null
+          phone?: string | null
+          provider?: string
+          status?: string
+          token?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instances_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_messages: {
         Row: {
           body: string
@@ -725,34 +737,65 @@ export type Database = {
           status: string | null
           total: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_kpis_cliente_diario: {
+        Row: {
+          atendidos: number | null
+          cliente_id: string | null
+          convertidos: number | null
+          cpl: number | null
+          data: string | null
+          investimento: number | null
+          leads_captados: number | null
+          leads_qualificados: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metricas_ads_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
-      admin_create_cliente: {
-        Args: {
-          _cnpj?: string
-          _email: string
-          _especialidade?: string
-          _nome: string
-        }
-        Returns: string
-      }
+      admin_create_cliente:
+        | {
+            Args: { _cnpj?: string; _email: string; _nome: string }
+            Returns: string
+          }
+        | {
+            Args: {
+              _cnpj?: string
+              _email: string
+              _especialidade?: string
+              _nome: string
+            }
+            Returns: string
+          }
+      admin_delete_cliente: { Args: { _id: string }; Returns: undefined }
       admin_update_cliente: {
         Args: {
+          _cnpj?: string
+          _email?: string
+          _especialidade?: string
           _id: string
           _nome?: string
-          _email?: string
-          _telefone?: string
-          _cnpj?: string
           _razao_social?: string
-          _especialidade?: string
           _status?: string
+          _telefone?: string
         }
-        Returns: undefined
-      }
-      admin_delete_cliente: {
-        Args: { _id: string }
         Returns: undefined
       }
       admin_upsert_profile_role: {
@@ -765,16 +808,9 @@ export type Database = {
         Returns: undefined
       }
       assert_current_admin: { Args: never; Returns: undefined }
+      atualizar_redes_cliente: { Args: { _redes: Json }; Returns: undefined }
       bootstrap_admin: { Args: { _email: string }; Returns: string }
       close_stalled_conversations: { Args: never; Returns: number }
-      log_ticket_converted: {
-        Args: { _lead_id: string; _ticket: number }
-        Returns: undefined
-      }
-      mover_lead_status: {
-        Args: { _lead_id: string; _motivo?: string; _novo: string }
-        Returns: undefined
-      }
       current_cliente_id: { Args: never; Returns: string }
       get_or_create_conversation: {
         Args: {
@@ -792,12 +828,16 @@ export type Database = {
         }
         Returns: boolean
       }
-      responder_conteudo: {
-        Args: { _aprovada: boolean; _feedback?: string; _id: string }
+      log_ticket_converted: {
+        Args: { _lead_id: string; _ticket: number }
         Returns: undefined
       }
-      atualizar_redes_cliente: {
-        Args: { _redes: Json }
+      mover_lead_status: {
+        Args: { _lead_id: string; _motivo?: string; _novo: string }
+        Returns: undefined
+      }
+      responder_conteudo: {
+        Args: { _aprovada: boolean; _feedback?: string; _id: string }
         Returns: undefined
       }
       responder_entrega: {

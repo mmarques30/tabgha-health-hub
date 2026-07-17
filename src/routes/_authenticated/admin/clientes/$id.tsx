@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Loader2,
@@ -490,8 +490,24 @@ async function invokeDiagnosticoEdge(body: Record<string, unknown>) {
     diagnostico?: unknown;
     plano_acao?: string;
   } | null;
+
   if (error) {
-    throw new Error(payload?.error || error.message || "Falha ao chamar a IA.");
+    // Tenta ler body do FunctionsHttpError (500/400 da edge)
+    let fromContext: string | undefined;
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx) {
+        const bodyJson = (await ctx.clone().json()) as { error?: string };
+        fromContext = bodyJson?.error;
+      }
+    } catch {
+      /* ignore */
+    }
+    const msg = payload?.error || fromContext || error.message || "Falha ao chamar a IA.";
+    if (msg.includes("ANTHROPIC_API_KEY")) {
+      throw new Error("IA indisponível: configure ANTHROPIC_API_KEY no Supabase.");
+    }
+    throw new Error(msg);
   }
   if (payload?.error) {
     throw new Error(payload.error);
@@ -508,7 +524,11 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   const [transcricao, setTranscricao] = useState("");
   const [genError, setGenError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
-  const [recInstance, setRecInstance] = useState<SpeechRecognitionLike | null>(null);
+  const [acoesError, setAcoesError] = useState<string | null>(null);
+  const [notasBrutas, setNotasBrutas] = useState("");
+  const recRef = useRef<SpeechRecognitionLike | null>(null);
+  const notasBrutasRef = useRef("");
+  const autoEstruturarRef = useRef(false);
 
   function setField(sec: keyof DiagnosticoData, key?: string) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -522,6 +542,14 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   function get(sec: keyof DiagnosticoData, key?: string): string {
     if (key) return (d[sec] as Record<string, string>)[key] ?? "";
     return (d[sec] as string) ?? "";
+  }
+
+  function appendNotasBrutas(chunk: string) {
+    const text = chunk.trim();
+    if (!text) return;
+    const next = notasBrutasRef.current.trim() ? `${notasBrutasRef.current.trim()} ${text}` : text;
+    notasBrutasRef.current = next;
+    setNotasBrutas(next);
   }
 
   async function onTranscriptFile(file: File | null) {
@@ -582,13 +610,20 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
     }
   }
 
-  async function estruturarAcoesComIA() {
-    const notas = get("plano_acao").trim();
+  async function estruturarAcoesComIA(notasOverride?: string) {
+    const notas =
+      notasOverride?.trim() ||
+      notasBrutasRef.current.trim() ||
+      notasBrutas.trim() ||
+      get("plano_acao").trim();
     if (!notas) {
-      toast.error("Fale ou digite as próximas ações antes de estruturar.");
+      const msg = "Fale ou digite as próximas ações antes de estruturar.";
+      setAcoesError(msg);
+      toast.error(msg);
       return;
     }
     setStructuringActions(true);
+    setAcoesError(null);
     try {
       const payload = await invokeDiagnosticoEdge({
         mode: "acoes",
@@ -600,57 +635,80 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
       });
       if (payload?.plano_acao) {
         setD((prev) => ({ ...prev, plano_acao: payload.plano_acao! }));
-        toast.success("Próximas ações estruturadas. Revise e salve.");
+        setNotasBrutas("");
+        notasBrutasRef.current = "";
+        toast.success("Próximas ações estruturadas com IA. Revise e salve.");
       } else {
         throw new Error("A IA não retornou as ações.");
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao estruturar ações.");
+      const msg = e instanceof Error ? e.message : "Falha ao estruturar ações.";
+      setAcoesError(msg);
+      toast.error(msg);
     } finally {
       setStructuringActions(false);
     }
   }
 
-  function toggleDictation() {
+  function stopDictation(shouldEstruturar: boolean) {
+    autoEstruturarRef.current = shouldEstruturar;
+    try {
+      recRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
+    setListening(false);
+  }
+
+  function startDictation() {
     const Ctor = getSpeechRecognition();
     if (!Ctor) {
       toast.error("Seu navegador não suporta ditado por áudio. Use Chrome ou Edge.");
       return;
     }
-    if (listening && recInstance) {
-      recInstance.stop();
-      setListening(false);
+    if (listening && recRef.current) {
+      stopDictation(true);
       return;
     }
+
     const rec = new Ctor();
     rec.lang = "pt-BR";
     rec.continuous = true;
-    rec.interimResults = true;
+    rec.interimResults = false;
     rec.onresult = (ev) => {
       let chunk = "";
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
         const row = ev.results[i];
         if (row.isFinal) chunk += row[0].transcript;
       }
-      if (chunk.trim()) {
-        setD((prev) => {
-          const base = (prev.plano_acao ?? "").trim();
-          const next = base ? `${base} ${chunk.trim()}` : chunk.trim();
-          return { ...prev, plano_acao: next };
-        });
-      }
+      appendNotasBrutas(chunk);
     };
     rec.onerror = (ev) => {
       setListening(false);
-      if (ev.error !== "aborted") {
+      if (ev.error !== "aborted" && ev.error !== "no-speech") {
         toast.error(`Áudio: ${ev.error}`);
       }
     };
-    rec.onend = () => setListening(false);
-    setRecInstance(rec);
+    rec.onend = () => {
+      setListening(false);
+      recRef.current = null;
+      if (autoEstruturarRef.current) {
+        autoEstruturarRef.current = false;
+        const notas = notasBrutasRef.current.trim();
+        if (notas) {
+          toast.message("Estruturando o que você falou com IA…");
+          void estruturarAcoesComIA(notas);
+        } else {
+          toast.error("Não captamos áudio. Tente de novo ou digite as ações.");
+        }
+      }
+    };
+    recRef.current = rec;
+    autoEstruturarRef.current = false;
     rec.start();
     setListening(true);
-    toast.message("Ouvindo… fale as próximas ações. Clique de novo para parar.");
+    setAcoesError(null);
+    toast.message("Ouvindo… fale as próximas ações. Ao parar, a IA estrutura automaticamente.");
   }
 
   const save = useMutation({
@@ -894,7 +952,7 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
         </div>
       </div>
 
-      {/* ── Row 3: Plano de ação (full-width, destaque) ── */}
+      {/* ── Row 3: Próximas ações — falar → estruturar com IA ── */}
       <div
         className="overflow-hidden rounded-2xl border border-primary/20 shadow-[0_2px_8px_rgba(26,95,173,0.10)]"
         style={{
@@ -912,19 +970,23 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
             <Button
               type="button"
               size="sm"
-              variant={listening ? "destructive" : "outline"}
+              variant={listening ? "destructive" : "default"}
               className="gap-1.5"
-              onClick={toggleDictation}
+              disabled={structuringActions}
+              onClick={() => {
+                if (listening) stopDictation(true);
+                else startDictation();
+              }}
             >
               {listening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-              {listening ? "Parar áudio" : "Falar ações"}
+              {listening ? "Parar e estruturar com IA" : "Falar ações"}
             </Button>
             <Button
               type="button"
               size="sm"
               variant="secondary"
               className="gap-1.5"
-              disabled={structuringActions}
+              disabled={structuringActions || listening}
               onClick={() => void estruturarAcoesComIA()}
             >
               {structuringActions ? (
@@ -936,22 +998,51 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
             </Button>
           </div>
         </div>
-        <div className="space-y-2 p-5">
-          <Field label="Fale ou digite as próximas ações — depois clique em Estruturar com IA">
-            <Textarea
-              rows={6}
-              value={get("plano_acao")}
-              onChange={setField("plano_acao")}
-              placeholder={
-                "Ex. (ditado): preciso subir campanha de joelho, revisar WhatsApp, alinhar conteúdo com o doutor…\n\nDepois a IA transforma em:\n1. Criar campanha Meta — 2 semanas — Tabgha\n2. …"
-              }
-              className="resize-none font-mono text-sm"
-            />
-          </Field>
-          <p className="text-[11px] text-muted-foreground">
-            O microfone usa o ditado do navegador (Chrome/Edge). A IA organiza em ações numeradas
-            por cliente.
-          </p>
+        <div className="space-y-4 p-5">
+          <div className="space-y-2">
+            <Field label="1. Fale ou digite as ações em bruto (como você pensa)">
+              <Textarea
+                rows={4}
+                value={notasBrutas}
+                onChange={(e) => {
+                  setNotasBrutas(e.target.value);
+                  notasBrutasRef.current = e.target.value;
+                }}
+                placeholder="Ex.: preciso subir campanha de joelho, revisar WhatsApp, alinhar conteúdo com o doutor…"
+                className="resize-none text-sm"
+              />
+            </Field>
+            <p className="text-[11px] text-muted-foreground">
+              Clique em <strong>Falar ações</strong> (Chrome/Edge). Ao parar, a IA estrutura
+              sozinha. Ou digite e clique em <strong>Estruturar com IA</strong>.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Field label="2. Ações estruturadas (resultado da IA — revise e salve)">
+              <Textarea
+                rows={6}
+                value={get("plano_acao")}
+                onChange={setField("plano_acao")}
+                placeholder={"1. Criar campanha Meta — 2 semanas — Tabgha\n2. …"}
+                className="resize-none font-mono text-sm"
+              />
+            </Field>
+          </div>
+
+          {listening ? (
+            <p className="animate-pulse text-xs font-medium text-rose-700">
+              Gravando… fale as próximas ações deste cliente.
+            </p>
+          ) : null}
+          {structuringActions ? (
+            <p className="animate-pulse text-xs font-medium text-primary">Estruturando com IA…</p>
+          ) : null}
+          {acoesError ? (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {acoesError}
+            </div>
+          ) : null}
         </div>
       </div>
 

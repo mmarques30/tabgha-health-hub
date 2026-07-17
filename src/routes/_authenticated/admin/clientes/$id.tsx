@@ -1411,11 +1411,49 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const hasZapiInstance = Boolean(wppInstance?.instance_id && wppInstance?.token);
+  const wppStatus = wppInstance?.status ?? "none";
+  const metaExtras = (extras.meta ?? null) as Record<string, unknown> | null;
+  const hasMeta = Boolean(metaExtras?.page_id || metaExtras?.ad_account_id);
+
   return (
-    <div className="py-5 space-y-4">
+    <div className="space-y-4 py-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card px-4 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            Meta Ads
+          </p>
+          <p className="mt-1 text-sm font-semibold text-foreground">
+            {hasMeta ? "Conectado (dados reais no JSON)" : "Ainda não conectado"}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {hasMeta
+              ? `Página: ${String(metaExtras?.page_name ?? metaExtras?.page_id ?? "—")}`
+              : "Conecte em Config Meta / Marketing Pago."}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-card px-4 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            WhatsApp / Pietro
+          </p>
+          <p className="mt-1 text-sm font-semibold text-foreground">
+            {!hasZapiInstance
+              ? "Sem instância Z-API"
+              : wppStatus === "connected"
+                ? agenteAtivo
+                  ? "Conectado + agente ligado"
+                  : "Conectado (agente desligado)"
+                : "Instância salva — falta escanear QR"}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            O agente só responde depois: instância salva → QR conectado → Agente ativo ligado.
+          </p>
+        </div>
+      </div>
+
       <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-5 py-4 text-sm text-amber-950">
         <p className="text-[10.5px] font-bold uppercase tracking-widest text-amber-800">
-          Como conectar a automação WhatsApp
+          Como conectar a automação WhatsApp (é real — não é mock)
         </p>
         <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-xs leading-relaxed">
           <li>
@@ -1432,19 +1470,24 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
           <li>
             Clique em “Gerar QR Code” no card ao lado e escaneie com o celular do consultório.
           </li>
-          <li>Ative “Agente ativo” e salve a metodologia — aí o bot responde nas conversas.</li>
+          <li>
+            Ative “Agente ativo”, salve a metodologia — aí o inbound chama o Pietro (
+            <span className="font-mono">ai-respond</span>) nas conversas com o bot.
+          </li>
         </ol>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-4">
           <WhatsappConnectCard clienteId={cliente.id} />
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)] space-y-3">
+          <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
             <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
               Provisionar Z-API (admin)
             </p>
             <p className="text-xs text-muted-foreground">
-              Sem Instance ID + Token salvos, o botão de QR fica em “Aguardando provisionamento”.
+              {hasZapiInstance
+                ? "Instância já salva neste cliente. Atualize só se trocar na Z-API."
+                : "Ainda não há instância neste cliente — por isso o card diz “Aguardando provisionamento”. Isso é o estado real."}
             </p>
             <div className="space-y-2">
               <Label>Instance ID</Label>
@@ -1494,28 +1537,34 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
               Pietro · Agente WhatsApp
             </p>
           </div>
-          <div className="p-5 space-y-3">
+          <div className="space-y-3 p-5">
             <div className="flex items-center justify-between rounded-xl border border-border bg-secondary/30 px-3 py-2.5">
               <div>
                 <p className="text-sm font-medium">Agente ativo</p>
                 <p className="text-xs text-muted-foreground">
-                  Quando ligado, o bot responde conversas com owner_state=bot.
+                  Só faz efeito com WhatsApp conectado. Liga o Pietro nas conversas do bot.
                 </p>
               </div>
               <Switch checked={agenteAtivo} onCheckedChange={setAgenteAtivo} />
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Cole a metodologia que o agente deve seguir nas conversas. Se vazio, usa o padrão
-              genérico (intenção, urgência, fit, capacidade financeira).
+            {!hasZapiInstance ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
+                Ainda não há instância Z-API. Salvar o agente agora só guarda a configuração — ele{" "}
+                <strong>não</strong> fala no WhatsApp até provisionar + QR.
+              </p>
+            ) : null}
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Metodologia do Pietro neste cliente. Campo vazio = usa o padrão genérico. O texto
+              cinza no campo é só exemplo (placeholder), não é dado salvo.
             </p>
             <Textarea
               rows={10}
               placeholder={
-                "Ex: Avalie o lead com base em:\n(1) Urgência — já tem pacientes interessados?\n(2) Volume — quantos atendimentos por semana?\n(3) Disposição — aberto a investir em marketing?\nConduza de forma natural, sem parecer interrogatório."
+                "Exemplo (não é dado real até você digitar e salvar):\n(1) Urgência — já tem pacientes interessados?\n(2) Volume — quantos atendimentos por semana?\n(3) Disposição — aberto a investir em marketing?\nConduza de forma natural, sem parecer interrogatório."
               }
               value={metodo}
               onChange={(e) => setMetodo(e.target.value)}
-              className="text-sm resize-none"
+              className="resize-none text-sm"
             />
             {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
             <Button
@@ -1535,18 +1584,21 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
         </div>
       </div>
 
-      {/* ── JSON avançado ── */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+      {/* ── JSON avançado (sempre visível — dados reais do cliente) ── */}
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
         <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50/60 px-5 py-3">
-          <span className="h-2 w-2 rounded-full bg-slate-400 shrink-0" />
+          <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
           <p className="text-[10.5px] font-bold uppercase tracking-widest text-slate-600">
             JSON Avançado
           </p>
         </div>
-        <div className="p-5 space-y-3">
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Redes sociais, automações (<span className="font-mono text-[11px]">meta_page_id</span>,{" "}
-            <span className="font-mono text-[11px]">zapi_instance_id</span>), GA4, webhooks, etc.
+        <div className="space-y-3 p-5">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Isto <strong className="font-semibold text-foreground">não é inventado</strong>: é o{" "}
+            <span className="font-mono text-[11px]">dados_extras</span> real deste cliente no banco.
+            O bloco <span className="font-mono text-[11px]">meta</span> veio da conexão Meta BM
+            (página DR. Pedro, ad accounts, tokens). WhatsApp / Z-API entra aqui depois de
+            provisionar. Não ocultamos este painel — é a visão técnica da operação.
           </p>
           <Textarea
             className="font-mono text-xs resize-none"

@@ -205,7 +205,7 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead; onClose: () => void }
   const [tab, setTab] = useState<"dados" | "conversas">("dados");
   const [obs, setObs] = useState(lead.observacoes ?? "");
   const [status, setStatus] = useState(lead.status as PipelineStatus);
-  const [motivo, setMotivo] = useState(lead.motivo_perda ?? "");
+  const [motivo, setMotivo] = useState((lead as Lead & { motivo_perda?: string | null }).motivo_perda ?? "");
   const [ticket, setTicket] = useState(() => String(parseTicket(lead.observacoes) ?? ""));
 
   const { data: messages = [], isLoading: loadingMsgs } = useQuery({

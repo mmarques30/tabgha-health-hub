@@ -31,6 +31,10 @@ function absoluteAppUrl(pathOrUrl: string, req: Request) {
   return `${origin.replace(/\/$/, "")}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
 }
 
+function normalizeAccountId(raw: string): string {
+  return raw.replace(/^act_/, "");
+}
+
 async function exchangeCode(code: string) {
   const url =
     `https://graph.facebook.com/${GRAPH_VERSION}/oauth/access_token` +
@@ -61,10 +65,11 @@ async function toLongLived(shortToken: string) {
   return (await res.json()) as { access_token: string; expires_in?: number };
 }
 
-async function fetchPage(token: string) {
+async function fetchPages(token: string) {
   const url =
     `https://graph.facebook.com/${GRAPH_VERSION}/me/accounts` +
     `?fields=id,name,access_token` +
+    `&limit=100` +
     `&access_token=${encodeURIComponent(token)}`;
 
   const res = await fetch(url);
@@ -74,25 +79,76 @@ async function fetchPage(token: string) {
   const data = (await res.json()) as {
     data?: Array<{ id: string; name: string; access_token: string }>;
   };
-  return data.data?.[0] ?? null;
+  return data.data ?? [];
 }
 
-async function fetchAdAccount(token: string) {
+type AdAccount = {
+  id: string;
+  name: string;
+  amount_spent: number;
+  currency?: string;
+};
+
+async function fetchAdAccounts(token: string): Promise<AdAccount[]> {
   const url =
     `https://graph.facebook.com/${GRAPH_VERSION}/me/adaccounts` +
-    `?fields=id,name,account_id` +
+    `?fields=id,name,account_id,amount_spent,currency` +
+    `&limit=100` +
     `&access_token=${encodeURIComponent(token)}`;
 
   const res = await fetch(url);
   if (!res.ok) {
-    return null;
+    return [];
   }
   const data = (await res.json()) as {
-    data?: Array<{ id?: string; account_id?: string }>;
+    data?: Array<{
+      id?: string;
+      name?: string;
+      account_id?: string;
+      amount_spent?: string;
+      currency?: string;
+    }>;
   };
 
-  const first = data.data?.[0];
-  return first?.account_id ?? first?.id?.replace(/^act_/, "") ?? null;
+  return (data.data ?? [])
+    .map((row) => {
+      const id = normalizeAccountId(row.account_id ?? row.id ?? "");
+      if (!id) return null;
+      return {
+        id,
+        name: row.name ?? id,
+        amount_spent: Number(row.amount_spent ?? 0),
+        currency: row.currency,
+      } satisfies AdAccount;
+    })
+    .filter((row): row is AdAccount => Boolean(row));
+}
+
+function pickAdAccount(accounts: AdAccount[], pageName?: string | null): string | null {
+  if (accounts.length === 0) return null;
+  const page = (pageName ?? "").trim().toLowerCase();
+  const ranked = [...accounts].sort((a, b) => {
+    const aName = a.name.toLowerCase();
+    const bName = b.name.toLowerCase();
+    const aMatch = page && (aName.includes(page) || page.includes(aName)) ? 1 : 0;
+    const bMatch = page && (bName.includes(page) || page.includes(bName)) ? 1 : 0;
+    if (aMatch !== bMatch) return bMatch - aMatch;
+    if (a.amount_spent !== b.amount_spent) return b.amount_spent - a.amount_spent;
+    return aName.localeCompare(bName);
+  });
+  return ranked[0]?.id ?? null;
+}
+
+async function subscribePageLeadgen(pageId: string, pageToken: string) {
+  const url =
+    `https://graph.facebook.com/${GRAPH_VERSION}/${pageId}/subscribed_apps` +
+    `?subscribed_fields=leadgen` +
+    `&access_token=${encodeURIComponent(pageToken)}`;
+  const res = await fetch(url, { method: "POST" });
+  if (!res.ok) {
+    return { ok: false as const, error: await res.text() };
+  }
+  return { ok: true as const, payload: await res.json() };
 }
 
 Deno.serve(async (req) => {
@@ -117,14 +173,24 @@ Deno.serve(async (req) => {
   try {
     const short = await exchangeCode(code);
     const longLived = await toLongLived(short.access_token);
-    const page = await fetchPage(longLived.access_token);
+    const pages = await fetchPages(longLived.access_token);
+    const page = pages[0] ?? null;
 
     const pageToken = page?.access_token ?? longLived.access_token;
     const pageId = page?.id ?? null;
-    const adAccountId = await fetchAdAccount(longLived.access_token);
+    const adAccounts = await fetchAdAccounts(longLived.access_token);
+    const adAccountId = pickAdAccount(adAccounts, page?.name);
     const expiresAt = longLived.expires_in
       ? new Date(Date.now() + longLived.expires_in * 1000).toISOString()
       : null;
+
+    let leadgenSubscribe: { ok: boolean; error?: string } | null = null;
+    if (pageId && page?.access_token) {
+      const sub = await subscribePageLeadgen(pageId, page.access_token);
+      leadgenSubscribe = sub.ok
+        ? { ok: true }
+        : { ok: false, error: "error" in sub ? sub.error : "subscribe_failed" };
+    }
 
     const { data: cliente, error: clienteError } = await supabase
       .from("clientes")
@@ -146,6 +212,14 @@ Deno.serve(async (req) => {
         page_id: pageId,
         page_name: page?.name ?? null,
         ad_account_id: adAccountId,
+        ad_accounts: adAccounts.map((a) => ({
+          id: a.id,
+          name: a.name,
+          amount_spent: a.amount_spent,
+          currency: a.currency ?? null,
+        })),
+        pages: pages.map((p) => ({ id: p.id, name: p.name })),
+        leadgen_subscribed: leadgenSubscribe?.ok ?? false,
         expires_at: expiresAt,
         connected_at: new Date().toISOString(),
       },
@@ -165,9 +239,21 @@ Deno.serve(async (req) => {
         page_id: pageId,
         page_name: page?.name ?? null,
         ad_account_id: adAccountId,
+        ad_accounts: adAccounts.slice(0, 12),
+        leadgen_subscribed: leadgenSubscribe?.ok ?? false,
+        leadgen_subscribe_error: leadgenSubscribe?.ok === false ? leadgenSubscribe.error : null,
         expires_at: expiresAt,
       },
     });
+
+    if (leadgenSubscribe && !leadgenSubscribe.ok) {
+      await supabase.from("webhook_errors").insert({
+        source: "meta_oauth_leadgen_subscribe",
+        cliente_id: state,
+        payload: { page_id: pageId },
+        error: leadgenSubscribe.error ?? "subscribe_failed",
+      });
+    }
 
     return redirect(
       absoluteAppUrl(

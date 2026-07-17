@@ -37,13 +37,22 @@ export const Route = createFileRoute("/_authenticated/admin/config-meta")({
   head: () => ({ meta: [{ title: "Conectar Meta BM — Admin" }] }),
 });
 
+type MetaAdAccountOption = {
+  id: string;
+  name?: string;
+  amount_spent?: number;
+  currency?: string | null;
+};
+
 type MetaExtras = {
   access_token?: string;
   page_id?: string;
   page_name?: string;
   ad_account_id?: string;
+  ad_accounts?: MetaAdAccountOption[];
   expires_at?: string;
   connected_at?: string;
+  leadgen_subscribed?: boolean;
 };
 
 const META_APP_ID = import.meta.env.VITE_META_APP_ID as string | undefined;
@@ -203,18 +212,38 @@ function ConfigMetaPage() {
       const payload = data as {
         ok?: boolean;
         error?: string;
-        resultados?: Array<{ meta?: { inseridos?: number; erros?: string[] } }>;
+        resultados?: Array<{
+          meta?: {
+            inseridos?: number;
+            erro?: string;
+            erros?: string[];
+            motivo?: string;
+            auto_switched?: boolean;
+            ad_account_id?: string;
+          };
+        }>;
       };
       if (!payload?.ok) throw new Error(payload?.error || "Sync falhou.");
       const first = payload.resultados?.[0]?.meta;
-      if (first?.erros?.length) {
-        toast.error(`Sync com erros: ${first.erros[0]}`);
+      if (first?.erro || first?.erros?.length) {
+        toast.error(`Sync com erros: ${first?.erro ?? first?.erros?.[0]}`);
+      } else if ((first?.inseridos ?? 0) === 0) {
+        toast.message("Sync ok, mas sem insights no período", {
+          description:
+            first?.motivo === "no_insights_in_range"
+              ? "Confira se o Ad Account certo está selecionado e se houve gasto nos últimos 30 dias."
+              : "Nenhuma linha inserida. Verifique o Ad Account ID.",
+        });
       } else {
         toast.success(
-          `Métricas sincronizadas (${first?.inseridos ?? 0} linhas nos últimos 30 dias).`,
+          first?.auto_switched
+            ? `Conta corrigida para ${first.ad_account_id} · ${first.inseridos} linhas (30d).`
+            : `Métricas sincronizadas (${first?.inseridos ?? 0} linhas nos últimos 30 dias).`,
         );
       }
       void queryClient.invalidateQueries({ queryKey: ["meta-ads-db"] });
+      void queryClient.invalidateQueries({ queryKey: ["cliente-meta", clienteId] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "meta-conexoes"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível sincronizar.");
     } finally {
@@ -431,28 +460,55 @@ function ConfigMetaPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="adAccount">Ad Account ID (sem act_)</Label>
-                  <div className="flex max-w-lg flex-col gap-2 sm:flex-row">
+                  <Label htmlFor="adAccount">Ad Account (conta de anúncios)</Label>
+                  {(meta?.ad_accounts?.length ?? 0) > 0 ? (
+                    <select
+                      id="adAccount"
+                      value={adAccountId}
+                      onChange={(e) => setAdAccountId(e.target.value)}
+                      className="w-full max-w-lg rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+                    >
+                      {meta?.ad_accounts?.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name ?? acc.id}
+                          {typeof acc.amount_spent === "number"
+                            ? ` · gasto hist. ${(acc.amount_spent / 100).toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: acc.currency === "USD" ? "USD" : "BRL",
+                              })}`
+                            : ""}{" "}
+                          ({acc.id})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
                     <Input
                       id="adAccount"
                       value={adAccountId}
                       onChange={(e) => setAdAccountId(e.target.value)}
                       placeholder="123456789012345"
-                      className="w-full"
+                      className="w-full max-w-lg"
                     />
+                  )}
+                  <div className="flex max-w-lg flex-wrap gap-2">
                     <Button
                       variant="outline"
                       onClick={() => void saveAdAccount()}
-                      disabled={savingAccount}
+                      disabled={savingAccount || !adAccountId.trim()}
                       className="shrink-0"
                     >
                       {savingAccount ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
-                        <Save className="h-4 w-4" />
+                        <Save className="mr-2 h-4 w-4" />
                       )}
+                      Salvar Ad Account
                     </Button>
                   </div>
+                  <p className="max-w-lg text-xs text-muted-foreground">
+                    OAuth pode pegar a conta errada da BM. Prefira a conta com o nome da clínica e
+                    gasto histórico. Sync também tenta auto-corrigir se vier 0 insights.
+                  </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -545,13 +601,22 @@ function ConfigMetaPage() {
                 <code>pages_show_list</code>, <code>business_management</code>
               </li>
               <li>
-                Webhooks · Page · <code>leadgen</code>
+                Webhooks · Page · <code>leadgen</code> (verify token já validado no app)
               </li>
               <li className="break-all">
                 Callback: <code>{SUPABASE_URL}/functions/v1/webhook_meta_lead</code>
               </li>
               <li>
                 Verify token = secret <code>META_WEBHOOK_VERIFY_TOKEN</code>
+              </li>
+              <li>
+                Após conectar, escolha o Ad Account certo e clique em{" "}
+                <strong>Sincronizar métricas</strong> (cron diário também roda com 7 dias)
+              </li>
+              <li>
+                Leads do CRM vêm só pelo webhook <code>leadgen</code> — OAuth sozinho não importa
+                formulários. Se a Page não estiver inscrita no app, ative em Meta Developers →
+                Webhooks ou habilite <code>pages_manage_metadata</code> no caso de uso.
               </li>
             </ol>
           </div>

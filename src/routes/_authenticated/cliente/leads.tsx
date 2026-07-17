@@ -39,7 +39,8 @@ function LeadsPage() {
 
   function updateSearch(patch: Partial<typeof search>) {
     void navigate({
-      search: (prev) => ({ ...prev, ...patch }),
+      to: ".",
+      search: (prev: typeof search) => ({ ...prev, ...patch }),
     });
   }
 

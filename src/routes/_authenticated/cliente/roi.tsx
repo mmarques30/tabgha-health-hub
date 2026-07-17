@@ -25,11 +25,6 @@ function fmtCurrency(n: number) {
   if (n >= 1000) return `R$ ${(n / 1000).toFixed(1)}k`;
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 }
-function fmtDecimal(n: number | null) {
-  if (n == null) return "—";
-  return n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-}
-
 function RoiPage() {
   const { profile } = useAuth();
   const clienteId = profile?.cliente_id;

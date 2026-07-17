@@ -87,14 +87,26 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("clientes").update(form.getValues()).eq("id", cliente.id);
+      const values = form.getValues();
+      const { error } = await supabase
+        .from("clientes")
+        .update({
+          nome: values.nome.trim(),
+          email: values.email.trim() || null,
+          telefone: values.telefone.trim() || null,
+          cnpj: values.cnpj.trim() || null,
+          razao_social: values.razao_social.trim() || null,
+          especialidade: values.especialidade.trim() || null,
+          status: values.status,
+        })
+        .eq("id", cliente.id);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Dados atualizados.");
       qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
     },
-    onError: () => toast.error("Erro ao salvar."),
+    onError: (e: Error) => toast.error(e.message || "Erro ao salvar."),
   });
 
   const extras = (cliente.dados_extras ?? {}) as Record<string, unknown>;
@@ -339,7 +351,7 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
       toast.success("Diagnóstico salvo.");
       qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
     },
-    onError: () => toast.error("Erro ao salvar."),
+    onError: (e: Error) => toast.error(e.message || "Erro ao salvar."),
   });
 
   const hasData = !!(cliente.especialidade || cliente.nome);

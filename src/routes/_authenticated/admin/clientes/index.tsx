@@ -54,10 +54,16 @@ function NovoClienteDialog({ open, onClose }: { open: boolean; onClose: () => vo
     mutationFn: (data: NewClientForm) => createClientWithAccess({ data }),
     onSuccess: () => {
       toast.success("Cliente criado.");
-      qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
-      onClose(); form.reset();
+      void qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
+      onClose();
+      form.reset();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      const msg = e.message || "Não foi possível criar o cliente.";
+      toast.error(msg.includes("assert_current_admin") || msg.includes("admin")
+        ? "Sem permissão de admin para criar cliente. Faça login novamente."
+        : msg);
+    },
   });
 
   return (

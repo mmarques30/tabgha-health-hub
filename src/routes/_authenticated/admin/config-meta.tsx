@@ -36,7 +36,10 @@ function buildOAuthUrl(clienteId: string) {
   const params = new URLSearchParams({
     client_id: META_APP_ID,
     redirect_uri: redirectUri,
-    scope: "leads_retrieval,ads_read,pages_manage_metadata,pages_show_list,business_management",
+    // pages_manage_metadata removed: Meta rejects it as Invalid Scope until the
+    // app use-case explicitly enables it. Connection works without it (page list
+    // + leads + ads). Page webhook subscription can be done in Meta UI.
+    scope: "leads_retrieval,ads_read,pages_show_list,business_management",
     response_type: "code",
     state: clienteId,
   });
@@ -277,7 +280,12 @@ function ConfigMetaPage() {
           <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm">
             <li>App em developers.facebook.com (conta IAplicada)</li>
             <li>
-              Produto Webhooks · subscribe <code>leadgen</code>
+              Casos de uso: permissões <code>leads_retrieval</code>, <code>ads_read</code>,{" "}
+              <code>pages_show_list</code>, <code>business_management</code> em “Pronto para
+              teste”
+            </li>
+            <li>
+              Webhooks · Page · subscribe <code>leadgen</code>
             </li>
             <li className="break-all">
               Callback: <code>{SUPABASE_URL}/functions/v1/webhook_meta_lead</code>
@@ -286,9 +294,14 @@ function ConfigMetaPage() {
               Verify token = secret <code>META_WEBHOOK_VERIFY_TOKEN</code>
             </li>
             <li>
-              Rodar sync diário com edge <code>sync_ads_metrics</code>
+              Sync diário: edge <code>sync_ads_metrics</code>
             </li>
           </ol>
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
+            Se aparecer <strong>Invalid Scopes</strong>, ative a permissão citada no caso de uso
+            do app Meta — ou atualize o Tabgha (não pedimos mais{" "}
+            <code>pages_manage_metadata</code> no OAuth).
+          </p>
         </aside>
       </div>
     </div>

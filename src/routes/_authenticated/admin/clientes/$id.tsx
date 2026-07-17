@@ -974,8 +974,6 @@ function ClienteFichaPage() {
     inativo: "bg-slate-100 text-slate-600 border-slate-200",
   };
 
-  const isTabghaSeed = cliente.id === "00000000-0000-0000-0000-000000000001";
-
   return (
     <div className="px-6 py-6">
       {/* Page header */}
@@ -990,43 +988,41 @@ function ClienteFichaPage() {
         <span className={cn("shrink-0 rounded-full border px-3 py-1 text-xs font-semibold capitalize", statusColor[cliente.status] ?? "bg-muted text-muted-foreground")}>
           {cliente.status}
         </span>
-        {!isTabghaSeed ? (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0 border-rose-200 text-rose-700 hover:bg-rose-50"
-                disabled={excluir.isPending}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 border-rose-200 text-rose-700 hover:bg-rose-50"
+              disabled={excluir.isPending}
+            >
+              {excluir.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Excluir
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir cliente?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Isso remove <strong>{cliente.nome}</strong> e dados vinculados (leads, conteúdos,
+                etc.). Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-rose-600 hover:bg-rose-700"
+                onClick={() => excluir.mutate()}
               >
-                {excluir.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="mr-2 h-4 w-4" />
-                )}
-                Excluir
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Excluir cliente?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Isso remove <strong>{cliente.nome}</strong> e dados vinculados (leads, conteúdos,
-                  etc.). Esta ação não pode ser desfeita.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-rose-600 hover:bg-rose-700"
-                  onClick={() => excluir.mutate()}
-                >
-                  Excluir definitivamente
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        ) : null}
+                Excluir definitivamente
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <Tabs defaultValue="cadastro">

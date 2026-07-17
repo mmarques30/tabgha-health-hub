@@ -1,4 +1,5 @@
 // Cria usuário Auth + profile/role (admin only).
+// Senha provisória padrão: Tabgha{ano} (ex.: Tabgha2026).
 // Se o email já existir com o MESMO role: redefine senha e atualiza perfil.
 // Se existir com role diferente: erro claro (não converte cliente↔admin).
 // POST { email, nome, role, cliente_id?, permissoes? }
@@ -10,6 +11,10 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SB_PUBLISHABLE_KEY") ?? "";
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+
+function provisionalPassword(now = new Date()) {
+  return `Tabgha${now.getFullYear()}`;
+}
 
 function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -94,17 +99,19 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: "cliente_id obrigatório para perfil cliente" }, 400);
     }
 
-    const temporaryPassword = `${crypto.randomUUID().slice(0, 8)}-Tabgha1!`;
+    const temporaryPassword = provisionalPassword();
     let userId: string | null = null;
     let reusedExisting = false;
 
     const existing = await findExistingByEmail(email);
     if (existing) {
       if (existing.role && existing.role !== role) {
+        const atual = existing.role === "cliente" ? "cliente (portal)" : "admin";
+        const pedido = role === "cliente" ? "cliente (portal)" : "admin";
         return json(
           {
             ok: false,
-            error: `Este email já está cadastrado como ${existing.role}. Abra Usuários & acessos → Editar, ou use outro email.`,
+            error: `Este email já está cadastrado como ${atual}. Você pediu ${pedido}. Abra Usuários & acessos → Editar o membro existente, ou use outro email.`,
           },
           409,
         );
@@ -128,19 +135,43 @@ Deno.serve(async (req) => {
           msg.toLowerCase().includes("already been registered") ||
           msg.toLowerCase().includes("email_exists");
         if (exists) {
-          return json(
-            {
-              ok: false,
-              error:
-                "Este email já existe no Auth. Tente de novo em alguns segundos ou edite o usuário na lista.",
-            },
-            409,
-          );
+          // Auth tem o email mas profile/role não bateu — tenta recuperar e alinhar
+          const again = await findExistingByEmail(email);
+          if (again && (!again.role || again.role === role)) {
+            userId = again.userId;
+            reusedExisting = true;
+            const { error: updateErr } = await admin.auth.admin.updateUserById(userId, {
+              password: temporaryPassword,
+              email_confirm: true,
+            });
+            if (updateErr) return json({ ok: false, error: updateErr.message }, 400);
+          } else if (again && again.role && again.role !== role) {
+            return json(
+              {
+                ok: false,
+                error: `Este email já está cadastrado como ${again.role}. Abra Usuários & acessos → Editar, ou use outro email.`,
+              },
+              409,
+            );
+          } else {
+            return json(
+              {
+                ok: false,
+                error:
+                  "Este email já existe no Auth. Edite o usuário na lista ou tente de novo em alguns segundos.",
+              },
+              409,
+            );
+          }
+        } else {
+          return json({ ok: false, error: msg }, 400);
         }
-        return json({ ok: false, error: msg }, 400);
+      } else {
+        userId = authData.user.id;
       }
-      userId = authData.user.id;
     }
+
+    if (!userId) return json({ ok: false, error: "Não foi possível obter o usuário." }, 500);
 
     const { error: rpcError } = await admin.rpc("admin_upsert_profile_role", {
       _user_id: userId,
@@ -170,8 +201,8 @@ Deno.serve(async (req) => {
       email,
       role,
       message: reusedExisting
-        ? "Usuário já existia — senha temporária redefinida."
-        : "Usuário criado. Anote a senha temporária.",
+        ? "Usuário já existia — senha provisória redefinida para Tabgha{ano}."
+        : "Usuário criado. Senha provisória: Tabgha{ano}.",
     });
   } catch (error) {
     return json(

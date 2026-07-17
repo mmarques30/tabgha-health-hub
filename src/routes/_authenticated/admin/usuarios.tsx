@@ -10,9 +10,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { PermissionPicker } from "@/components/PermissionPicker";
 import { CredentialsDialog, type AccessCredentials } from "@/components/usuarios/CredentialsDialog";
+import { ProvisionalPasswordField } from "@/components/usuarios/ProvisionalPasswordField";
 import { createUserWithRole } from "@/functions/usuarios/createUserWithRole.functions";
 import { updateMemberAccess } from "@/functions/usuarios/updateMemberAccess.functions";
 import { summarizePermissions } from "@/lib/permissions";
+import { provisionalPassword } from "@/lib/provisional-password";
 import { useAuth } from "@/lib/auth";
 import { useClientesOptions } from "@/hooks/useClientesOptions";
 import { Button } from "@/components/ui/button";
@@ -111,6 +113,7 @@ function AddUserDialog({
   onCredentials: (c: AccessCredentials) => void;
 }) {
   const [permissoes, setPermissoes] = useState<string[]>(["*"]);
+  const [formError, setFormError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { data: clientes = [] } = useClientesOptions();
 
@@ -132,10 +135,15 @@ function AddUserDialog({
         },
       }),
     onSuccess: (result) => {
-      toast.success(result.reused_existing ? "Senha redefinida." : "Usuário criado.");
+      setFormError(null);
+      toast.success(
+        result.reused_existing
+          ? `Senha redefinida para ${result.temporary_password}.`
+          : `Acesso criado. Senha: ${result.temporary_password}`,
+      );
       onCredentials({
         email: result.email,
-        temporary_password: result.temporary_password,
+        temporary_password: result.temporary_password || provisionalPassword(),
         reused_existing: result.reused_existing,
         role: result.role,
       });
@@ -144,11 +152,22 @@ function AddUserDialog({
       form.reset({ nome: "", email: "", role: "cliente", cliente_id: null });
       setPermissoes(["*"]);
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      setFormError(err.message);
+      toast.error(err.message);
+    },
   });
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) {
+          setFormError(null);
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Adicionar membro</DialogTitle>
@@ -156,12 +175,13 @@ function AddUserDialog({
 
         <form
           onSubmit={form.handleSubmit((d) => {
+            setFormError(null);
             if (d.role === "cliente" && !d.cliente_id) {
-              toast.error("Selecione o consultório vinculado.");
+              setFormError("Selecione o consultório vinculado.");
               return;
             }
             if (permissoes.length === 0) {
-              toast.error("Selecione ao menos uma permissão.");
+              setFormError("Selecione ao menos uma permissão.");
               return;
             }
             mutation.mutate(d as AddUserForm);
@@ -169,9 +189,15 @@ function AddUserDialog({
           className="space-y-4 py-2"
         >
           <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
-            Isso cria o <strong>login</strong> (email + senha). O cadastro de consultório fica em
-            Clientes. Depois do salvar, a senha temporária aparece para você copiar.
+            Isso cria o <strong>login</strong> (email + senha provisória{" "}
+            <strong>{provisionalPassword()}</strong>). O cadastro de consultório fica em Clientes.
           </p>
+
+          {formError ? (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {formError}
+            </div>
+          ) : null}
 
           <div className="space-y-1">
             <Label>Nome</Label>
@@ -188,6 +214,8 @@ function AddUserDialog({
               <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
             )}
           </div>
+
+          <ProvisionalPasswordField />
 
           <div className="space-y-1">
             <Label>Perfil</Label>

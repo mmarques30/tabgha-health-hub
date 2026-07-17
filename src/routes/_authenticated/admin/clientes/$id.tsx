@@ -192,8 +192,12 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
                 <Field label="Nome">
                   <Input {...form.register("nome")} />
                 </Field>
-                <Field label="Email">
+                <Field label="Email do consultório">
                   <Input type="email" {...form.register("email")} />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Se existir login de portal com o email antigo, ele também é atualizado no Auth —
+                    assim você consegue liberar o email certo para outro usuário.
+                  </p>
                 </Field>
                 <Field label="Telefone">
                   <Input {...form.register("telefone")} />

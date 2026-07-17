@@ -287,13 +287,20 @@ function EditAccessDialog({ member, onClose }: { member: TeamMember; onClose: ()
   const { user, refresh } = useAuth();
   const { data: clientes = [] } = useClientesOptions();
   const [nome, setNome] = useState(member.nome ?? "");
+  const [email, setEmail] = useState(member.email ?? "");
   const [clienteId, setClienteId] = useState<string | null>(member.cliente_id);
   const [permissoes, setPermissoes] = useState<string[]>(
     member.permissoes.length ? member.permissoes : ["*"],
   );
+  const [formError, setFormError] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: () => {
+      setFormError(null);
+      const nextEmail = email.trim().toLowerCase();
+      if (!nextEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+        throw new Error("Informe um email de login válido.");
+      }
       if (member.role === "cliente" && !clienteId) {
         throw new Error("Selecione o consultório vinculado.");
       }
@@ -302,18 +309,28 @@ function EditAccessDialog({ member, onClose }: { member: TeamMember; onClose: ()
         data: {
           id: member.id,
           nome: nome.trim() || null,
+          email: nextEmail,
           cliente_id: member.role === "cliente" ? clienteId : null,
           permissoes,
         },
       });
     },
     onSuccess: async () => {
-      toast.success("Acessos atualizados. O usuário precisa recarregar a página (ou relogar).");
+      const emailChanged = email.trim().toLowerCase() !== (member.email ?? "").trim().toLowerCase();
+      toast.success(
+        emailChanged
+          ? "Email e acessos atualizados. O login passa a usar o novo email."
+          : "Acessos atualizados. O usuário precisa recarregar a página (ou relogar).",
+      );
       void queryClient.invalidateQueries({ queryKey: ["admin", "team"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "clientes"] });
       if (user?.id === member.id) await refresh();
       onClose();
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      setFormError(err.message);
+      toast.error(err.message);
+    },
   });
 
   return (
@@ -325,15 +342,34 @@ function EditAccessDialog({ member, onClose }: { member: TeamMember; onClose: ()
 
         <div className="space-y-4 py-2">
           <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
-            <p className="text-sm font-medium">{member.email}</p>
             <p className="text-[11px] text-muted-foreground">
               Perfil: {member.role === "admin" ? "Admin" : "Cliente (portal)"}
             </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Alterar o email corrige o login no Auth — necessário quando o email está errado e
+              trava a criação de outro usuário.
+            </p>
           </div>
+
+          {formError ? (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {formError}
+            </div>
+          ) : null}
 
           <div className="space-y-1">
             <Label>Nome</Label>
             <Input value={nome} onChange={(e) => setNome(e.target.value)} />
+          </div>
+
+          <div className="space-y-1">
+            <Label>Email de login</Label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@exemplo.com"
+            />
           </div>
 
           {member.role === "cliente" && (

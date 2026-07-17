@@ -82,6 +82,16 @@ export async function updateClienteAdmin(input: {
   especialidade: string;
   status: string;
 }) {
+  const newEmail = input.email.trim().toLowerCase();
+
+  const { data: before, error: beforeErr } = await supabase
+    .from("clientes")
+    .select("email")
+    .eq("id", input.id)
+    .maybeSingle();
+  if (beforeErr) throw new Error(adminErrorMessage(beforeErr.message));
+  const oldEmail = (before?.email ?? "").trim().toLowerCase();
+
   const { error } = await supabase.rpc("admin_update_cliente", {
     _id: input.id,
     _nome: input.nome,
@@ -93,6 +103,37 @@ export async function updateClienteAdmin(input: {
     _status: input.status,
   });
   if (error) throw new Error(adminErrorMessage(error.message));
+
+  // Se o e-mail do consultório mudou e havia login de portal com o e-mail antigo,
+  // atualiza Auth + profile para não travar criação de outro usuário / login.
+  if (oldEmail && newEmail && oldEmail !== newEmail) {
+    const { data: portals } = await supabase
+      .from("profiles")
+      .select("id, email")
+      .eq("cliente_id", input.id)
+      .eq("email", oldEmail);
+
+    for (const portal of portals ?? []) {
+      const { data: result, error: emailErr } = await supabase.functions.invoke(
+        "admin-update-user-email",
+        {
+          body: {
+            user_id: portal.id,
+            email: newEmail,
+            sync_cliente_email: false,
+          },
+        },
+      );
+      const payload = result as { ok?: boolean; error?: string } | null;
+      if (emailErr || !payload?.ok) {
+        throw new Error(
+          payload?.error ||
+            emailErr?.message ||
+            "Consultório atualizado, mas falhou ao sincronizar o email de login do portal.",
+        );
+      }
+    }
+  }
 }
 
 export async function deleteClienteAdmin(id: string) {

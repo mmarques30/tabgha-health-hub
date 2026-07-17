@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ExternalLink, Link2Off, Loader2, Save, Unplug } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ExternalLink,
+  Link2Off,
+  Loader2,
+  RefreshCw,
+  Save,
+  Unplug,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -48,9 +57,6 @@ function buildOAuthUrl(clienteId: string) {
   const params = new URLSearchParams({
     client_id: META_APP_ID,
     redirect_uri: redirectUri,
-    // pages_manage_metadata removed: Meta rejects it as Invalid Scope until the
-    // app use-case explicitly enables it. Connection works without it (page list
-    // + leads + ads). Page webhook subscription can be done in Meta UI.
     scope: "leads_retrieval,ads_read,pages_show_list,business_management",
     response_type: "code",
     state: clienteId,
@@ -64,7 +70,10 @@ function ConfigMetaPage() {
   const [clienteId, setClienteId] = useState<string>("");
   const [disconnecting, setDisconnecting] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [adAccountId, setAdAccountId] = useState("");
+  const [painelAberto, setPainelAberto] = useState(false);
+  const [setupAberto, setSetupAberto] = useState(false);
 
   useEffect(() => {
     if (!clienteId && clientes[0]?.id) {
@@ -80,10 +89,12 @@ function ConfigMetaPage() {
       toast.success("Meta Business conectado.");
       const fromUrl = params.get("cliente_id");
       if (fromUrl) setClienteId(fromUrl);
+      setPainelAberto(true);
       void queryClient.invalidateQueries({ queryKey: ["cliente-meta"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "meta-conexoes"] });
     } else if (meta === "error") {
       toast.error(`Falha ao conectar Meta (${params.get("reason") ?? "erro"}).`);
+      setPainelAberto(true);
     }
   }, [queryClient]);
 
@@ -143,6 +154,12 @@ function ConfigMetaPage() {
 
   const oauthUrl = clienteId ? buildOAuthUrl(clienteId) : null;
   const connected = Boolean(meta?.access_token && meta?.page_id);
+  const clienteNome = cliente?.nome ?? clientes.find((c) => c.id === clienteId)?.nome ?? "—";
+
+  function selecionarCliente(id: string) {
+    setClienteId(id);
+    setPainelAberto(true);
+  }
 
   async function saveAdAccount() {
     if (!clienteId || !cliente) return;
@@ -171,6 +188,40 @@ function ConfigMetaPage() {
     }
   }
 
+  async function syncMetrics() {
+    if (!clienteId) return;
+    if (!adAccountId.trim() && !meta?.ad_account_id) {
+      toast.error("Informe e salve o Ad Account ID antes de sincronizar.");
+      return;
+    }
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync_ads_metrics", {
+        body: { cliente_id: clienteId, days: 30 },
+      });
+      if (error) throw error;
+      const payload = data as {
+        ok?: boolean;
+        error?: string;
+        resultados?: Array<{ meta?: { inseridos?: number; erros?: string[] } }>;
+      };
+      if (!payload?.ok) throw new Error(payload?.error || "Sync falhou.");
+      const first = payload.resultados?.[0]?.meta;
+      if (first?.erros?.length) {
+        toast.error(`Sync com erros: ${first.erros[0]}`);
+      } else {
+        toast.success(
+          `Métricas sincronizadas (${first?.inseridos ?? 0} linhas nos últimos 30 dias).`,
+        );
+      }
+      void queryClient.invalidateQueries({ queryKey: ["meta-ads-db"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível sincronizar.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function disconnect() {
     if (!clienteId || !cliente) return;
     setDisconnecting(true);
@@ -193,174 +244,24 @@ function ConfigMetaPage() {
   }
 
   return (
-    <div className="w-full min-h-full px-6 py-6 lg:px-8">
-      <header className="mb-8 w-full animate-fade-up">
+    <div className="w-full min-h-full space-y-6 px-6 py-6 lg:px-8">
+      <header className="w-full animate-fade-up">
         <span className="eyebrow-pill">Aquisição</span>
         <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
           Conectar Meta Business
         </h1>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Autorize o app da IAplicada e informe o <strong>Ad Account ID</strong> para habilitar o
-          sync diário de métricas.
+          Lista das conexões Meta. Clique em um cliente para abrir o painel de gerenciamento.
         </p>
       </header>
 
-      <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)] lg:items-start">
-        <section className="w-full space-y-6 rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-          <div className="space-y-2">
-            <Label htmlFor="cliente">Cliente</Label>
-            {loadingClientes ? (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : (
-              <select
-                id="cliente"
-                value={clienteId}
-                onChange={(e) => setClienteId(e.target.value)}
-                className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
-              >
-                {clientes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Carregando…
-            </div>
-          ) : connected ? (
-            <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
-                  Conectado
-                </p>
-                <p className="mt-1 text-sm font-medium text-slate-900">
-                  {meta?.page_name ?? "Página Meta"} · page_id {meta?.page_id}
-                </p>
-                {meta?.expires_at ? (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Expira em {new Date(meta.expires_at).toLocaleString("pt-BR")}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="adAccount">Ad Account ID (sem act_)</Label>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    id="adAccount"
-                    value={adAccountId}
-                    onChange={(e) => setAdAccountId(e.target.value)}
-                    placeholder="123456789012345"
-                    className="w-full"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => void saveAdAccount()}
-                    disabled={savingAccount}
-                    className="shrink-0"
-                  >
-                    {savingAccount ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {oauthUrl ? (
-                  <Button asChild variant="outline" className="rounded-xl">
-                    <a href={oauthUrl}>
-                      Reconectar
-                      <ExternalLink className="ml-2 h-3.5 w-3.5" />
-                    </a>
-                  </Button>
-                ) : null}
-                <Button
-                  variant="outline"
-                  className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50"
-                  disabled={disconnecting}
-                  onClick={() => void disconnect()}
-                >
-                  {disconnecting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Unplug className="mr-2 h-4 w-4" />
-                  )}
-                  Desconectar
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-dashed border-border bg-secondary/30 p-5 text-sm text-muted-foreground">
-                <Link2Off className="mb-2 h-5 w-5" />
-                Nenhuma conexão Meta para este cliente. Clique em conectar e autorize a BM da
-                clínica.
-              </div>
-              {oauthUrl ? (
-                <Button asChild className="rounded-xl bg-sky-600 hover:bg-sky-700">
-                  <a href={oauthUrl}>
-                    Conectar Meta Business
-                    <ExternalLink className="ml-2 h-3.5 w-3.5" />
-                  </a>
-                </Button>
-              ) : (
-                <p className="text-sm text-amber-700">
-                  Configure <code>VITE_META_APP_ID</code> e os secrets <code>META_APP_ID</code> /{" "}
-                  <code>META_APP_SECRET</code> no Supabase para habilitar o OAuth.
-                </p>
-              )}
-            </div>
-          )}
-        </section>
-
-        <aside className="w-full rounded-2xl border border-border bg-card p-6 text-sm leading-relaxed text-muted-foreground shadow-sm sm:p-8">
-          <p className="text-sm font-semibold text-foreground">Setup Meta</p>
-          <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm">
-            <li>App em developers.facebook.com (conta IAplicada)</li>
-            <li>
-              Casos de uso: permissões <code>leads_retrieval</code>, <code>ads_read</code>,{" "}
-              <code>pages_show_list</code>, <code>business_management</code> em “Pronto para
-              teste”
-            </li>
-            <li>
-              Webhooks · Page · subscribe <code>leadgen</code>
-            </li>
-            <li className="break-all">
-              Callback: <code>{SUPABASE_URL}/functions/v1/webhook_meta_lead</code>
-            </li>
-            <li>
-              Verify token = secret <code>META_WEBHOOK_VERIFY_TOKEN</code>
-            </li>
-            <li>
-              Sync diário: edge <code>sync_ads_metrics</code>
-            </li>
-          </ol>
-          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
-            Se aparecer <strong>Invalid Scopes</strong>, ative a permissão citada no caso de uso
-            do app Meta — ou atualize o Tabgha (não pedimos mais{" "}
-            <code>pages_manage_metadata</code> no OAuth).
-          </p>
-        </aside>
-      </div>
-
-      <section className="mt-8 w-full rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+      <section className="w-full rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               Carteira
             </p>
             <h2 className="mt-1 text-lg font-semibold tracking-tight">Clientes e Meta</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Visão de todas as conexões. Clique em um cliente para gerenciar acima.
-            </p>
           </div>
           <p className="text-xs text-muted-foreground">
             <span className="font-semibold text-emerald-700">{conectados.length}</span> conectados
@@ -389,10 +290,10 @@ function ConfigMetaPage() {
                 <li key={row.id}>
                   <button
                     type="button"
-                    onClick={() => setClienteId(row.id)}
+                    onClick={() => selecionarCliente(row.id)}
                     className={cn(
                       "grid w-full grid-cols-1 gap-1 px-4 py-3 text-left transition-colors hover:bg-secondary/40 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_minmax(0,0.9fr)_auto] sm:items-center sm:gap-3",
-                      row.id === clienteId && "bg-sky-50/80 hover:bg-sky-50",
+                      row.id === clienteId && painelAberto && "bg-sky-50/80 hover:bg-sky-50",
                     )}
                   >
                     <div className="min-w-0">
@@ -441,6 +342,220 @@ function ConfigMetaPage() {
             </ul>
           </div>
         )}
+      </section>
+
+      <section className="w-full overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <button
+          type="button"
+          onClick={() => setPainelAberto((v) => !v)}
+          className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-secondary/30 sm:px-6"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Gerenciar conexão
+            </p>
+            <p className="mt-1 truncate text-sm font-semibold text-foreground">
+              {clienteNome}
+              {connected ? (
+                <span className="ml-2 font-normal text-emerald-700">
+                  · {meta?.page_name ?? "Meta conectada"}
+                </span>
+              ) : (
+                <span className="ml-2 font-normal text-muted-foreground">· sem conexão</span>
+              )}
+            </p>
+            {connected && meta?.ad_account_id ? (
+              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                act {meta.ad_account_id}
+              </p>
+            ) : null}
+          </div>
+          {connected ? (
+            <span className="hidden shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 sm:inline-flex">
+              Conectado
+            </span>
+          ) : (
+            <span className="hidden shrink-0 rounded-full border border-border bg-secondary px-2.5 py-1 text-[11px] font-semibold text-muted-foreground sm:inline-flex">
+              Pendente
+            </span>
+          )}
+          <ChevronDown
+            className={cn(
+              "h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200",
+              painelAberto && "rotate-180",
+            )}
+          />
+        </button>
+
+        {painelAberto ? (
+          <div className="space-y-5 border-t border-border px-5 py-5 sm:px-6">
+            <div className="space-y-2">
+              <Label htmlFor="cliente">Cliente</Label>
+              {loadingClientes ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : (
+                <select
+                  id="cliente"
+                  value={clienteId}
+                  onChange={(e) => setClienteId(e.target.value)}
+                  className="w-full max-w-md rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
+                >
+                  {clientes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando…
+              </div>
+            ) : connected ? (
+              <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-5">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                    Conectado
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">
+                    {meta?.page_name ?? "Página Meta"} · page_id {meta?.page_id}
+                  </p>
+                  {meta?.expires_at ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Expira em {new Date(meta.expires_at).toLocaleString("pt-BR")}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="adAccount">Ad Account ID (sem act_)</Label>
+                  <div className="flex max-w-lg flex-col gap-2 sm:flex-row">
+                    <Input
+                      id="adAccount"
+                      value={adAccountId}
+                      onChange={(e) => setAdAccountId(e.target.value)}
+                      placeholder="123456789012345"
+                      className="w-full"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => void saveAdAccount()}
+                      disabled={savingAccount}
+                      className="shrink-0"
+                    >
+                      {savingAccount ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    className="rounded-xl bg-sky-600 hover:bg-sky-700"
+                    disabled={syncing || !adAccountId.trim()}
+                    onClick={() => void syncMetrics()}
+                  >
+                    {syncing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    Sincronizar métricas (30d)
+                  </Button>
+                  {oauthUrl ? (
+                    <Button asChild variant="outline" className="rounded-xl">
+                      <a href={oauthUrl}>
+                        Reconectar
+                        <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                      </a>
+                    </Button>
+                  ) : null}
+                  <Button
+                    variant="outline"
+                    className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50"
+                    disabled={disconnecting}
+                    onClick={() => void disconnect()}
+                  >
+                    {disconnecting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Unplug className="mr-2 h-4 w-4" />
+                    )}
+                    Desconectar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-dashed border-border bg-secondary/30 p-5 text-sm text-muted-foreground">
+                  <Link2Off className="mb-2 h-5 w-5" />
+                  Nenhuma conexão Meta para este cliente. Clique em conectar e autorize a BM da
+                  clínica.
+                </div>
+                {oauthUrl ? (
+                  <Button asChild className="rounded-xl bg-sky-600 hover:bg-sky-700">
+                    <a href={oauthUrl}>
+                      Conectar Meta Business
+                      <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                ) : (
+                  <p className="text-sm text-amber-700">
+                    Configure <code>VITE_META_APP_ID</code> e os secrets <code>META_APP_ID</code> /{" "}
+                    <code>META_APP_SECRET</code> no Supabase para habilitar o OAuth.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="w-full overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <button
+          type="button"
+          onClick={() => setSetupAberto((v) => !v)}
+          className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-secondary/30 sm:px-6"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground">Setup técnico Meta</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Permissões, webhook e secrets — só se precisar configurar o app Developers
+            </p>
+          </div>
+          <ChevronDown
+            className={cn(
+              "h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200",
+              setupAberto && "rotate-180",
+            )}
+          />
+        </button>
+        {setupAberto ? (
+          <div className="border-t border-border px-5 py-4 text-sm leading-relaxed text-muted-foreground sm:px-6">
+            <ol className="list-decimal space-y-2 pl-4">
+              <li>App em developers.facebook.com (conta IAplicada)</li>
+              <li>
+                Permissões: <code>leads_retrieval</code>, <code>ads_read</code>,{" "}
+                <code>pages_show_list</code>, <code>business_management</code>
+              </li>
+              <li>
+                Webhooks · Page · <code>leadgen</code>
+              </li>
+              <li className="break-all">
+                Callback: <code>{SUPABASE_URL}/functions/v1/webhook_meta_lead</code>
+              </li>
+              <li>
+                Verify token = secret <code>META_WEBHOOK_VERIFY_TOKEN</code>
+              </li>
+            </ol>
+          </div>
+        ) : null}
       </section>
     </div>
   );

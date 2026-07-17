@@ -53,6 +53,7 @@ const ADMIN_NAV: NavGroup[] = [
     items: [
       { to: "/admin/dashboard",        label: "Dashboard",            icon: LayoutDashboard, perm: "admin.dashboard" },
       { to: "/admin/roi",              label: "ROI da operação",      icon: TrendingUp,      perm: "admin.roi" },
+      { to: "/admin/meta-ads",         label: "Marketing Pago",       icon: Megaphone,       perm: "admin.meta_ads" },
     ],
   },
   {
@@ -75,7 +76,6 @@ const ADMIN_NAV: NavGroup[] = [
     items: [
       { to: "/admin/automacoes-leads", label: "Automações de leads",  icon: Zap,             perm: "admin.operacao" },
       { to: "/admin/leads",            label: "Funil de leads",       icon: Users,           perm: "admin.operacao" },
-      { to: "/admin/meta-ads",         label: "Meta Ads",             icon: Megaphone,       perm: "admin.meta_ads" },
       { to: "/admin/config-meta",      label: "Conectar Meta BM",     icon: Link2,           perm: "admin.meta_ads" },
     ],
   },
@@ -91,8 +91,9 @@ const CLIENTE_NAV: NavGroup[] = [
   {
     group: "Visão",
     items: [
-      { to: "/cliente/dashboard",  label: "Dashboard",   icon: LayoutDashboard, perm: "cliente.dashboard" },
-      { to: "/cliente/roi",        label: "ROI",         icon: TrendingUp,      perm: "cliente.roi" },
+      { to: "/cliente/dashboard",  label: "Dashboard",        icon: LayoutDashboard, perm: "cliente.dashboard" },
+      { to: "/cliente/roi",        label: "ROI",              icon: TrendingUp,      perm: "cliente.roi" },
+      { to: "/cliente/meta-ads",   label: "Marketing Pago",   icon: Megaphone,       perm: "cliente.meta_ads" },
     ],
   },
   {
@@ -108,7 +109,6 @@ const CLIENTE_NAV: NavGroup[] = [
     items: [
       { to: "/cliente/conteudo",   label: "Conteúdo",    icon: FileText,        perm: "cliente.conteudo" },
       { to: "/cliente/entregas",   label: "Entregas",    icon: Package,         perm: "cliente.entregas" },
-      { to: "/cliente/meta-ads",   label: "Meta Ads",    icon: Megaphone,       perm: "cliente.meta_ads" },
       { to: "/cliente/calendario", label: "Calendário",  icon: Calendar,        perm: "cliente.calendario" },
     ],
   },

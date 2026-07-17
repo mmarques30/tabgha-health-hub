@@ -42,7 +42,7 @@ function AprovacaoModal({ conteudo, onClose }: { conteudo: Tables<"conteudos">; 
       const { error } = await supabase.rpc("responder_conteudo", {
         _id: conteudo.id,
         _aprovada: aprovado,
-        _feedback: feedback.trim() || null,
+        _feedback: feedback.trim() || undefined,
       });
       if (error) throw error;
     },

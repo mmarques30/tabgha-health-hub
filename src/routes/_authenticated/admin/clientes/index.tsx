@@ -58,12 +58,7 @@ function NovoClienteDialog({ open, onClose }: { open: boolean; onClose: () => vo
       onClose();
       form.reset();
     },
-    onError: (e: Error) => {
-      const msg = e.message || "Não foi possível criar o cliente.";
-      toast.error(msg.includes("assert_current_admin") || msg.includes("admin")
-        ? "Sem permissão de admin para criar cliente. Faça login novamente."
-        : msg);
-    },
+    onError: (e: Error) => toast.error(e.message || "Não foi possível criar o cliente."),
   });
 
   return (

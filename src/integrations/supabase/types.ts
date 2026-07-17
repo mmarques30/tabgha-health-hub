@@ -730,8 +730,30 @@ export type Database = {
     }
     Functions: {
       admin_create_cliente: {
-        Args: { _cnpj?: string; _email: string; _nome: string }
+        Args: {
+          _cnpj?: string
+          _email: string
+          _especialidade?: string
+          _nome: string
+        }
         Returns: string
+      }
+      admin_update_cliente: {
+        Args: {
+          _id: string
+          _nome?: string
+          _email?: string
+          _telefone?: string
+          _cnpj?: string
+          _razao_social?: string
+          _especialidade?: string
+          _status?: string
+        }
+        Returns: undefined
+      }
+      admin_delete_cliente: {
+        Args: { _id: string }
+        Returns: undefined
       }
       admin_upsert_profile_role: {
         Args: {

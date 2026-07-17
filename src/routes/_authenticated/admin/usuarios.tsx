@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { UserPlus, Users, Loader2 } from "lucide-react";
+import { Pencil, UserPlus, Users, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { PermissionPicker } from "@/components/PermissionPicker";
 import { createUserWithRole } from "@/functions/usuarios/createUserWithRole.functions";
+import { updateMemberAccess } from "@/functions/usuarios/updateMemberAccess.functions";
+import { summarizePermissions } from "@/lib/permissions";
 import { useClientesOptions } from "@/hooks/useClientesOptions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +35,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export const Route = createFileRoute("/_authenticated/admin/usuarios")({
   component: UsuariosPage,
-  head: () => ({ meta: [{ title: "Usuários — Tabgha Admin" }] }),
+  head: () => ({ meta: [{ title: "Usuários & acessos — Tabgha Admin" }] }),
 });
 
 type TeamMember = {
@@ -42,24 +44,30 @@ type TeamMember = {
   email: string | null;
   role: string | null;
   permissoes: string[];
+  cliente_id: string | null;
+  cliente_nome: string | null;
 };
 
 async function fetchTeam(): Promise<TeamMember[]> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, nome, email, permissoes, user_roles(role)")
+    .select("id, nome, email, permissoes, cliente_id, clientes(nome), user_roles(role)")
     .order("nome");
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((p) => ({
-    id: p.id,
-    nome: p.nome,
-    email: p.email,
-    // user_roles is a joined array — cast needed because Supabase types don't infer nested joins
-    role: (p.user_roles as unknown as { role: string }[] | null)?.[0]?.role ?? null,
-    permissoes: p.permissoes ?? [],
-  }));
+  return (data ?? []).map((p) => {
+    const clienteJoin = p.clientes as unknown as { nome: string } | null;
+    return {
+      id: p.id,
+      nome: p.nome,
+      email: p.email,
+      role: (p.user_roles as unknown as { role: string }[] | null)?.[0]?.role ?? null,
+      permissoes: p.permissoes ?? [],
+      cliente_id: p.cliente_id,
+      cliente_nome: clienteJoin?.nome ?? null,
+    };
+  });
 }
 
 const addUserSchema = z.object({
@@ -76,9 +84,16 @@ type AddUserForm = {
   cliente_id: string | null;
 };
 
-function initials(nome: string | null): string {
-  if (!nome) return "?";
-  return nome.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
+function initials(nome: string | null, email: string | null): string {
+  if (nome)
+    return nome
+      .split(" ")
+      .slice(0, 2)
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
+  if (email) return email.slice(0, 2).toUpperCase();
+  return "?";
 }
 
 function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -100,7 +115,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
         data: {
           ...data,
           cliente_id: data.role === "cliente" ? data.cliente_id : null,
-          permissoes: data.role === "admin" ? permissoes : ["*"],
+          permissoes,
         },
       }),
     onSuccess: () => {
@@ -115,7 +130,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Adicionar membro</DialogTitle>
         </DialogHeader>
@@ -124,6 +139,10 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
           onSubmit={form.handleSubmit((d) => {
             if (d.role === "cliente" && !d.cliente_id) {
               toast.error("Selecione o cliente para o acesso ao portal.");
+              return;
+            }
+            if (permissoes.length === 0) {
+              toast.error("Selecione ao menos uma permissão.");
               return;
             }
             mutation.mutate(d as AddUserForm);
@@ -153,6 +172,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
               onValueChange={(v) => {
                 form.setValue("role", v as "admin" | "cliente");
                 if (v === "admin") form.setValue("cliente_id", null);
+                setPermissoes(["*"]);
               }}
             >
               <SelectTrigger>
@@ -165,7 +185,7 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
             </Select>
           </div>
 
-          {role === "cliente" ? (
+          {role === "cliente" && (
             <div className="space-y-1">
               <Label>Cliente vinculado</Label>
               <Select
@@ -187,12 +207,16 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
                 Sem esse vínculo, o portal do médico fica vazio.
               </p>
             </div>
-          ) : (
-            <div className="space-y-2">
-              <Label>Permissões</Label>
-              <PermissionPicker value={permissoes} onChange={setPermissoes} />
-            </div>
           )}
+
+          <div className="space-y-2">
+            <Label>Permissões {role === "cliente" ? "do portal" : "do admin"}</Label>
+            <PermissionPicker
+              value={permissoes}
+              onChange={setPermissoes}
+              variant={role === "cliente" ? "cliente" : "admin"}
+            />
+          </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
@@ -209,8 +233,109 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
   );
 }
 
+function EditAccessDialog({ member, onClose }: { member: TeamMember; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const { data: clientes = [] } = useClientesOptions();
+  const [nome, setNome] = useState(member.nome ?? "");
+  const [clienteId, setClienteId] = useState<string | null>(member.cliente_id);
+  const [permissoes, setPermissoes] = useState<string[]>(
+    member.permissoes.length ? member.permissoes : ["*"],
+  );
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      if (member.role === "cliente" && !clienteId) {
+        throw new Error("Selecione o cliente vinculado.");
+      }
+      if (permissoes.length === 0) {
+        throw new Error("Selecione ao menos uma permissão.");
+      }
+      return updateMemberAccess({
+        data: {
+          id: member.id,
+          nome: nome.trim() || null,
+          cliente_id: member.role === "cliente" ? clienteId : null,
+          permissoes,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Acessos atualizados.");
+      void queryClient.invalidateQueries({ queryKey: ["admin", "team"] });
+      onClose();
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Editar acessos</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+            <p className="text-sm font-medium">{member.email}</p>
+            <p className="text-[11px] text-muted-foreground">
+              Perfil: {member.role === "admin" ? "Admin" : "Cliente (portal)"}
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <Label>Nome</Label>
+            <Input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Nome completo"
+            />
+          </div>
+
+          {member.role === "cliente" && (
+            <div className="space-y-1">
+              <Label>Cliente vinculado</Label>
+              <Select value={clienteId ?? ""} onValueChange={(v) => setClienteId(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o consultório…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Permissões {member.role === "cliente" ? "do portal" : "do admin"}</Label>
+            <PermissionPicker
+              value={permissoes}
+              onChange={setPermissoes}
+              variant={member.role === "cliente" ? "cliente" : "admin"}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="button" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+              {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function UsuariosPage() {
   const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState<TeamMember | null>(null);
 
   const { data: team = [], isLoading } = useQuery({
     queryKey: ["admin", "team"],
@@ -219,17 +344,18 @@ function UsuariosPage() {
   });
 
   const admins = team.filter((m) => m.role === "admin");
-  const clientes = team.filter((m) => m.role === "cliente");
+  const clientesMembers = team.filter((m) => m.role === "cliente");
 
   return (
     <div className="px-6 py-6 space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">Configurações</span>
-          <h1 className="text-xl font-bold tracking-tight">Equipe</h1>
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">
+            Configurações
+          </span>
+          <h1 className="text-xl font-bold tracking-tight">Usuários & acessos</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Gerencie os membros e suas permissões de acesso.
+            Cadastro de membros, vínculo com consultórios e permissões do menu atual.
           </p>
         </div>
         <Button onClick={() => setShowAdd(true)}>
@@ -238,13 +364,12 @@ function UsuariosPage() {
         </Button>
       </div>
 
-      {/* KPI Cards */}
       {!isLoading && team.length > 0 && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {[
             { label: "Total de membros", value: team.length, color: "text-slate-700" },
             { label: "Admins", value: admins.length, color: "text-primary" },
-            { label: "Clientes", value: clientes.length, color: "text-sky-700" },
+            { label: "Clientes", value: clientesMembers.length, color: "text-sky-700" },
           ].map((kpi, i) => (
             <div
               key={kpi.label}
@@ -254,7 +379,9 @@ function UsuariosPage() {
               <p className="text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground">
                 {kpi.label}
               </p>
-              <p className={`text-3xl font-extrabold tracking-tight animate-numeric-pop mt-1 ${kpi.color}`}>
+              <p
+                className={`text-3xl font-extrabold tracking-tight animate-numeric-pop mt-1 ${kpi.color}`}
+              >
                 {kpi.value}
               </p>
             </div>
@@ -262,7 +389,6 @@ function UsuariosPage() {
         </div>
       )}
 
-      {/* Members List */}
       {isLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -291,14 +417,21 @@ function UsuariosPage() {
                 </span>
                 <Avatar>
                   <AvatarFallback className="text-xs bg-slate-100 text-slate-700">
-                    {initials(member.nome)}
+                    {initials(member.nome, member.email)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{member.nome ?? "—"}</p>
                   <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                  {member.role === "cliente" && (
+                    <p className="text-[11px] text-sky-700 mt-0.5 truncate">
+                      {member.cliente_nome
+                        ? `Vinculado: ${member.cliente_nome}`
+                        : "Sem consultório vinculado"}
+                    </p>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="hidden sm:flex flex-col items-end gap-1 max-w-[200px]">
                   {member.role === "admin" ? (
                     <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-700">
                       Admin
@@ -308,12 +441,20 @@ function UsuariosPage() {
                       Cliente
                     </span>
                   )}
-                  {member.permissoes.includes("*") && (
-                    <Badge variant="outline" className="text-[11px]">
-                      Acesso total
-                    </Badge>
-                  )}
+                  <Badge variant="outline" className="text-[10px] font-normal truncate max-w-full">
+                    {summarizePermissions(member.permissoes, member.role)}
+                  </Badge>
                 </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => setEditing(member)}
+                  aria-label={`Editar acessos de ${member.email ?? member.nome ?? "membro"}`}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
               </div>
             ))}
           </div>
@@ -321,6 +462,9 @@ function UsuariosPage() {
       )}
 
       <AddUserDialog open={showAdd} onClose={() => setShowAdd(false)} />
+      {editing && (
+        <EditAccessDialog key={editing.id} member={editing} onClose={() => setEditing(null)} />
+      )}
     </div>
   );
 }

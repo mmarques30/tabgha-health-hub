@@ -277,7 +277,13 @@ function ConfigMetaPage() {
           <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm">
             <li>App em developers.facebook.com (conta IAplicada)</li>
             <li>
-              Produto Webhooks · subscribe <code>leadgen</code>
+              Em <strong>Casos de uso</strong>, personalize Marketing / Leads e ative as
+              permissões: <code>leads_retrieval</code>, <code>pages_manage_metadata</code>,{" "}
+              <code>pages_show_list</code>, <code>ads_read</code>,{" "}
+              <code>business_management</code> (status “Pronto para teste”)
+            </li>
+            <li>
+              Produto Webhooks · Page · subscribe <code>leadgen</code>
             </li>
             <li className="break-all">
               Callback: <code>{SUPABASE_URL}/functions/v1/webhook_meta_lead</code>
@@ -289,6 +295,10 @@ function ConfigMetaPage() {
               Rodar sync diário com edge <code>sync_ads_metrics</code>
             </li>
           </ol>
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
+            Se o Facebook mostrar <strong>Invalid Scopes</strong>, as permissões ainda não foram
+            adicionadas no caso de uso do app (não é bug do Tabgha).
+          </p>
         </aside>
       </div>
     </div>

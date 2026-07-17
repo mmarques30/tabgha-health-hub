@@ -5,7 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { ConversationFilters, WhatsappConversation } from "@/lib/types";
 
-function applyTabFilter(query: ReturnType<typeof supabase.from>, tab: ConversationFilters["tab"]) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyTabFilter(query: any, tab: ConversationFilters["tab"]): any {
   switch (tab) {
     case "awaiting_human":
       return query.eq("owner_state", "human_alert");

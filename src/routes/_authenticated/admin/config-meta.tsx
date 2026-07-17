@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Link2Off, Loader2, Save, Unplug } from "lucide-react";
+import { CheckCircle2, ExternalLink, Link2Off, Loader2, Save, Unplug } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useClientesOptions } from "@/hooks/useClientesOptions";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import type { Json } from "@/integrations/supabase/types";
+
+type ClienteMetaRow = {
+  id: string;
+  nome: string;
+  page_id: string | null;
+  page_name: string | null;
+  ad_account_id: string | null;
+  connected_at: string | null;
+  expires_at: string | null;
+  connected: boolean;
+};
 
 export const Route = createFileRoute("/_authenticated/admin/config-meta")({
   component: ConfigMetaPage,
@@ -69,6 +81,7 @@ function ConfigMetaPage() {
       const fromUrl = params.get("cliente_id");
       if (fromUrl) setClienteId(fromUrl);
       void queryClient.invalidateQueries({ queryKey: ["cliente-meta"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "meta-conexoes"] });
     } else if (meta === "error") {
       toast.error(`Falha ao conectar Meta (${params.get("reason") ?? "erro"}).`);
     }
@@ -87,6 +100,37 @@ function ConfigMetaPage() {
       return data;
     },
   });
+
+  const { data: conexoes = [], isLoading: loadingConexoes } = useQuery({
+    queryKey: ["admin", "meta-conexoes"],
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("id, nome, dados_extras")
+        .order("nome");
+      if (error) throw error;
+
+      return (data ?? []).map((row) => {
+        const extras = (row.dados_extras ?? {}) as { meta?: MetaExtras };
+        const m = extras.meta;
+        const connected = Boolean(m?.access_token && m?.page_id);
+        return {
+          id: row.id,
+          nome: row.nome,
+          page_id: m?.page_id ?? null,
+          page_name: m?.page_name ?? null,
+          ad_account_id: m?.ad_account_id ?? null,
+          connected_at: m?.connected_at ?? null,
+          expires_at: m?.expires_at ?? null,
+          connected,
+        } satisfies ClienteMetaRow;
+      });
+    },
+  });
+
+  const conectados = useMemo(() => conexoes.filter((c) => c.connected), [conexoes]);
+  const pendentes = useMemo(() => conexoes.filter((c) => !c.connected), [conexoes]);
 
   const meta = useMemo(() => {
     const extras = (cliente?.dados_extras ?? {}) as { meta?: MetaExtras };
@@ -119,6 +163,7 @@ function ConfigMetaPage() {
       if (error) throw error;
       toast.success("Ad Account ID salvo.");
       void queryClient.invalidateQueries({ queryKey: ["cliente-meta", clienteId] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "meta-conexoes"] });
     } catch {
       toast.error("Não foi possível salvar o Ad Account ID.");
     } finally {
@@ -139,6 +184,7 @@ function ConfigMetaPage() {
       if (error) throw error;
       toast.success("Meta desconectado.");
       void queryClient.invalidateQueries({ queryKey: ["cliente-meta", clienteId] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "meta-conexoes"] });
     } catch {
       toast.error("Não foi possível desconectar.");
     } finally {
@@ -304,6 +350,98 @@ function ConfigMetaPage() {
           </p>
         </aside>
       </div>
+
+      <section className="mt-8 w-full rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Carteira
+            </p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight">Clientes e Meta</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Visão de todas as conexões. Clique em um cliente para gerenciar acima.
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            <span className="font-semibold text-emerald-700">{conectados.length}</span> conectados
+            {" · "}
+            <span className="font-semibold text-slate-700">{pendentes.length}</span> pendentes
+          </p>
+        </div>
+
+        {loadingConexoes ? (
+          <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando conexões…
+          </div>
+        ) : conexoes.length === 0 ? (
+          <p className="py-6 text-sm text-muted-foreground">Nenhum cliente cadastrado.</p>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-border">
+            <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_minmax(0,0.9fr)_auto] gap-3 border-b border-border bg-secondary/40 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground sm:grid">
+              <span>Cliente</span>
+              <span>Página Meta</span>
+              <span>Ad Account</span>
+              <span className="text-right">Status</span>
+            </div>
+            <ul className="divide-y divide-border">
+              {conexoes.map((row) => (
+                <li key={row.id}>
+                  <button
+                    type="button"
+                    onClick={() => setClienteId(row.id)}
+                    className={cn(
+                      "grid w-full grid-cols-1 gap-1 px-4 py-3 text-left transition-colors hover:bg-secondary/40 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_minmax(0,0.9fr)_auto] sm:items-center sm:gap-3",
+                      row.id === clienteId && "bg-sky-50/80 hover:bg-sky-50",
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">{row.nome}</p>
+                      {row.connected_at ? (
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          Conectado em {new Date(row.connected_at).toLocaleDateString("pt-BR")}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="min-w-0 text-sm text-muted-foreground">
+                      {row.connected ? (
+                        <>
+                          <p className="truncate font-medium text-slate-800">
+                            {row.page_name ?? "Página Meta"}
+                          </p>
+                          <p className="truncate font-mono text-[11px]">page_id {row.page_id}</p>
+                        </>
+                      ) : (
+                        <span className="text-xs">—</span>
+                      )}
+                    </div>
+                    <div className="min-w-0 text-sm text-muted-foreground">
+                      {row.ad_account_id ? (
+                        <span className="font-mono text-xs">{row.ad_account_id}</span>
+                      ) : (
+                        <span className="text-xs">{row.connected ? "não informado" : "—"}</span>
+                      )}
+                    </div>
+                    <div className="sm:justify-self-end">
+                      {row.connected ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Conectado
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+                          <Link2Off className="h-3.5 w-3.5" />
+                          Pendente
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

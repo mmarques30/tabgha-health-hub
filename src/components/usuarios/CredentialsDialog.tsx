@@ -52,7 +52,8 @@ export function CredentialsDialog({ credentials, onClose }: Props) {
 
         <div className="space-y-3 py-1">
           <p className="text-sm text-muted-foreground">
-            Envie estes dados ao usuário. A senha só aparece agora — anote ou copie.
+            Envie estes dados ao usuário. Senha provisória padrão:{" "}
+            <strong className="text-foreground">{credentials.temporary_password}</strong>.
           </p>
 
           <div className="rounded-xl border border-border bg-muted/40 p-3 space-y-2">

@@ -9,7 +9,9 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { CredentialsDialog, type AccessCredentials } from "@/components/usuarios/CredentialsDialog";
+import { ProvisionalPasswordField } from "@/components/usuarios/ProvisionalPasswordField";
 import { createClientWithAccess } from "@/functions/clientes/createClientWithAccess.functions";
+import { provisionalPassword } from "@/lib/provisional-password";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -158,10 +160,11 @@ function NovoClienteDialog({
             >
               Gerar acesso ao portal agora
               <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                Cria login com senha temporária (você copia na próxima tela).
+                Cria login com a senha provisória {provisionalPassword()}.
               </span>
             </Label>
           </div>
+          {gerarAcesso ? <ProvisionalPasswordField /> : null}
           <DialogFooter>
             <Button variant="outline" type="button" onClick={onClose}>
               Cancelar

@@ -11,12 +11,18 @@ const schema = z.object({
 
 type Input = z.infer<typeof schema>;
 
+export type CreateUserResult = {
+  user_id: string;
+  reused_existing?: boolean;
+  temporary_password?: string | null;
+  recovery_link?: string | null;
+};
+
 /**
  * Cria usuário via edge `admin-create-user` (service role no servidor).
+ * Se o email já existir, a edge reativa/atualiza o perfil em vez de falhar em silêncio.
  */
-export async function createUserWithRole(input: {
-  data: Input;
-}): Promise<{ user_id: string }> {
+export async function createUserWithRole(input: { data: Input }): Promise<CreateUserResult> {
   const data = schema.parse(input.data);
 
   if (data.role === "cliente" && !data.cliente_id) {
@@ -33,11 +39,27 @@ export async function createUserWithRole(input: {
     },
   });
 
-  if (error) throw new Error(error.message || "Falha ao criar usuário.");
-  const payload = result as { ok?: boolean; user_id?: string; error?: string } | null;
+  const payload = result as {
+    ok?: boolean;
+    user_id?: string;
+    error?: string;
+    reused_existing?: boolean;
+    temporary_password?: string | null;
+    recovery_link?: string | null;
+  } | null;
+
+  if (error) {
+    const detail = payload?.error || error.message || "Falha ao criar usuário.";
+    throw new Error(detail);
+  }
   if (!payload?.ok || !payload.user_id) {
     throw new Error(payload?.error || "Falha ao criar usuário.");
   }
 
-  return { user_id: payload.user_id };
+  return {
+    user_id: payload.user_id,
+    reused_existing: payload.reused_existing,
+    temporary_password: payload.temporary_password,
+    recovery_link: payload.recovery_link,
+  };
 }

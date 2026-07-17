@@ -118,8 +118,24 @@ function AddUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
           permissoes,
         },
       }),
-    onSuccess: () => {
-      toast.success("Usuário criado.");
+    onSuccess: (result) => {
+      if (result.reused_existing) {
+        toast.success("Email já existia — perfil atualizado.");
+      } else {
+        toast.success("Usuário criado.");
+      }
+      if (result.temporary_password) {
+        toast.message("Senha temporária (copie agora)", {
+          description: result.temporary_password,
+          duration: 20_000,
+        });
+      }
+      if (result.recovery_link) {
+        toast.message("Link de recuperação", {
+          description: result.recovery_link,
+          duration: 20_000,
+        });
+      }
       void queryClient.invalidateQueries({ queryKey: ["admin", "team"] });
       onClose();
       form.reset();

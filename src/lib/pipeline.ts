@@ -73,6 +73,9 @@ export const CANAL_COLORS: Record<string, string> = {
   whatsapp: "bg-emerald-100 text-emerald-700",
   lp: "bg-sky-100 text-sky-700",
   site: "bg-violet-100 text-violet-700",
+  manual: "bg-slate-100 text-slate-700",
+  indicação: "bg-amber-100 text-amber-800",
+  indicacao: "bg-amber-100 text-amber-800",
 };
 
 export function maskPhone(phone: string | null | undefined) {

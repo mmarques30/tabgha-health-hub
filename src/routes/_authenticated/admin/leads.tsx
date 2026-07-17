@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Users } from "lucide-react";
+import { Loader2, UserPlus, Users } from "lucide-react";
 
 import { EmptyState } from "@/components/EmptyState";
+import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { FunilHeader, KanbanBoard } from "@/components/crm/KanbanBoard";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useClientesOptions } from "@/hooks/useClientesOptions";
 import { useLeads } from "@/hooks/useLeads";
@@ -24,6 +26,7 @@ function AdminLeadsPage() {
   const search = Route.useSearch();
   const { data: clientes = [] } = useClientesOptions();
   const [localSearch, setLocalSearch] = useState(search.q);
+  const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
     if (!search.cliente && clientes[0]?.id) {
@@ -58,12 +61,23 @@ function AdminLeadsPage() {
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-6 py-5">
         <span className="eyebrow-pill">Aquisição</span>
-        <div className="mt-2 flex items-baseline gap-3">
-          <h1 className="text-xl font-bold tracking-tight">Funil de leads</h1>
-          <span className="text-sm text-muted-foreground">{leads.length} no período</span>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-xl font-bold tracking-tight">Funil de leads</h1>
+            <span className="text-sm text-muted-foreground">{leads.length} no período</span>
+          </div>
+          <Button
+            size="sm"
+            className="gap-2"
+            disabled={!search.cliente}
+            onClick={() => setShowCreate(true)}
+          >
+            <UserPlus className="h-4 w-4" />
+            Novo lead
+          </Button>
         </div>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Kanban ao vivo com drag-and-drop, filtros e realtime.
+          Crie leads manualmente ou acompanhe captura Meta/LP/WhatsApp.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -95,6 +109,8 @@ function AdminLeadsPage() {
             className="rounded-xl border border-input bg-background px-3 py-1.5 text-sm"
           >
             <option value="">Todos os canais</option>
+            <option value="manual">Manual</option>
+            <option value="indicação">Indicação</option>
             <option value="meta">Meta</option>
             <option value="whatsapp">WhatsApp</option>
             <option value="lp">Landing page</option>
@@ -122,7 +138,12 @@ function AdminLeadsPage() {
           <EmptyState
             icon={<Users className="h-6 w-6" />}
             title="Nenhum lead no filtro"
-            description="Ajuste período/cliente ou aguarde captura Meta/LP/WhatsApp."
+            description="Crie um lead manualmente ou ajuste período/cliente."
+            action={
+              search.cliente
+                ? { label: "Novo lead", onClick: () => setShowCreate(true) }
+                : undefined
+            }
           />
         </div>
       ) : (
@@ -136,6 +157,14 @@ function AdminLeadsPage() {
           </div>
         </div>
       )}
+
+      {search.cliente ? (
+        <CreateLeadDialog
+          open={showCreate}
+          onClose={() => setShowCreate(false)}
+          clienteId={search.cliente}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,7 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ExternalLink, Link2Off, Loader2, Save, Unplug } from "lucide-react";
+import {
+  CheckCircle2,
+  ExternalLink,
+  Link2Off,
+  Loader2,
+  RefreshCw,
+  Save,
+  Unplug,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -64,6 +72,7 @@ function ConfigMetaPage() {
   const [clienteId, setClienteId] = useState<string>("");
   const [disconnecting, setDisconnecting] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [adAccountId, setAdAccountId] = useState("");
 
   useEffect(() => {
@@ -171,6 +180,41 @@ function ConfigMetaPage() {
     }
   }
 
+  async function syncMetrics() {
+    if (!clienteId) return;
+    if (!adAccountId.trim() && !meta?.ad_account_id) {
+      toast.error("Informe e salve o Ad Account ID antes de sincronizar.");
+      return;
+    }
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync_ads_metrics", {
+        body: { cliente_id: clienteId, days: 30 },
+      });
+      if (error) throw error;
+      const payload = data as {
+        ok?: boolean;
+        error?: string;
+        resultados?: Array<{ meta?: { inseridos?: number; erros?: string[] } }>;
+      };
+      if (!payload?.ok) throw new Error(payload?.error || "Sync falhou.");
+      const first = payload.resultados?.[0]?.meta;
+      if (first?.erros?.length) {
+        toast.error(`Sync com erros: ${first.erros[0]}`);
+      } else {
+        toast.success(
+          `Métricas sincronizadas (${first?.inseridos ?? 0} linhas nos últimos 30 dias).`,
+        );
+      }
+      void queryClient.invalidateQueries({ queryKey: ["meta-ads-db"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "meta-conexoes"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível sincronizar.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function disconnect() {
     if (!clienteId || !cliente) return;
     setDisconnecting(true);
@@ -274,6 +318,18 @@ function ConfigMetaPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <Button
+                  className="rounded-xl bg-sky-600 hover:bg-sky-700"
+                  disabled={syncing || !adAccountId.trim()}
+                  onClick={() => void syncMetrics()}
+                >
+                  {syncing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  )}
+                  Sincronizar métricas (30d)
+                </Button>
                 {oauthUrl ? (
                   <Button asChild variant="outline" className="rounded-xl">
                     <a href={oauthUrl}>
@@ -296,6 +352,10 @@ function ConfigMetaPage() {
                   Desconectar
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Sem sync, Meta Ads / ROI ficam vazios. O cron diário também roda, mas o botão
+                preenche os últimos 30 dias agora.
+              </p>
             </div>
           ) : (
             <div className="space-y-4">

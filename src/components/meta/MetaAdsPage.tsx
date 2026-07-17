@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
@@ -111,6 +111,16 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
   const { data: clientesOptions = [] } = useClientesOptions();
   const activeClienteId = fixedClienteId ?? clienteId ?? profile?.cliente_id ?? null;
 
+  useEffect(() => {
+    if (fixedClienteId) {
+      setClienteId(fixedClienteId);
+      return;
+    }
+    if (!isAdmin) return;
+    if (clienteId) return;
+    if (clientesOptions[0]?.id) setClienteId(clientesOptions[0].id);
+  }, [fixedClienteId, isAdmin, clienteId, clientesOptions]);
+
   const dataQuery = useQuery({
     queryKey: ["meta-ads-db", activeClienteId, range],
     enabled: Boolean(activeClienteId),
@@ -213,6 +223,16 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
       };
     },
   });
+
+  if (isAdmin && !fixedClienteId && clientesOptions.length === 0) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
+        <p className="text-sm text-muted-foreground">
+          Nenhum cliente cadastrado. Crie um cliente e conecte a Meta BM primeiro.
+        </p>
+      </div>
+    );
+  }
 
   if (!activeClienteId) {
     return (

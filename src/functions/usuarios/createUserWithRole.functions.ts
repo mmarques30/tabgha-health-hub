@@ -1,5 +1,5 @@
-import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { supabase } from "@/integrations/supabase/client";
 
 const schema = z.object({
   email: z.string().email(),
@@ -11,34 +11,33 @@ const schema = z.object({
 
 type Input = z.infer<typeof schema>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const createUserWithRole = (createServerFn() as any)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  .handler(async (ctx: any) => {
-    const data = schema.parse(ctx.data);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+/**
+ * Cria usuário via edge `admin-create-user` (service role no servidor).
+ */
+export async function createUserWithRole(input: {
+  data: Input;
+}): Promise<{ user_id: string }> {
+  const data = schema.parse(input.data);
 
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: data.email,
-      email_confirm: true,
-      password: `${crypto.randomUUID()}-Tmp1!`,
-    });
-    if (authError) throw new Error(authError.message);
+  if (data.role === "cliente" && !data.cliente_id) {
+    throw new Error("Selecione o cliente ao criar um usuário com perfil Cliente.");
+  }
 
-    const userId = authData.user.id;
+  const { data: result, error } = await supabase.functions.invoke("admin-create-user", {
+    body: {
+      email: data.email.trim().toLowerCase(),
+      nome: data.nome.trim(),
+      role: data.role,
+      cliente_id: data.cliente_id,
+      permissoes: data.permissoes,
+    },
+  });
 
-    const { error: rpcError } = await supabaseAdmin.rpc("admin_upsert_profile_role", {
-      _user_id: userId,
-      _role: data.role,
-      _cliente_id: data.cliente_id ?? undefined,
-      _permissoes: data.permissoes,
-    });
-    if (rpcError) throw new Error(rpcError.message);
+  if (error) throw new Error(error.message || "Falha ao criar usuário.");
+  const payload = result as { ok?: boolean; user_id?: string; error?: string } | null;
+  if (!payload?.ok || !payload.user_id) {
+    throw new Error(payload?.error || "Falha ao criar usuário.");
+  }
 
-    await supabaseAdmin
-      .from("profiles")
-      .update({ nome: data.nome, email: data.email })
-      .eq("id", userId);
-
-    return { user_id: userId };
-  }) as (input: { data: Input }) => Promise<{ user_id: string }>;
+  return { user_id: payload.user_id };
+}

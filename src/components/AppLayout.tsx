@@ -1,16 +1,13 @@
 import { type ReactNode, Suspense, lazy, useState, useEffect, useRef } from "react";
-const AssistantBubble = lazy(() => import("./AssistantBubble").then((m) => ({ default: m.AssistantBubble })));
+const AssistantBubble = lazy(() =>
+  import("./AssistantBubble").then((m) => ({ default: m.AssistantBubble })),
+);
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard,
@@ -51,38 +48,63 @@ const ADMIN_NAV: NavGroup[] = [
   {
     group: "Visão",
     items: [
-      { to: "/admin/dashboard",        label: "Dashboard",            icon: LayoutDashboard, perm: "admin.dashboard" },
-      { to: "/admin/roi",              label: "ROI da operação",      icon: TrendingUp,      perm: "admin.roi" },
-      { to: "/admin/meta-ads",         label: "Marketing Pago",       icon: Megaphone,       perm: "admin.meta_ads" },
+      {
+        to: "/admin/dashboard",
+        label: "Dashboard",
+        icon: LayoutDashboard,
+        perm: "admin.dashboard",
+      },
+      { to: "/admin/roi", label: "ROI da operação", icon: TrendingUp, perm: "admin.roi" },
+      { to: "/admin/meta-ads", label: "Marketing Pago", icon: Megaphone, perm: "admin.meta_ads" },
     ],
   },
   {
     group: "Carteira",
     items: [
-      { to: "/admin/clientes",         label: "Clientes",             icon: Users,           perm: "admin.clientes" },
-      { to: "/admin/diagnosticos",     label: "Diagnósticos",         icon: Stethoscope,     perm: "admin.diagnosticos" },
+      { to: "/admin/clientes", label: "Clientes", icon: Users, perm: "admin.clientes" },
+      {
+        to: "/admin/diagnosticos",
+        label: "Diagnósticos",
+        icon: Stethoscope,
+        perm: "admin.diagnosticos",
+      },
     ],
   },
   {
     group: "Operação diária",
     items: [
-      { to: "/admin/atendimento",      label: "Atendimento",          icon: MessageSquare,   perm: "admin.atendimento" },
-      { to: "/admin/estrategia",       label: "Estratégia editorial", icon: FileText,        perm: "admin.estrategia" },
-      { to: "/admin/calendario",       label: "Calendário",           icon: Calendar,        perm: "admin.operacao" },
+      {
+        to: "/admin/atendimento",
+        label: "Atendimento",
+        icon: MessageSquare,
+        perm: "admin.atendimento",
+      },
+      {
+        to: "/admin/estrategia",
+        label: "Estratégia editorial",
+        icon: FileText,
+        perm: "admin.estrategia",
+      },
+      { to: "/admin/calendario", label: "Calendário", icon: Calendar, perm: "admin.operacao" },
     ],
   },
   {
     group: "Aquisição",
     items: [
-      { to: "/admin/automacoes-leads", label: "Automações de leads",  icon: Zap,             perm: "admin.operacao" },
-      { to: "/admin/leads",            label: "Funil de leads",       icon: Users,           perm: "admin.operacao" },
-      { to: "/admin/config-meta",      label: "Conectar Meta BM",     icon: Link2,           perm: "admin.meta_ads" },
+      {
+        to: "/admin/automacoes-leads",
+        label: "Automações de leads",
+        icon: Zap,
+        perm: "admin.operacao",
+      },
+      { to: "/admin/leads", label: "Funil de leads", icon: Users, perm: "admin.operacao" },
+      { to: "/admin/config-meta", label: "Conectar Meta BM", icon: Link2, perm: "admin.meta_ads" },
     ],
   },
   {
     group: "Administração",
     items: [
-      { to: "/admin/usuarios",         label: "Usuários & acessos",   icon: UserCog,         perm: "admin.usuarios" },
+      { to: "/admin/usuarios", label: "Usuários & acessos", icon: UserCog, perm: "admin.usuarios" },
     ],
   },
 ];
@@ -91,32 +113,57 @@ const CLIENTE_NAV: NavGroup[] = [
   {
     group: "Visão",
     items: [
-      { to: "/cliente/dashboard",  label: "Dashboard",        icon: LayoutDashboard, perm: "cliente.dashboard" },
-      { to: "/cliente/roi",        label: "ROI",              icon: TrendingUp,      perm: "cliente.roi" },
-      { to: "/cliente/meta-ads",   label: "Marketing Pago",   icon: Megaphone,       perm: "cliente.meta_ads" },
+      {
+        to: "/cliente/dashboard",
+        label: "Dashboard",
+        icon: LayoutDashboard,
+        perm: "cliente.dashboard",
+      },
+      { to: "/cliente/roi", label: "ROI", icon: TrendingUp, perm: "cliente.roi" },
+      {
+        to: "/cliente/meta-ads",
+        label: "Marketing Pago",
+        icon: Megaphone,
+        perm: "cliente.meta_ads",
+      },
     ],
   },
   {
     group: "Relacionamento",
     items: [
-      { to: "/cliente/atendimento", label: "Atendimento", icon: MessageSquare,  perm: "cliente.atendimento" },
-      { to: "/cliente/leads",       label: "Leads",       icon: Users,           perm: "cliente.leads" },
-      { to: "/cliente/clientes",    label: "Pacientes",   icon: UserCheck,       perm: "cliente.clientes" },
+      {
+        to: "/cliente/atendimento",
+        label: "Atendimento",
+        icon: MessageSquare,
+        perm: "cliente.atendimento",
+      },
+      { to: "/cliente/leads", label: "Leads", icon: Users, perm: "cliente.leads" },
+      { to: "/cliente/clientes", label: "Pacientes", icon: UserCheck, perm: "cliente.clientes" },
     ],
   },
   {
     group: "Marketing",
     items: [
-      { to: "/cliente/conteudo",   label: "Conteúdo",    icon: FileText,        perm: "cliente.conteudo" },
-      { to: "/cliente/entregas",   label: "Entregas",    icon: Package,         perm: "cliente.entregas" },
-      { to: "/cliente/calendario", label: "Calendário",  icon: Calendar,        perm: "cliente.calendario" },
+      { to: "/cliente/conteudo", label: "Conteúdo", icon: FileText, perm: "cliente.conteudo" },
+      { to: "/cliente/entregas", label: "Entregas", icon: Package, perm: "cliente.entregas" },
+      {
+        to: "/cliente/calendario",
+        label: "Calendário",
+        icon: Calendar,
+        perm: "cliente.calendario",
+      },
     ],
   },
   {
     group: "Estratégia",
     items: [
-      { to: "/cliente/diagnostico", label: "Diagnóstico", icon: Stethoscope,   perm: "cliente.diagnostico" },
-      { to: "/cliente/conexoes",    label: "Conexões",    icon: Link2,          perm: "cliente.conexoes" },
+      {
+        to: "/cliente/diagnostico",
+        label: "Diagnóstico",
+        icon: Stethoscope,
+        perm: "cliente.diagnostico",
+      },
+      { to: "/cliente/conexoes", label: "Conexões", icon: Link2, perm: "cliente.conexoes" },
     ],
   },
 ];
@@ -162,9 +209,7 @@ function ClientPicker({
     if (!open && clientes.length === 0) fetchClientes();
   }
 
-  const filtered = clientes.filter((c) =>
-    c.nome.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = clientes.filter((c) => c.nome.toLowerCase().includes(search.toLowerCase()));
 
   const trigger = (
     <button
@@ -186,13 +231,19 @@ function ClientPicker({
       {collapsed ? (
         <Tooltip>
           <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-          <TooltipContent side="right" className="text-xs">Ver como cliente</TooltipContent>
+          <TooltipContent side="right" className="text-xs">
+            Ver como cliente
+          </TooltipContent>
         </Tooltip>
-      ) : trigger}
+      ) : (
+        trigger
+      )}
 
       {open && (
-        <div className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-sidebar-border bg-sidebar shadow-xl z-50 overflow-hidden"
-          style={{ minWidth: 200 }}>
+        <div
+          className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-sidebar-border bg-sidebar shadow-xl z-50 overflow-hidden"
+          style={{ minWidth: 200 }}
+        >
           <div className="border-b border-sidebar-border px-3 py-2">
             <p className="text-[10.5px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
               Simular como cliente
@@ -209,21 +260,33 @@ function ClientPicker({
           </div>
           <div className="max-h-48 overflow-y-auto py-1">
             {loading ? (
-              <p className="px-3 py-4 text-center text-[11px] text-sidebar-foreground/40">Carregando…</p>
+              <p className="px-3 py-4 text-center text-[11px] text-sidebar-foreground/40">
+                Carregando…
+              </p>
             ) : filtered.length === 0 ? (
-              <p className="px-3 py-4 text-center text-[11px] text-sidebar-foreground/40">Nenhum cliente encontrado</p>
-            ) : filtered.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => { onSelect(c.id, c.nome); setOpen(false); setSearch(""); }}
-                className="flex w-full flex-col px-3 py-2 text-left hover:bg-sidebar-accent/60 transition-colors"
-              >
-                <span className="text-[12px] font-medium text-sidebar-foreground">{c.nome}</span>
-                {c.especialidade && (
-                  <span className="text-[10px] text-sidebar-foreground/40">{c.especialidade}</span>
-                )}
-              </button>
-            ))}
+              <p className="px-3 py-4 text-center text-[11px] text-sidebar-foreground/40">
+                Nenhum cliente encontrado
+              </p>
+            ) : (
+              filtered.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    onSelect(c.id, c.nome);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                  className="flex w-full flex-col px-3 py-2 text-left hover:bg-sidebar-accent/60 transition-colors"
+                >
+                  <span className="text-[12px] font-medium text-sidebar-foreground">{c.nome}</span>
+                  {c.especialidade && (
+                    <span className="text-[10px] text-sidebar-foreground/40">
+                      {c.especialidade}
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -277,10 +340,12 @@ function SidebarNav({
   return (
     <TooltipProvider delayDuration={0}>
       {/* ── Logo ── */}
-      <div className={cn(
-        "flex h-12 items-center border-b border-sidebar-border shrink-0",
-        collapsed ? "justify-center px-0" : "px-3.5",
-      )}>
+      <div
+        className={cn(
+          "flex h-12 items-center border-b border-sidebar-border shrink-0",
+          collapsed ? "justify-center px-0" : "px-3.5",
+        )}
+      >
         {!collapsed && (
           <img
             src="https://tabghamkt.com.br/wp-content/uploads/2025/05/logo_tabgha_health_mkt_caixa_alta-04-scaled-e1747895382243.png"
@@ -300,8 +365,12 @@ function SidebarNav({
         <div className="mx-2 mt-2 flex items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2">
           <Eye className="h-3.5 w-3.5 shrink-0 text-amber-400" />
           <div className="flex-1 min-w-0">
-            <p className="text-[9.5px] font-semibold uppercase tracking-widest text-amber-400/70">Simulando</p>
-            <p className="text-[11.5px] font-semibold text-amber-300 truncate">{simulatedClientNome}</p>
+            <p className="text-[9.5px] font-semibold uppercase tracking-widest text-amber-400/70">
+              Simulando
+            </p>
+            <p className="text-[11.5px] font-semibold text-amber-300 truncate">
+              {simulatedClientNome}
+            </p>
           </div>
         </div>
       )}
@@ -328,8 +397,8 @@ function SidebarNav({
                     hasActive
                       ? "text-sidebar-primary"
                       : isAdminGroup
-                      ? "text-sidebar-foreground/50 hover:text-sidebar-foreground/70"
-                      : "text-sidebar-foreground/35 hover:text-sidebar-foreground/60",
+                        ? "text-sidebar-foreground/50 hover:text-sidebar-foreground/70"
+                        : "text-sidebar-foreground/35 hover:text-sidebar-foreground/60",
                   )}
                 >
                   <span className="flex items-center gap-1.5">
@@ -366,7 +435,9 @@ function SidebarNav({
                                   : "text-sidebar-foreground/50 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
                               )}
                             >
-                              <Icon className={cn("h-4 w-4", active ? "opacity-100" : "opacity-60")} />
+                              <Icon
+                                className={cn("h-4 w-4", active ? "opacity-100" : "opacity-60")}
+                              />
                             </Link>
                           </TooltipTrigger>
                           <TooltipContent side="right" className="text-xs font-medium">
@@ -408,10 +479,12 @@ function SidebarNav({
       </nav>
 
       {/* ── Footer ── */}
-      <div className={cn(
-        "border-t border-sidebar-border py-2 shrink-0 space-y-1",
-        collapsed ? "flex flex-col items-center gap-0 px-0 space-y-0" : "px-2",
-      )}>
+      <div
+        className={cn(
+          "border-t border-sidebar-border py-2 shrink-0 space-y-1",
+          collapsed ? "flex flex-col items-center gap-0 px-0 space-y-0" : "px-2",
+        )}
+      >
         {/* User name */}
         {!collapsed && (
           <div className="px-2.5 pb-1 truncate text-[11px] font-medium text-sidebar-foreground/70">
@@ -432,9 +505,7 @@ function SidebarNav({
                 onClick={onStopSimulation}
                 className={cn(
                   "flex items-center gap-2 rounded-md text-[11px] font-medium text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 transition-colors",
-                  collapsed
-                    ? "h-8 w-8 justify-center"
-                    : "w-full px-2.5 py-2",
+                  collapsed ? "h-8 w-8 justify-center" : "w-full px-2.5 py-2",
                 )}
               >
                 <X className="h-3.5 w-3.5 shrink-0" />
@@ -442,7 +513,9 @@ function SidebarNav({
               </button>
             </TooltipTrigger>
             {collapsed && (
-              <TooltipContent side="right" className="text-xs">Sair da simulação</TooltipContent>
+              <TooltipContent side="right" className="text-xs">
+                Sair da simulação
+              </TooltipContent>
             )}
           </Tooltip>
         )}
@@ -457,9 +530,7 @@ function SidebarNav({
               }}
               className={cn(
                 "flex items-center gap-2 rounded-md text-[11px] text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors",
-                collapsed
-                  ? "h-8 w-8 justify-center"
-                  : "w-full px-2.5 py-2",
+                collapsed ? "h-8 w-8 justify-center" : "w-full px-2.5 py-2",
               )}
             >
               <LogOut className="h-3.5 w-3.5 shrink-0" />
@@ -467,7 +538,9 @@ function SidebarNav({
             </button>
           </TooltipTrigger>
           {collapsed && (
-            <TooltipContent side="right" className="text-xs">Sair</TooltipContent>
+            <TooltipContent side="right" className="text-xs">
+              Sair
+            </TooltipContent>
           )}
         </Tooltip>
 
@@ -481,20 +554,24 @@ function SidebarNav({
                   onClick={onToggleCollapse}
                   className={cn(
                     "flex items-center gap-2 rounded-md text-[11px] text-sidebar-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors",
-                    collapsed
-                      ? "h-8 w-8 justify-center"
-                      : "w-full px-2.5 py-2",
+                    collapsed ? "h-8 w-8 justify-center" : "w-full px-2.5 py-2",
                   )}
                   aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
                 >
-                  {collapsed
-                    ? <ChevronRight className="h-3.5 w-3.5" />
-                    : <><ChevronLeft className="h-3.5 w-3.5 shrink-0" /><span>Recolher menu</span></>
-                  }
+                  {collapsed ? (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  ) : (
+                    <>
+                      <ChevronLeft className="h-3.5 w-3.5 shrink-0" />
+                      <span>Recolher menu</span>
+                    </>
+                  )}
                 </button>
               </TooltipTrigger>
               {collapsed && (
-                <TooltipContent side="right" className="text-xs">Expandir menu</TooltipContent>
+                <TooltipContent side="right" className="text-xs">
+                  Expandir menu
+                </TooltipContent>
               )}
             </Tooltip>
           </>
@@ -507,7 +584,18 @@ function SidebarNav({
 // ── App Layout ────────────────────────────────────────────────────────────────
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const { profile, role, realRole, user, signOut, isSimulating, simulatedClientId, simulatedClientNome, startSimulation, stopSimulation } = useAuth();
+  const {
+    profile,
+    role,
+    realRole,
+    user,
+    signOut,
+    isSimulating,
+    simulatedClientId,
+    simulatedClientNome,
+    startSimulation,
+    stopSimulation,
+  } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -520,10 +608,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const groups: NavGroup[] = allGroups
     .map((g) => ({
       ...g,
-      items:
-        role === "admin"
-          ? g.items
-          : g.items.filter((i) => hasPermission(profile?.permissoes, i.perm)),
+      items: g.items.filter((i) => hasPermission(profile?.permissoes, i.perm)),
     }))
     .filter((g) => g.items.length > 0);
 
@@ -577,13 +662,24 @@ export function AppLayout({ children }: { children: ReactNode }) {
             src="https://tabghamkt.com.br/wp-content/uploads/2025/05/logo_tabgha_health_mkt_caixa_alta-04-scaled-e1747895382243.png"
             alt="Tabgha Health Marketing"
             className="h-6 w-auto"
-            style={{ filter: "brightness(0) saturate(100%) invert(18%) sepia(56%) saturate(1200%) hue-rotate(204deg) brightness(82%) contrast(97%)" }}
+            style={{
+              filter:
+                "brightness(0) saturate(100%) invert(18%) sepia(56%) saturate(1200%) hue-rotate(204deg) brightness(82%) contrast(97%)",
+            }}
           />
           {isSimulating && (
             <div className="ml-auto flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1">
               <Eye className="h-3 w-3 text-amber-400" />
-              <span className="text-[11px] font-semibold text-amber-400 max-w-[120px] truncate">{simulatedClientNome}</span>
-              <button onClick={() => { stopSimulation(); navigate({ to: "/admin/dashboard", replace: true }); }} className="ml-1 text-amber-400/60 hover:text-amber-400">
+              <span className="text-[11px] font-semibold text-amber-400 max-w-[120px] truncate">
+                {simulatedClientNome}
+              </span>
+              <button
+                onClick={() => {
+                  stopSimulation();
+                  navigate({ to: "/admin/dashboard", replace: true });
+                }}
+                className="ml-1 text-amber-400/60 hover:text-amber-400"
+              >
                 <X className="h-3 w-3" />
               </button>
             </div>
@@ -592,7 +688,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
         {/* Mobile drawer */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetContent side="left" className="w-56 p-0 flex flex-col bg-sidebar border-sidebar-border">
+          <SheetContent
+            side="left"
+            className="w-56 p-0 flex flex-col bg-sidebar border-sidebar-border"
+          >
             <SheetTitle className="sr-only">Menu de navegação</SheetTitle>
             <SidebarNav {...navProps} onNavigate={() => setMobileOpen(false)} />
           </SheetContent>
@@ -602,7 +701,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </div>
 
       {process.env.ANTHROPIC_API_KEY && (
-        <Suspense fallback={null}><AssistantBubble /></Suspense>
+        <Suspense fallback={null}>
+          <AssistantBubble />
+        </Suspense>
       )}
     </div>
   );

@@ -1,11 +1,17 @@
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  createUserWithRole,
+  type CreateUserResult,
+} from "@/functions/usuarios/createUserWithRole.functions";
 
 const schema = z.object({
   nome: z.string().min(2),
   email: z.string().email(),
   cnpj: z.string().optional(),
   especialidade: z.string().optional(),
+  /** Se true (padrão), também cria login no portal com senha temporária */
+  gerar_acesso_portal: z.boolean().default(true),
 });
 
 type Input = z.infer<typeof schema>;
@@ -17,12 +23,16 @@ function adminErrorMessage(raw: string) {
   return raw || "Operação falhou.";
 }
 
+export type CreateClientResult = {
+  cliente_id: string;
+  portal?: CreateUserResult | null;
+};
+
 /**
- * Cria cliente via RPC `admin_create_cliente` (SECURITY DEFINER + assert_current_admin).
+ * Cria consultório via RPC `admin_create_cliente`.
+ * Opcionalmente cria o login do portal (role cliente) com senha temporária.
  */
-export async function createClientWithAccess(input: {
-  data: Input;
-}): Promise<{ cliente_id: string }> {
+export async function createClientWithAccess(input: { data: Input }): Promise<CreateClientResult> {
   const data = schema.parse(input.data);
   const email = data.email.trim().toLowerCase();
 
@@ -46,7 +56,20 @@ export async function createClientWithAccess(input: {
   if (error) throw new Error(adminErrorMessage(error.message));
   if (!clienteId) throw new Error("Falha ao criar cliente.");
 
-  return { cliente_id: clienteId as string };
+  let portal: CreateUserResult | null = null;
+  if (data.gerar_acesso_portal !== false) {
+    portal = await createUserWithRole({
+      data: {
+        nome: data.nome.trim(),
+        email,
+        role: "cliente",
+        cliente_id: clienteId as string,
+        permissoes: ["*"],
+      },
+    });
+  }
+
+  return { cliente_id: clienteId as string, portal };
 }
 
 export async function updateClienteAdmin(input: {

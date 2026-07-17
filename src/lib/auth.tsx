@@ -29,9 +29,15 @@ interface AuthState {
 
 const AuthCtx = createContext<AuthState | undefined>(undefined);
 
-async function loadProfileAndRole(userId: string): Promise<{ profile: Profile | null; role: AppRole | null }> {
+async function loadProfileAndRole(
+  userId: string,
+): Promise<{ profile: Profile | null; role: AppRole | null }> {
   const [{ data: profile }, { data: roles }] = await Promise.all([
-    supabase.from("profiles").select("id, cliente_id, nome, email, permissoes").eq("id", userId).maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("id, cliente_id, nome, email, permissoes")
+      .eq("id", userId)
+      .maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", userId),
   ]);
   const role =
@@ -83,9 +89,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       hydrate(session?.user ?? null);
     });
+
+    // Recarrega perfil/permissões ao voltar para a aba (mudanças feitas em Usuários & acessos)
+    const onFocus = () => {
+      void supabase.auth.getUser().then(({ data }) => {
+        if (mounted && data.user) void hydrate(data.user);
+      });
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") onFocus();
+    });
+
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 
@@ -94,9 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthState = {
     loading,
     user,
-    profile: isSimulating && profile
-      ? { ...profile, cliente_id: simulatedClientId }
-      : profile,
+    profile: isSimulating && profile ? { ...profile, cliente_id: simulatedClientId } : profile,
     role: isSimulating ? "cliente" : role,
     realRole: role,
     signOut: async () => {

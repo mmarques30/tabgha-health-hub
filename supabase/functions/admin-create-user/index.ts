@@ -1,5 +1,6 @@
 // Cria usuário Auth + profile/role (admin only).
-// Se o email já existir, atualiza perfil/role e gera link de recuperação.
+// Se o email já existir com o MESMO role: redefine senha e atualiza perfil.
+// Se existir com role diferente: erro claro (não converte cliente↔admin).
 // POST { email, nome, role, cliente_id?, permissoes? }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -21,36 +22,36 @@ function json(body: Record<string, unknown>, status = 200) {
   });
 }
 
-function translateAuthError(message: string): string {
-  const lower = message.toLowerCase();
-  if (lower.includes("already been registered") || lower.includes("email_exists")) {
-    return "Este email já está cadastrado. Atualizamos o perfil existente — use o link de recuperação ou a senha temporária.";
-  }
-  return message;
-}
+async function findExistingByEmail(email: string): Promise<{
+  userId: string;
+  role: string | null;
+} | null> {
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
 
-async function findUserIdByEmail(email: string): Promise<string | null> {
-  // Lista paginada — base pequena; suficiente para equipe Tabgha
-  for (let page = 1; page <= 20; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
-    if (error) throw error;
-    const found = data.users.find((u) => (u.email ?? "").toLowerCase() === email);
-    if (found) return found.id;
-    if (data.users.length < 200) break;
+  if (profile?.id) {
+    const { data: roleRow } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", profile.id)
+      .maybeSingle();
+    return { userId: profile.id, role: roleRow?.role ?? null };
   }
-  return null;
-}
 
-async function generateRecoveryLink(email: string): Promise<string | null> {
-  const { data, error } = await admin.auth.admin.generateLink({
-    type: "recovery",
-    email,
-  });
-  if (error) {
-    console.error("generateLink failed", error.message);
-    return null;
-  }
-  return data.properties?.action_link ?? null;
+  // Fallback Auth (caso raro: user sem profile)
+  const { data: listed, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+  if (error) throw error;
+  const found = listed.users.find((u) => (u.email ?? "").toLowerCase() === email);
+  if (!found) return null;
+  const { data: roleRow } = await admin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", found.id)
+    .maybeSingle();
+  return { userId: found.id, role: roleRow?.role ?? null };
 }
 
 Deno.serve(async (req) => {
@@ -97,45 +98,47 @@ Deno.serve(async (req) => {
     let userId: string | null = null;
     let reusedExisting = false;
 
-    const { data: authData, error: authError } = await admin.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      password: temporaryPassword,
-    });
-
-    if (authError) {
-      const msg = authError.message || "";
-      const exists =
-        msg.toLowerCase().includes("already been registered") ||
-        msg.toLowerCase().includes("email_exists") ||
-        (authError as { code?: string }).code === "email_exists";
-
-      if (!exists) {
-        return json({ ok: false, error: translateAuthError(msg) }, 400);
-      }
-
-      userId = await findUserIdByEmail(email);
-      if (!userId) {
+    const existing = await findExistingByEmail(email);
+    if (existing) {
+      if (existing.role && existing.role !== role) {
         return json(
           {
             ok: false,
-            error:
-              "Este email já existe no Auth, mas não foi possível localizar o usuário. Contate o suporte.",
+            error: `Este email já está cadastrado como ${existing.role}. Abra Usuários & acessos → Editar, ou use outro email.`,
           },
-          400,
+          409,
         );
       }
+      userId = existing.userId;
       reusedExisting = true;
-
-      // Garante senha conhecida para o admin passar ao usuário
       const { error: updateErr } = await admin.auth.admin.updateUserById(userId, {
         password: temporaryPassword,
         email_confirm: true,
       });
-      if (updateErr) {
-        return json({ ok: false, error: updateErr.message }, 400);
-      }
+      if (updateErr) return json({ ok: false, error: updateErr.message }, 400);
     } else {
+      const { data: authData, error: authError } = await admin.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        password: temporaryPassword,
+      });
+      if (authError) {
+        const msg = authError.message || "";
+        const exists =
+          msg.toLowerCase().includes("already been registered") ||
+          msg.toLowerCase().includes("email_exists");
+        if (exists) {
+          return json(
+            {
+              ok: false,
+              error:
+                "Este email já existe no Auth. Tente de novo em alguns segundos ou edite o usuário na lista.",
+            },
+            409,
+          );
+        }
+        return json({ ok: false, error: msg }, 400);
+      }
       userId = authData.user.id;
     }
 
@@ -147,15 +150,7 @@ Deno.serve(async (req) => {
     });
     if (rpcError) return json({ ok: false, error: rpcError.message }, 400);
 
-    // Garante role única desejada (admin_upsert só faz ON CONFLICT DO NOTHING)
-    await admin.from("user_roles").delete().eq("user_id", userId).neq("role", role);
-    const { error: roleInsertErr } = await admin.from("user_roles").upsert(
-      { user_id: userId, role },
-      { onConflict: "user_id,role" },
-    );
-    if (roleInsertErr) {
-      console.error("role upsert", roleInsertErr.message);
-    }
+    await admin.from("user_roles").upsert({ user_id: userId, role }, { onConflict: "user_id,role" });
 
     await admin
       .from("profiles")
@@ -167,17 +162,16 @@ Deno.serve(async (req) => {
       })
       .eq("id", userId);
 
-    const recoveryLink = await generateRecoveryLink(email);
-
     return json({
       ok: true,
       user_id: userId,
       reused_existing: reusedExisting,
       temporary_password: temporaryPassword,
-      recovery_link: recoveryLink,
+      email,
+      role,
       message: reusedExisting
-        ? "Usuário já existia — perfil atualizado e senha temporária gerada."
-        : "Usuário criado com senha temporária.",
+        ? "Usuário já existia — senha temporária redefinida."
+        : "Usuário criado. Anote a senha temporária.",
     });
   } catch (error) {
     return json(

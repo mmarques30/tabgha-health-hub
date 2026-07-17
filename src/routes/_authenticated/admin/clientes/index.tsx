@@ -8,11 +8,19 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
+import { CredentialsDialog, type AccessCredentials } from "@/components/usuarios/CredentialsDialog";
 import { createClientWithAccess } from "@/functions/clientes/createClientWithAccess.functions";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_authenticated/admin/clientes/")({
@@ -23,7 +31,10 @@ export const Route = createFileRoute("/_authenticated/admin/clientes/")({
 type Cliente = Tables<"clientes"> & { leads_count: number };
 
 const STATUS_LABELS: Record<string, string> = {
-  onboarding: "Onboarding", ativo: "Ativo", pausa: "Pausa", inativo: "Inativo",
+  onboarding: "Onboarding",
+  ativo: "Ativo",
+  pausa: "Pausa",
+  inativo: "Inativo",
 };
 const STATUS_COLORS: Record<string, string> = {
   onboarding: "bg-blue-100 text-blue-700",
@@ -43,20 +54,60 @@ const newClientSchema = z.object({
   email: z.string().email("Email inválido"),
   cnpj: z.string().optional(),
   especialidade: z.string().optional(),
+  gerar_acesso_portal: z.boolean().default(true),
 });
 type NewClientForm = z.infer<typeof newClientSchema>;
 
-function NovoClienteDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function NovoClienteDialog({
+  open,
+  onClose,
+  onCredentials,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCredentials: (c: AccessCredentials) => void;
+}) {
   const qc = useQueryClient();
-  const form = useForm<NewClientForm>({ resolver: zodResolver(newClientSchema) });
+  const form = useForm<NewClientForm>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(newClientSchema) as any,
+    defaultValues: {
+      nome: "",
+      email: "",
+      cnpj: "",
+      especialidade: "",
+      gerar_acesso_portal: true,
+    },
+  });
+
+  const gerarAcesso = form.watch("gerar_acesso_portal");
 
   const criar = useMutation({
     mutationFn: (data: NewClientForm) => createClientWithAccess({ data }),
-    onSuccess: () => {
-      toast.success("Cliente criado.");
+    onSuccess: (result) => {
+      toast.success(
+        result.portal
+          ? "Consultório criado e acesso ao portal gerado."
+          : "Consultório criado (sem login).",
+      );
+      if (result.portal) {
+        onCredentials({
+          email: result.portal.email,
+          temporary_password: result.portal.temporary_password,
+          reused_existing: result.portal.reused_existing,
+          role: "cliente",
+        });
+      }
       void qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
+      void qc.invalidateQueries({ queryKey: ["admin", "team"] });
       onClose();
-      form.reset();
+      form.reset({
+        nome: "",
+        email: "",
+        cnpj: "",
+        especialidade: "",
+        gerar_acesso_portal: true,
+      });
     },
     onError: (e: Error) => toast.error(e.message || "Não foi possível criar o cliente."),
   });
@@ -64,17 +115,26 @@ function NovoClienteDialog({ open, onClose }: { open: boolean; onClose: () => vo
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Novo cliente</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Novo cliente</DialogTitle>
+        </DialogHeader>
         <form onSubmit={form.handleSubmit((d) => criar.mutate(d))} className="space-y-4 py-2">
           <div className="space-y-1">
             <Label>Nome do consultório / médico</Label>
             <Input placeholder="Dr. Pedro Souza" {...form.register("nome")} />
-            {form.formState.errors.nome && <p className="text-xs text-destructive">{form.formState.errors.nome.message}</p>}
+            {form.formState.errors.nome && (
+              <p className="text-xs text-destructive">{form.formState.errors.nome.message}</p>
+            )}
           </div>
           <div className="space-y-1">
             <Label>Email</Label>
             <Input type="email" placeholder="dr.pedro@email.com" {...form.register("email")} />
-            {form.formState.errors.email && <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>}
+            {form.formState.errors.email && (
+              <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Se gerar acesso ao portal, este email será o login.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -86,8 +146,26 @@ function NovoClienteDialog({ open, onClose }: { open: boolean; onClose: () => vo
               <Input placeholder="00.000.000/0000-00" {...form.register("cnpj")} />
             </div>
           </div>
+          <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3">
+            <Checkbox
+              id="gerar-portal"
+              checked={gerarAcesso}
+              onCheckedChange={(c) => form.setValue("gerar_acesso_portal", c === true)}
+            />
+            <Label
+              htmlFor="gerar-portal"
+              className="cursor-pointer text-sm leading-snug font-normal"
+            >
+              Gerar acesso ao portal agora
+              <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                Cria login com senha temporária (você copia na próxima tela).
+              </span>
+            </Label>
+          </div>
           <DialogFooter>
-            <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
+            <Button variant="outline" type="button" onClick={onClose}>
+              Cancelar
+            </Button>
             <Button type="submit" disabled={criar.isPending}>
               {criar.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Criar cliente
             </Button>
@@ -100,6 +178,7 @@ function NovoClienteDialog({ open, onClose }: { open: boolean; onClose: () => vo
 
 function ClientesAdminPage() {
   const [showNew, setShowNew] = useState(false);
+  const [credentials, setCredentials] = useState<AccessCredentials | null>(null);
   const [search, setSearch] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
 
@@ -107,8 +186,7 @@ function ClientesAdminPage() {
     queryKey: ["admin", "clientes"],
     staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clientes").select("*, leads(id)").order("nome");
+      const { data, error } = await supabase.from("clientes").select("*, leads(id)").order("nome");
       if (error) throw error;
       return (data ?? []).map((c) => ({
         ...c,
@@ -120,7 +198,8 @@ function ClientesAdminPage() {
   const filtered = clientes.filter((c) => {
     const matchStatus = filtroStatus === "todos" || c.status === filtroStatus;
     const q = search.toLowerCase();
-    const matchSearch = !q || c.nome.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q);
+    const matchSearch =
+      !q || c.nome.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q);
     return matchStatus && matchSearch;
   });
 
@@ -145,7 +224,8 @@ function ClientesAdminPage() {
           <h1 className="mt-2 text-xl font-bold tracking-tight">Clientes</h1>
         </div>
         <Button onClick={() => setShowNew(true)}>
-          <Plus className="mr-2 h-4 w-4" />Novo cliente
+          <Plus className="mr-2 h-4 w-4" />
+          Novo cliente
         </Button>
       </div>
 
@@ -157,9 +237,15 @@ function ClientesAdminPage() {
             className="card-lift animate-fade-up rounded-2xl border border-border bg-card px-5 pt-5 pb-4 shadow-[0_1px_3px_rgba(15,27,53,0.04)] flex flex-col"
             style={{ animationDelay: i * 75 + "ms" }}
           >
-            <span className="text-[9px] font-black tracking-[0.16em] text-muted-foreground/40 mb-4">{kpi.rank}</span>
-            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{kpi.label}</p>
-            <p className="text-[2.4rem] font-black tracking-tight leading-none animate-numeric-pop mt-auto">{kpi.value}</p>
+            <span className="text-[9px] font-black tracking-[0.16em] text-muted-foreground/40 mb-4">
+              {kpi.rank}
+            </span>
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+              {kpi.label}
+            </p>
+            <p className="text-[2.4rem] font-black tracking-tight leading-none animate-numeric-pop mt-auto">
+              {kpi.value}
+            </p>
             <div className={`mt-3 h-0.5 w-full rounded-full ${kpi.color}`} />
           </div>
         ))}
@@ -170,11 +256,18 @@ function ClientesAdminPage() {
         className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)] animate-fade-up"
         style={{ animationDelay: "300ms" }}
       >
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Filtros</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          Filtros
+        </p>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative max-w-xs flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Buscar…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input
+              className="pl-9"
+              placeholder="Buscar…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
           <div className="flex flex-wrap gap-1">
             {["todos", "onboarding", "ativo", "pausa", "inativo"].map((s) => (
@@ -200,7 +293,9 @@ function ClientesAdminPage() {
         style={{ animationDelay: "375ms" }}
       >
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
-          Lista de clientes {filtered.length !== clientes.length && `· ${filtered.length} resultado${filtered.length !== 1 ? "s" : ""}`}
+          Lista de clientes{" "}
+          {filtered.length !== clientes.length &&
+            `· ${filtered.length} resultado${filtered.length !== 1 ? "s" : ""}`}
         </p>
 
         {isLoading ? (
@@ -211,7 +306,11 @@ function ClientesAdminPage() {
           <EmptyState
             icon={<Plus className="h-6 w-6" />}
             title="Nenhum cliente encontrado"
-            action={clientes.length === 0 ? { label: "Criar primeiro cliente", onClick: () => setShowNew(true) } : undefined}
+            action={
+              clientes.length === 0
+                ? { label: "Criar primeiro cliente", onClick: () => setShowNew(true) }
+                : undefined
+            }
           />
         ) : (
           <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
@@ -226,12 +325,20 @@ function ClientesAdminPage() {
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{c.nome}</p>
-                  <p className="text-xs text-muted-foreground">{c.especialidade ?? "—"} · {c.email ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {c.especialidade ?? "—"} · {c.email ?? "—"}
+                  </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs text-muted-foreground tabular-nums">{c.leads_count} leads</span>
-                  <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[c.status] ?? "bg-muted text-muted-foreground"}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[c.status] ?? "bg-slate-400"}`} />
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {c.leads_count} leads
+                  </span>
+                  <span
+                    className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[c.status] ?? "bg-muted text-muted-foreground"}`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[c.status] ?? "bg-slate-400"}`}
+                    />
                     {STATUS_LABELS[c.status] ?? c.status}
                   </span>
                 </div>
@@ -241,7 +348,12 @@ function ClientesAdminPage() {
         )}
       </div>
 
-      <NovoClienteDialog open={showNew} onClose={() => setShowNew(false)} />
+      <NovoClienteDialog
+        open={showNew}
+        onClose={() => setShowNew(false)}
+        onCredentials={setCredentials}
+      />
+      <CredentialsDialog credentials={credentials} onClose={() => setCredentials(null)} />
     </div>
   );
 }

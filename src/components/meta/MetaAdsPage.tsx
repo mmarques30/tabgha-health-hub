@@ -76,7 +76,8 @@ function aggregate(metrics: Metrica[], leads: LeadRow[]): DashboardAgg {
   const leadsAds = metrics.reduce((sum, m) => sum + Number(m.leads ?? 0), 0);
 
   const leadsMeta = leads.filter((l) => ["meta", "facebook"].includes(l.canal ?? ""));
-  const leadsCaptados = leadsMeta.length;
+  // CRM (webhook) tem prioridade; se ainda não caiu lead, usa o total reportado pelo Ads.
+  const leadsCaptados = leadsMeta.length > 0 ? leadsMeta.length : leadsAds;
   const leadsQualificados = leadsMeta.filter((l) => l.status !== "novo").length;
   const atendidos = leadsMeta.filter((l) => l.status === "atendido").length;
   const convertidos = leadsMeta.filter((l) => l.status === "convertido").length;
@@ -118,7 +119,9 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
     }
     if (!isAdmin) return;
     if (clienteId) return;
-    if (clientesOptions[0]?.id) setClienteId(clientesOptions[0].id);
+    const pedro = clientesOptions.find((c) => /pedro/i.test(c.nome));
+    const pick = pedro?.id ?? clientesOptions[0]?.id;
+    if (pick) setClienteId(pick);
   }, [fixedClienteId, isAdmin, clienteId, clientesOptions]);
 
   const dataQuery = useQuery({

@@ -48,8 +48,8 @@ function LeadsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 py-5">
+    <div className="flex h-[calc(100dvh-3rem)] flex-col overflow-hidden md:h-screen">
+      <div className="shrink-0 border-b border-border px-6 py-5">
         <span className="eyebrow-pill">Captação</span>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-baseline gap-3">
@@ -123,13 +123,17 @@ function LeadsPage() {
           />
         </div>
       ) : (
-        <div className="flex flex-col gap-5 px-6 py-5 pb-8">
-          <FunilHeader leads={leads} />
-          <div>
-            <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-4">
+          <div className="shrink-0">
+            <FunilHeader leads={leads} />
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col">
+            <p className="mb-3 shrink-0 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               Pipeline
             </p>
-            <KanbanBoard leads={leads} />
+            <div className="min-h-0 flex-1">
+              <KanbanBoard leads={leads} />
+            </div>
           </div>
         </div>
       )}

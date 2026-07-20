@@ -51,6 +51,31 @@ function asNotes(raw: unknown): Record<string, unknown> | null {
   return raw as Record<string, unknown>;
 }
 
+function hasMetaAttribution(lead: Lead) {
+  return Boolean(
+    lead.meta_ad_id ||
+      lead.meta_ad_name ||
+      lead.meta_campaign_id ||
+      lead.meta_campaign_name ||
+      lead.meta_form_id ||
+      lead.meta_form_name ||
+      lead.meta_page_id ||
+      lead.meta_leadgen_id ||
+      lead.canal === "meta" ||
+      lead.canal === "facebook",
+  );
+}
+
+function MetaAttrRow({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null;
+  return (
+    <div>
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <p className="mt-0.5 break-words font-medium">{value}</p>
+    </div>
+  );
+}
+
 type Props = {
   lead: Lead;
   onClose: () => void;
@@ -263,17 +288,64 @@ export function LeadDetailDialog({ lead, onClose }: Props) {
                   {new Date(lead.atualizado_em).toLocaleString("pt-BR")}
                 </p>
               </div>
-              {(lead.utm_source || lead.utm_medium || lead.utm_campaign) && (
-                <div className="col-span-2">
-                  <span className="text-xs text-muted-foreground">UTM</span>
-                  <p className="mt-0.5 break-all font-medium">
-                    {[lead.utm_source, lead.utm_medium, lead.utm_campaign]
-                      .filter(Boolean)
-                      .join(" / ") || "—"}
-                  </p>
-                </div>
-              )}
             </div>
+
+            {hasMetaAttribution(lead) ? (
+              <div className="space-y-2 rounded-lg border border-sky-200/70 bg-sky-50/50 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-800">
+                  Origem Meta (formulário / anúncio)
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <MetaAttrRow
+                    label="Anúncio"
+                    value={
+                      lead.meta_ad_name ||
+                      (lead.meta_ad_id ? `Anúncio ${lead.meta_ad_id}` : null)
+                    }
+                  />
+                  <MetaAttrRow
+                    label="Campanha"
+                    value={
+                      lead.meta_campaign_name ||
+                      lead.utm_campaign ||
+                      (lead.meta_campaign_id ? `Campanha ${lead.meta_campaign_id}` : null)
+                    }
+                  />
+                  <MetaAttrRow
+                    label="Formulário"
+                    value={
+                      lead.meta_form_name ||
+                      (lead.meta_form_id ? `Formulário ${lead.meta_form_id}` : null)
+                    }
+                  />
+                  <MetaAttrRow label="Página Meta" value={lead.meta_page_id} />
+                  <MetaAttrRow label="Leadgen ID" value={lead.meta_leadgen_id} />
+                  <MetaAttrRow
+                    label="UTM"
+                    value={
+                      [lead.utm_source, lead.utm_medium, lead.utm_campaign]
+                        .filter(Boolean)
+                        .join(" / ") || null
+                    }
+                  />
+                </div>
+                {!lead.meta_ad_id && !lead.meta_form_id && !lead.meta_leadgen_id ? (
+                  <p className="text-xs text-muted-foreground">
+                    Canal Meta, mas ainda sem IDs de anúncio/formulário. Rode “Importar leads Meta”
+                    em Conectar Meta BM para enriquecer.
+                  </p>
+                ) : null}
+              </div>
+            ) : (lead.utm_source || lead.utm_medium || lead.utm_campaign) ? (
+              <div className="rounded-lg bg-secondary/40 px-3 py-2.5 text-sm">
+                <span className="text-xs text-muted-foreground">UTM</span>
+                <p className="mt-0.5 break-all font-medium">
+                  {[lead.utm_source, lead.utm_medium, lead.utm_campaign]
+                    .filter(Boolean)
+                    .join(" / ") || "—"}
+                </p>
+              </div>
+            ) : null}
 
             <div className="space-y-1">
               <Label htmlFor="lead-status">Estágio no funil</Label>

@@ -8,6 +8,10 @@
 // Mapa de campos: app_config.meta_form_map[form_id] ou _default
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  createAttributionCache,
+  resolveMetaAttribution,
+} from "../_shared/meta_lead_attribution.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -110,6 +114,7 @@ Deno.serve(async (req: Request) => {
   try {
     const entries = (body.entry as Array<Record<string, unknown>>) ?? [];
     let inseridos = 0;
+    const attrCache = createAttributionCache();
 
     for (const entry of entries) {
       const changes = (entry.changes as Array<Record<string, unknown>>) ?? [];
@@ -140,7 +145,7 @@ Deno.serve(async (req: Request) => {
         }
 
         const meta = (cliente.dados_extras as {
-          meta?: { access_token?: string };
+          meta?: { access_token?: string; page_name?: string };
         } | null)?.meta;
         const accessToken = meta?.access_token;
         if (!accessToken) {
@@ -190,6 +195,19 @@ Deno.serve(async (req: Request) => {
         const adId = leadPayload.ad_id ?? value.ad_id ?? null;
         const campaignId = leadPayload.campaign_id ?? value.campaign_id ?? null;
 
+        const attribution = await resolveMetaAttribution(
+          accessToken,
+          GRAPH_VERSION,
+          {
+            ad_id: adId,
+            campaign_id: campaignId,
+            form_id: formId,
+            page_id: String(pageId),
+            page_name: meta?.page_name,
+          },
+          attrCache,
+        );
+
         const { data: already } = await supabase
           .from("leads")
           .select("id")
@@ -206,16 +224,18 @@ Deno.serve(async (req: Request) => {
             email,
             canal: "meta",
             utm_source: "facebook",
-            utm_campaign: campaignId,
+            utm_medium: "paid",
+            utm_campaign: attribution.meta_campaign_name ?? campaignId,
             status: "novo",
             meta_leadgen_id: leadgenId,
-            observacoes: [
-              adId ? `Ad ${adId}` : null,
-              formId ? `form ${formId}` : null,
-              `leadgen ${leadgenId}`,
-            ]
-              .filter(Boolean)
-              .join(" | "),
+            meta_ad_id: attribution.meta_ad_id,
+            meta_ad_name: attribution.meta_ad_name,
+            meta_campaign_id: attribution.meta_campaign_id,
+            meta_campaign_name: attribution.meta_campaign_name,
+            meta_form_id: attribution.meta_form_id,
+            meta_form_name: attribution.meta_form_name,
+            meta_page_id: attribution.meta_page_id,
+            observacoes: null,
           })
           .select("id")
           .single();
@@ -238,8 +258,11 @@ Deno.serve(async (req: Request) => {
             leadgen_id: leadgenId,
             page_id: pageId,
             form_id: formId,
-            ad_id: adId,
-            campaign_id: campaignId,
+            form_name: attribution.meta_form_name,
+            ad_id: attribution.meta_ad_id,
+            ad_name: attribution.meta_ad_name,
+            campaign_id: attribution.meta_campaign_id,
+            campaign_name: attribution.meta_campaign_name,
           },
         });
 

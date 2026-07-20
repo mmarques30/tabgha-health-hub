@@ -339,8 +339,8 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
             <p className="text-sm font-semibold">Diagnóstico estratégico</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {diagPreenchido
-                ? "Preenchido — clique para editar ou regenerar"
-                : "Não preenchido — gere com IA em segundos"}
+                ? "Publicado no portal — envie nova fonte para regenerar"
+                : "Cole a transcrição ou anexe arquivo para gerar e publicar"}
             </p>
           </div>
           <span
@@ -349,7 +349,7 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
               diagPreenchido ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700",
             )}
           >
-            {diagPreenchido ? "Preenchido" : "Pendente"}
+            {diagPreenchido ? "Publicado" : "Pendente"}
           </span>
           <ChevronDown
             className={cn(
@@ -368,6 +368,7 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
 
 // ── DiagnosticoData types ─────────────────────────────────────────────────────
 type DiagnosticoData = {
+  resumo: string;
   perfil: {
     especialidade: string;
     cidade: string;
@@ -385,10 +386,13 @@ type DiagnosticoData = {
   };
   dores: { principais: string; marketing: string; operacional: string };
   concorrentes: string;
-  plano_acao: string;
+  /** Interno Tabgha — sugestões de demanda; NÃO exibir no portal do médico */
+  demandas_sugeridas: string;
+  gerado_em?: string;
 };
 
 const EMPTY_DIAG: DiagnosticoData = {
+  resumo: "",
   perfil: {
     especialidade: "",
     cidade: "",
@@ -406,7 +410,7 @@ const EMPTY_DIAG: DiagnosticoData = {
   },
   dores: { principais: "", marketing: "", operacional: "" },
   concorrentes: "",
-  plano_acao: "",
+  demandas_sugeridas: "",
 };
 
 function parseDiag(raw: unknown): DiagnosticoData {
@@ -424,7 +428,9 @@ function parseDiag(raw: unknown): DiagnosticoData {
     r.dores && typeof r.dores === "object" && !Array.isArray(r.dores)
       ? (r.dores as Record<string, unknown>)
       : {};
+  const demandasRaw = r.demandas_sugeridas ?? r.plano_acao;
   return {
+    resumo: typeof r.resumo === "string" ? r.resumo : "",
     perfil: {
       especialidade: String(perfil.especialidade ?? ""),
       cidade: String(perfil.cidade ?? ""),
@@ -451,15 +457,20 @@ function parseDiag(raw: unknown): DiagnosticoData {
         : Array.isArray(r.concorrentes)
           ? r.concorrentes.join("\n")
           : "",
-    plano_acao:
-      typeof r.plano_acao === "string"
-        ? r.plano_acao
-        : Array.isArray(r.plano_acao)
-          ? r.plano_acao
+    demandas_sugeridas:
+      typeof demandasRaw === "string"
+        ? demandasRaw
+        : Array.isArray(demandasRaw)
+          ? demandasRaw
               .map((a: unknown) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
               .join("\n")
           : "",
+    gerado_em: typeof r.gerado_em === "string" ? r.gerado_em : undefined,
   };
+}
+
+function diagPreenchidoCheck(d: DiagnosticoData) {
+  return Boolean(d.resumo.trim() || d.perfil.especialidade.trim() || d.dores.principais.trim());
 }
 
 type SpeechRecognitionLike = {
@@ -493,10 +504,10 @@ async function invokeDiagnosticoEdge(body: Record<string, unknown>) {
     detail?: string;
     diagnostico?: unknown;
     plano_acao?: string;
+    demandas_sugeridas?: string;
   } | null;
 
   if (error) {
-    // Tenta ler body do FunctionsHttpError (500/400 da edge)
     let fromContext: string | undefined;
     try {
       const ctx = (error as { context?: Response }).context;
@@ -519,6 +530,18 @@ async function invokeDiagnosticoEdge(body: Record<string, unknown>) {
   return payload;
 }
 
+function PreviewField({ label, value }: { label: string; value: string }) {
+  if (!value?.trim()) return null;
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
+      <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">{value}</p>
+    </div>
+  );
+}
+
 // ── Tab: Diagnóstico ──────────────────────────────────────────────────────────
 function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   const qc = useQueryClient();
@@ -526,6 +549,7 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   const [generating, setGenerating] = useState(false);
   const [structuringActions, setStructuringActions] = useState(false);
   const [transcricao, setTranscricao] = useState("");
+  const [fonteUrl, setFonteUrl] = useState("");
   const [genError, setGenError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [acoesError, setAcoesError] = useState<string | null>(null);
@@ -533,20 +557,6 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const notasBrutasRef = useRef("");
   const autoEstruturarRef = useRef(false);
-
-  function setField(sec: keyof DiagnosticoData, key?: string) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setD((prev) => {
-        if (key) return { ...prev, [sec]: { ...(prev[sec] as object), [key]: e.target.value } };
-        return { ...prev, [sec]: e.target.value };
-      });
-    };
-  }
-
-  function get(sec: keyof DiagnosticoData, key?: string): string {
-    if (key) return (d[sec] as Record<string, string>)[key] ?? "";
-    return (d[sec] as string) ?? "";
-  }
 
   function appendNotasBrutas(chunk: string) {
     const text = chunk.trim();
@@ -556,51 +566,49 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
     setNotasBrutas(next);
   }
 
-  async function onTranscriptFile(file: File | null) {
-    if (!file) return;
-    const ok = file.type.startsWith("text/") || /\.(txt|md|markdown|csv|json)$/i.test(file.name);
-    if (!ok) {
-      toast.error("Envie um arquivo de texto (.txt, .md, .csv). PDF/Word em breve.");
-      return;
-    }
-    try {
-      const text = await file.text();
-      setTranscricao((prev) => (prev ? `${prev.trim()}\n\n${text.trim()}` : text.trim()));
-      toast.success(`Arquivo “${file.name}” carregado.`);
-    } catch {
-      toast.error("Não foi possível ler o arquivo.");
-    }
+  async function persistDiagnostico(next: DiagnosticoData) {
+    const toSave = {
+      ...next,
+      plano_acao: next.demandas_sugeridas,
+    };
+    const { error } = await supabase
+      .from("clientes")
+      .update({ diagnostico: toSave as never })
+      .eq("id", cliente.id);
+    if (error) throw error;
+    void qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
+    void qc.invalidateQueries({ queryKey: ["cliente", "diagnostico"] });
   }
 
-  async function gerarComIA() {
+  async function gerarEPublicar(opts?: { transcricaoOverride?: string; urlOverride?: string }) {
+    const fonte = (opts?.transcricaoOverride ?? transcricao).trim();
+    const url = (opts?.urlOverride ?? fonteUrl).trim();
+    if (!fonte && !url) {
+      setGenError("Cole a transcrição, anexe um arquivo ou informe um link HTML.");
+      return;
+    }
     setGenerating(true);
     setGenError(null);
     try {
-      if (!transcricao.trim()) {
-        setGenError(
-          "Cole a transcrição da reunião (ou anexe um .txt/.md) antes de gerar. Assim o diagnóstico fica fiel ao que foi falado.",
-        );
-        return;
-      }
       const payload = await invokeDiagnosticoEdge({
         mode: "diagnostico",
         nome: cliente.nome,
-        especialidade: cliente.especialidade ?? d.perfil.especialidade,
+        especialidade: cliente.especialidade ?? undefined,
         cidade: d.perfil.cidade || undefined,
-        publico_alvo: d.perfil.publico_alvo || undefined,
-        ticket_medio: d.perfil.ticket_medio || undefined,
-        tempo_mercado: d.perfil.tempo_mercado || undefined,
-        diferencial: d.perfil.diferencial || undefined,
-        canais_aquisicao: d.jornada.canais_aquisicao || undefined,
-        transcricao: transcricao.trim(),
-        diagnostico_atual: d,
+        transcricao: fonte || undefined,
+        fonte_url: url || undefined,
       });
-      if (payload?.diagnostico) {
-        setD(parseDiag(payload.diagnostico));
-        toast.success("Diagnóstico gerado a partir da reunião. Revise e salve.");
-      } else {
+      if (!payload?.diagnostico) {
         throw new Error("A IA não retornou o diagnóstico.");
       }
+      const next = {
+        ...parseDiag(payload.diagnostico),
+        demandas_sugeridas: d.demandas_sugeridas,
+        gerado_em: new Date().toISOString(),
+      };
+      setD(next);
+      await persistDiagnostico(next);
+      toast.success("Diagnóstico gerado e publicado no portal do cliente.");
     } catch (e) {
       const msg =
         e instanceof Error
@@ -608,20 +616,36 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
           : "Erro ao gerar diagnóstico. Verifique a ANTHROPIC_API_KEY no Supabase.";
       setGenError(msg);
       toast.error(msg);
-      console.error(e);
     } finally {
       setGenerating(false);
     }
   }
 
-  async function estruturarAcoesComIA(notasOverride?: string) {
-    const notas =
-      notasOverride?.trim() ||
-      notasBrutasRef.current.trim() ||
-      notasBrutas.trim() ||
-      get("plano_acao").trim();
-    if (!notas) {
-      const msg = "Fale ou digite as próximas ações antes de estruturar.";
+  async function onTranscriptFile(file: File | null) {
+    if (!file) return;
+    const ok =
+      file.type.startsWith("text/") ||
+      file.type.includes("html") ||
+      /\.(txt|md|markdown|csv|json|html|htm)$/i.test(file.name);
+    if (!ok) {
+      toast.error("Envie texto ou HTML (.txt, .md, .html). PDF/Word em breve.");
+      return;
+    }
+    try {
+      const text = await file.text();
+      const merged = transcricao ? `${transcricao.trim()}\n\n${text.trim()}` : text.trim();
+      setTranscricao(merged);
+      toast.message(`Arquivo “${file.name}” carregado — gerando diagnóstico…`);
+      await gerarEPublicar({ transcricaoOverride: merged });
+    } catch {
+      toast.error("Não foi possível ler o arquivo.");
+    }
+  }
+
+  async function estruturarDemandasComIA(notasOverride?: string) {
+    const notas = notasOverride?.trim() || notasBrutasRef.current.trim() || notasBrutas.trim();
+    if (!diagPreenchidoCheck(d) && !notas) {
+      const msg = "Gere o diagnóstico antes (ou digite notas) para sugerir demandas.";
       setAcoesError(msg);
       toast.error(msg);
       return;
@@ -634,19 +658,20 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
         nome: cliente.nome,
         especialidade: cliente.especialidade ?? d.perfil.especialidade,
         cidade: d.perfil.cidade || undefined,
-        notas_acoes: notas,
+        notas_acoes: notas || undefined,
+        diagnostico_atual: d,
         transcricao: transcricao.trim() || undefined,
       });
-      if (payload?.plano_acao) {
-        setD((prev) => ({ ...prev, plano_acao: payload.plano_acao! }));
-        setNotasBrutas("");
-        notasBrutasRef.current = "";
-        toast.success("Próximas ações estruturadas com IA. Revise e salve.");
-      } else {
-        throw new Error("A IA não retornou as ações.");
-      }
+      const demandas = payload?.demandas_sugeridas || payload?.plano_acao;
+      if (!demandas) throw new Error("A IA não retornou demandas.");
+      const next = { ...d, demandas_sugeridas: demandas };
+      setD(next);
+      setNotasBrutas("");
+      notasBrutasRef.current = "";
+      await persistDiagnostico(next);
+      toast.success("Sugestões de demanda salvas (só visão Tabgha — não vão ao portal).");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Falha ao estruturar ações.";
+      const msg = e instanceof Error ? e.message : "Falha ao sugerir demandas.";
       setAcoesError(msg);
       toast.error(msg);
     } finally {
@@ -700,10 +725,10 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
         autoEstruturarRef.current = false;
         const notas = notasBrutasRef.current.trim();
         if (notas) {
-          toast.message("Estruturando o que você falou com IA…");
-          void estruturarAcoesComIA(notas);
+          toast.message("Gerando sugestões de demanda…");
+          void estruturarDemandasComIA(notas);
         } else {
-          toast.error("Não captamos áudio. Tente de novo ou digite as ações.");
+          toast.error("Não captamos áudio. Tente de novo ou digite as notas.");
         }
       }
     };
@@ -712,82 +737,73 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
     rec.start();
     setListening(true);
     setAcoesError(null);
-    toast.message("Ouvindo… fale as próximas ações. Ao parar, a IA estrutura automaticamente.");
+    toast.message("Ouvindo… ao parar, sugerimos demandas internas com base no diagnóstico.");
   }
 
-  const save = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from("clientes")
-        .update({ diagnostico: d as any })
-        .eq("id", cliente.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Diagnóstico salvo.");
-      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
-    },
-    onError: (e: Error) => toast.error(e.message || "Erro ao salvar."),
-  });
+  const filled = diagPreenchidoCheck(d);
 
   return (
-    <div className="space-y-4 py-5">
-      {/* ── AI generation: transcrição → diagnóstico ── */}
+    <div className="space-y-5 py-5">
       <div className="space-y-3 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-primary">Gerar diagnóstico com IA</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              Cole a transcrição da reunião (ou anexe um documento de texto). A IA preenche perfil,
-              jornada, dores, concorrentes e plano de ação — você só revisa e salva.
-            </p>
-          </div>
-          <Button
-            onClick={() => void gerarComIA()}
-            disabled={generating}
-            className="shrink-0 gap-2"
-          >
-            {generating ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Gerando…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" />
-                {d.perfil.especialidade ? "Regenerar diagnóstico" : "Gerar diagnóstico"}
-              </>
-            )}
-          </Button>
+        <div>
+          <p className="text-sm font-bold text-primary">Fonte → diagnóstico publicado</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            Cole a transcrição, anexe .txt/.html ou informe um link. A IA gera o diagnóstico
+            consolidado e já publica no portal do médico. Campos manuais redundantes foram
+            removidos.
+          </p>
         </div>
 
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <Label className="flex items-center gap-1.5 text-xs font-semibold">
               <FileText className="h-3.5 w-3.5 text-primary" />
-              Transcrição da reunião
+              Transcrição ou texto
             </Label>
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-secondary/50">
               <Upload className="h-3.5 w-3.5" />
-              Anexar .txt / .md
+              Anexar arquivo
               <input
                 type="file"
-                accept=".txt,.md,.markdown,.csv,text/plain"
+                accept=".txt,.md,.markdown,.csv,.html,.htm,text/plain,text/html"
                 className="hidden"
                 onChange={(e) => void onTranscriptFile(e.target.files?.[0] ?? null)}
               />
             </label>
           </div>
           <Textarea
-            rows={7}
+            rows={6}
             value={transcricao}
             onChange={(e) => setTranscricao(e.target.value)}
-            placeholder="Cole aqui a transcrição do discovery / reunião estratégica com o médico…"
+            placeholder="Cole aqui a transcrição da reunião / discovery…"
             className="resize-y font-mono text-xs leading-relaxed"
           />
-          <p className="text-[11px] text-muted-foreground">
-            Fonte principal da IA. Sem isso, o botão avisa e não inventa diagnóstico genérico.
-          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs font-semibold">Link HTML (opcional)</Label>
+          <Input
+            value={fonteUrl}
+            onChange={(e) => setFonteUrl(e.target.value)}
+            placeholder="https://… página ou export com o conteúdo da reunião"
+            className="text-sm"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => void gerarEPublicar()} disabled={generating} className="gap-2">
+            {generating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Gerando e publicando…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                {filled ? "Regenerar e publicar" : "Gerar e publicar no portal"}
+              </>
+            )}
+          </Button>
         </div>
 
         {genError ? (
@@ -797,275 +813,130 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
         ) : null}
       </div>
 
-      {/* ── Row 1: Perfil + Jornada ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Perfil */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <div className="flex items-center gap-2.5 border-b border-blue-100 bg-blue-50/60 px-5 py-3">
-            <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-blue-700">
-              Perfil do consultório
-            </p>
-          </div>
-          <div className="p-5 grid grid-cols-2 gap-4">
-            <Field label="Especialidade">
-              <Input
-                value={get("perfil", "especialidade")}
-                onChange={setField("perfil", "especialidade")}
-              />
-            </Field>
-            <Field label="Cidade">
-              <Input value={get("perfil", "cidade")} onChange={setField("perfil", "cidade")} />
-            </Field>
-            <Field label="Tempo de mercado">
-              <Input
-                value={get("perfil", "tempo_mercado")}
-                onChange={setField("perfil", "tempo_mercado")}
-              />
-            </Field>
-            <Field label="Ticket médio">
-              <Input
-                value={get("perfil", "ticket_medio")}
-                onChange={setField("perfil", "ticket_medio")}
-              />
-            </Field>
-            <div className="col-span-2">
-              <Field label="Público-alvo">
-                <Textarea
-                  rows={2}
-                  value={get("perfil", "publico_alvo")}
-                  onChange={setField("perfil", "publico_alvo")}
-                />
-              </Field>
+      {filled ? (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-[10.5px] font-bold uppercase tracking-widest text-sky-700">
+                Visão do cliente (publicada)
+              </p>
+              {d.gerado_em ? (
+                <p className="text-[10px] text-muted-foreground">
+                  Gerado em {new Date(d.gerado_em).toLocaleString("pt-BR")}
+                </p>
+              ) : null}
             </div>
-            <div className="col-span-2">
-              <Field label="Diferencial competitivo">
-                <Textarea
-                  rows={2}
-                  value={get("perfil", "diferencial")}
-                  onChange={setField("perfil", "diferencial")}
-                />
-              </Field>
+            {d.resumo ? (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
+                {d.resumo}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Sem resumo narrativo — regenere para consolidar a leitura do médico.
+              </p>
+            )}
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <PreviewField label="Público-alvo" value={d.perfil.publico_alvo} />
+              <PreviewField label="Diferencial" value={d.perfil.diferencial} />
+              <PreviewField label="Canais" value={d.jornada.canais_aquisicao} />
+              <PreviewField label="Funil" value={d.jornada.funil} />
+              <PreviewField label="Dores (paciente)" value={d.dores.principais} />
+              <PreviewField label="Dores (marketing)" value={d.dores.marketing} />
+              <div className="sm:col-span-2">
+                <PreviewField label="Concorrentes & posicionamento" value={d.concorrentes} />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Jornada */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <div className="flex items-center gap-2.5 border-b border-violet-100 bg-violet-50/60 px-5 py-3">
-            <span className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-violet-700">
-              Jornada do paciente
-            </p>
-          </div>
-          <div className="p-5 space-y-4">
-            <Field label="Canais de aquisição">
-              <Input
-                value={get("jornada", "canais_aquisicao")}
-                onChange={setField("jornada", "canais_aquisicao")}
-                placeholder="Meta Ads, Indicação, Orgânico…"
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Taxa agendamento">
-                <Input
-                  value={get("jornada", "taxa_agendamento")}
-                  onChange={setField("jornada", "taxa_agendamento")}
-                  placeholder="ex: 40%"
-                />
-              </Field>
-              <Field label="Taxa conversão">
-                <Input
-                  value={get("jornada", "taxa_conversao")}
-                  onChange={setField("jornada", "taxa_conversao")}
-                  placeholder="ex: 25%"
-                />
-              </Field>
+          <div className="overflow-hidden rounded-2xl border border-amber-200/80 bg-amber-50/40 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/70 px-5 py-3">
+              <div>
+                <p className="text-[10.5px] font-bold uppercase tracking-widest text-amber-800">
+                  Sugestões de demanda (interno Tabgha)
+                </p>
+                <p className="mt-0.5 text-[11px] text-amber-900/70">
+                  Não aparece no portal do médico — use para incluir demandas neste cliente.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={listening ? "destructive" : "default"}
+                  className="gap-1.5"
+                  disabled={structuringActions}
+                  onClick={() => {
+                    if (listening) stopDictation(true);
+                    else startDictation();
+                  }}
+                >
+                  {listening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                  {listening ? "Parar e sugerir" : "Falar notas"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="gap-1.5"
+                  disabled={structuringActions || listening}
+                  onClick={() => void estruturarDemandasComIA()}
+                >
+                  {structuringActions ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  Sugerir a partir do diagnóstico
+                </Button>
+              </div>
             </div>
-            <Field label="Descrição do funil">
+            <div className="space-y-3 p-5">
               <Textarea
                 rows={3}
-                value={get("jornada", "funil")}
-                onChange={setField("jornada", "funil")}
-              />
-            </Field>
-            <Field label="Objeções frequentes">
-              <Textarea
-                rows={3}
-                value={get("jornada", "objecoes")}
-                onChange={setField("jornada", "objecoes")}
-              />
-            </Field>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Row 2: Dores + Concorrentes ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Dores */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <div className="flex items-center gap-2.5 border-b border-rose-100 bg-rose-50/60 px-5 py-3">
-            <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-rose-700">
-              Dores identificadas
-            </p>
-          </div>
-          <div className="p-5 space-y-4">
-            <Field label="Principais dores do paciente">
-              <Textarea
-                rows={3}
-                value={get("dores", "principais")}
-                onChange={setField("dores", "principais")}
-              />
-            </Field>
-            <Field label="Dores de marketing">
-              <Textarea
-                rows={3}
-                value={get("dores", "marketing")}
-                onChange={setField("dores", "marketing")}
-              />
-            </Field>
-            <Field label="Dores operacionais">
-              <Textarea
-                rows={3}
-                value={get("dores", "operacional")}
-                onChange={setField("dores", "operacional")}
-              />
-            </Field>
-          </div>
-        </div>
-
-        {/* Concorrentes */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <div className="flex items-center gap-2.5 border-b border-amber-100 bg-amber-50/60 px-5 py-3">
-            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-amber-700">
-              Concorrentes & posicionamento
-            </p>
-          </div>
-          <div className="p-5">
-            <Field label="Cenário competitivo e estratégia de diferenciação">
-              <Textarea
-                rows={11}
-                value={get("concorrentes")}
-                onChange={setField("concorrentes")}
-                className="resize-none"
-              />
-            </Field>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Row 3: Próximas ações — falar → estruturar com IA ── */}
-      <div
-        className="overflow-hidden rounded-2xl border border-primary/20 shadow-[0_2px_8px_rgba(26,95,173,0.10)]"
-        style={{
-          background: "linear-gradient(135deg, rgba(26,95,173,0.04) 0%, rgba(26,95,173,0.01) 100%)",
-        }}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/15 bg-primary/8 px-5 py-3">
-          <div className="flex items-center gap-2.5">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-primary">
-              Próximas ações — 90 dias
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={listening ? "destructive" : "default"}
-              className="gap-1.5"
-              disabled={structuringActions}
-              onClick={() => {
-                if (listening) stopDictation(true);
-                else startDictation();
-              }}
-            >
-              {listening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-              {listening ? "Parar e estruturar com IA" : "Falar ações"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              className="gap-1.5"
-              disabled={structuringActions || listening}
-              onClick={() => void estruturarAcoesComIA()}
-            >
-              {structuringActions ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5" />
-              )}
-              Estruturar com IA
-            </Button>
-          </div>
-        </div>
-        <div className="space-y-4 p-5">
-          <div className="space-y-2">
-            <Field label="1. Fale ou digite as ações em bruto (como você pensa)">
-              <Textarea
-                rows={4}
                 value={notasBrutas}
                 onChange={(e) => {
                   setNotasBrutas(e.target.value);
                   notasBrutasRef.current = e.target.value;
                 }}
-                placeholder="Ex.: preciso subir campanha de joelho, revisar WhatsApp, alinhar conteúdo com o doutor…"
+                placeholder="Notas opcionais da equipe (ex.: priorizar joelho, revisar WhatsApp)…"
                 className="resize-none text-sm"
               />
-            </Field>
-            <p className="text-[11px] text-muted-foreground">
-              Clique em <strong>Falar ações</strong> (Chrome/Edge). Ao parar, a IA estrutura
-              sozinha. Ou digite e clique em <strong>Estruturar com IA</strong>.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Field label="2. Ações estruturadas (resultado da IA — revise e salve)">
               <Textarea
                 rows={6}
-                value={get("plano_acao")}
-                onChange={setField("plano_acao")}
-                placeholder={"1. Criar campanha Meta — 2 semanas — Tabgha\n2. …"}
+                value={d.demandas_sugeridas}
+                onChange={(e) => setD((prev) => ({ ...prev, demandas_sugeridas: e.target.value }))}
+                placeholder={"1. …\n2. …"}
                 className="resize-none font-mono text-sm"
               />
-            </Field>
-          </div>
-
-          {listening ? (
-            <p className="animate-pulse text-xs font-medium text-rose-700">
-              Gravando… fale as próximas ações deste cliente.
-            </p>
-          ) : null}
-          {structuringActions ? (
-            <p className="animate-pulse text-xs font-medium text-primary">Estruturando com IA…</p>
-          ) : null}
-          {acoesError ? (
-            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {acoesError}
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => {
+                  void persistDiagnostico(d)
+                    .then(() => toast.success("Demandas internas atualizadas."))
+                    .catch((err: Error) => toast.error(err.message));
+                }}
+              >
+                <Save className="h-3.5 w-3.5" />
+                Salvar demandas
+              </Button>
+              {listening ? (
+                <p className="animate-pulse text-xs font-medium text-rose-700">Gravando…</p>
+              ) : null}
+              {acoesError ? (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {acoesError}
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          </div>
         </div>
-      </div>
-
-      {/* ── Save bar ── */}
-      <div className="flex items-center gap-3 border-t border-border pt-4">
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
-          {save.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="mr-2 h-4 w-4" />
-          )}
-          Salvar diagnóstico
-        </Button>
-        {generating && (
-          <p className="text-xs text-muted-foreground animate-pulse">
-            Claude está analisando os dados…
-          </p>
-        )}
-      </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+          Ainda sem diagnóstico publicado. Envie a fonte acima para gerar.
+        </p>
+      )}
     </div>
   );
 }

@@ -73,6 +73,8 @@ export function CreateLeadDialog({
     onSuccess: (lead) => {
       toast.success("Lead criado — abrindo detalhes.");
       void queryClient.invalidateQueries({ queryKey: ["leads-kanban"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "cliente"] });
+      void queryClient.invalidateQueries({ queryKey: ["cliente", "pacientes"] });
       reset();
       onClose();
       onCreated?.(lead);

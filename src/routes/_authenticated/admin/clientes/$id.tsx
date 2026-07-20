@@ -14,6 +14,7 @@ import {
   MicOff,
   FileText,
   Upload,
+  UserPlus,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -54,6 +55,9 @@ import { cn } from "@/lib/utils";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { WhatsappConnectCard } from "@/components/whatsapp/WhatsappConnectCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
+import { LeadDetailDialog } from "@/components/crm/LeadDetailDialog";
+import type { Lead as CrmLead } from "@/hooks/useLeads";
 
 export const Route = createFileRoute("/_authenticated/admin/clientes/$id")({
   component: ClienteFichaPage,
@@ -974,6 +978,9 @@ const LEADS_PIPELINE = [
 ] as const;
 
 function TabLeads({ clienteId }: { clienteId: string }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["admin", "cliente", clienteId, "leads"],
     staleTime: 30_000,
@@ -984,20 +991,16 @@ function TabLeads({ clienteId }: { clienteId: string }) {
         .eq("cliente_id", clienteId)
         .order("criado_em", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as CrmLead[];
     },
   });
+
+  const selected = selectedId ? (leads.find((l) => l.id === selectedId) ?? null) : null;
 
   if (isLoading)
     return (
       <div className="flex justify-center py-12">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  if (leads.length === 0)
-    return (
-      <div className="py-8">
-        <EmptyState title="Nenhum lead" description="Leads chegam via Meta Ads e WhatsApp." />
       </div>
     );
 
@@ -1011,11 +1014,22 @@ function TabLeads({ clienteId }: { clienteId: string }) {
   return (
     <div className="py-5">
       <div className="mb-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">{leads.length} leads</span>
-          <span className="text-xs text-muted-foreground">
-            — {leads.filter((l) => l.status === "convertido").length} convertidos
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">{leads.length} leads</span>
+            <span className="text-xs text-muted-foreground">
+              — {leads.filter((l) => l.status === "convertido").length} convertidos
+            </span>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="rounded-xl"
+            onClick={() => setShowCreate(true)}
+          >
+            <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+            Novo lead
+          </Button>
         </div>
         {funnelStats.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -1032,46 +1046,74 @@ function TabLeads({ clienteId }: { clienteId: string }) {
             ))}
           </div>
         )}
+        <p className="text-[11px] text-muted-foreground">
+          Clique em um lead para ver, editar, anotar ou excluir.
+        </p>
       </div>
-      <div className="rounded-xl border border-border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-secondary/60 text-[10.5px] uppercase tracking-wide text-muted-foreground">
-              {["Nome", "Contato", "Canal", "Status", "Data"].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left font-semibold">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {leads.map((l) => (
-              <tr key={l.id} className="hover:bg-secondary/30 transition-colors">
-                <td className="px-4 py-2.5 font-medium">{l.nome ?? "Sem nome"}</td>
-                <td className="px-4 py-2.5 text-muted-foreground text-xs">
-                  {l.telefone ?? l.email ?? "—"}
-                </td>
-                <td className="px-4 py-2.5 text-muted-foreground text-xs capitalize">
-                  {l.canal ?? "—"}
-                </td>
-                <td className="px-4 py-2.5">
-                  <span
-                    className={cn(
-                      "rounded-full px-2.5 py-0.5 text-[11px] font-medium",
-                      STATUS_BADGE[l.status] ?? "bg-slate-100 text-slate-600",
-                    )}
-                  >
-                    {STATUS_LABELS[l.status] ?? l.status}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-muted-foreground text-xs">
-                  {format(new Date(l.criado_em), "dd MMM yyyy", { locale: ptBR })}
-                </td>
+
+      {leads.length === 0 ? (
+        <div className="py-4">
+          <EmptyState
+            title="Nenhum lead"
+            description="Cadastre manualmente ou importe via Meta Ads / WhatsApp."
+          />
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-secondary/60 text-[10.5px] uppercase tracking-wide text-muted-foreground">
+                {["Nome", "Contato", "Canal", "Status", "Data"].map((h) => (
+                  <th key={h} className="px-4 py-2.5 text-left font-semibold">
+                    {h}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {leads.map((l) => (
+                <tr
+                  key={l.id}
+                  className="cursor-pointer transition-colors hover:bg-sky-50/70"
+                  onClick={() => setSelectedId(l.id)}
+                >
+                  <td className="px-4 py-2.5 font-medium text-sky-900">{l.nome ?? "Sem nome"}</td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    {l.telefone ?? l.email ?? "—"}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs capitalize text-muted-foreground">
+                    {l.canal ?? "—"}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span
+                      className={cn(
+                        "rounded-full px-2.5 py-0.5 text-[11px] font-medium",
+                        STATUS_BADGE[l.status] ?? "bg-slate-100 text-slate-600",
+                      )}
+                    >
+                      {STATUS_LABELS[l.status] ?? l.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    {format(new Date(l.criado_em), "dd MMM yyyy", { locale: ptBR })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {selected ? (
+        <LeadDetailDialog lead={selected} onClose={() => setSelectedId(null)} />
+      ) : null}
+
+      <CreateLeadDialog
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        clienteId={clienteId}
+        onCreated={(lead) => setSelectedId(lead.id)}
+      />
     </div>
   );
 }

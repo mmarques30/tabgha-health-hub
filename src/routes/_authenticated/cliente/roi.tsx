@@ -5,6 +5,8 @@ import { ArrowRight, Loader2, TrendingUp } from "lucide-react";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -302,6 +304,8 @@ function RoiPage() {
                 ))}
               </div>
 
+              <InsightStack items={[...campaignInsights, ...funnelInsights].slice(0, 3)} />
+
               <div className="grid gap-4 lg:grid-cols-2">
                 <Panel title="Investimento × Leads" subtitle={`Últimos ${periodo} dias`} tone="soft">
                   {chartData.length === 0 ? (
@@ -390,6 +394,55 @@ function RoiPage() {
                   <FunnelBars stages={funnel} />
                 </Panel>
               </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Panel
+                  title="Budget por campanha"
+                  subtitle="Onde o investimento está concentrado"
+                  tone="soft"
+                >
+                  {campaignSpendChart.length === 0 ? (
+                    <p className="py-10 text-center text-sm text-muted-foreground">
+                      Sem campanhas no período
+                    </p>
+                  ) : (
+                    <RankedBarChart
+                      data={campaignSpendChart}
+                      formatValue={(v) => fmtMoneyCompact(v)}
+                      color={["#0369a1", "#0284c7", "#0ea5e9", "#38bdf8"]}
+                    />
+                  )}
+                </Panel>
+                <Panel title="Leads por campanha" subtitle="Quem está trazendo gente">
+                  {campaignLeadsChart.length === 0 ? (
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,27,53,0.06)" />
+                          <XAxis
+                            dataKey="data"
+                            tick={{ fontSize: 10 }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                          <Tooltip />
+                          <Bar dataKey="leads" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <RankedBarChart
+                      data={campaignLeadsChart}
+                      color={["#0f766e", "#14b8a6", "#2dd4bf", "#5eead4"]}
+                    />
+                  )}
+                </Panel>
+              </div>
+
+              <Panel title="Status dos leads" subtitle="Onde cada oportunidade está agora">
+                <StatusChips items={statusBreakdown} />
+              </Panel>
 
               <Panel title="Registros do período" subtitle="Linhas de mídia (nível campanha)">
                 <div className="overflow-x-auto">

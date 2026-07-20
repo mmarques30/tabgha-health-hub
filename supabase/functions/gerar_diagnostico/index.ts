@@ -1,7 +1,6 @@
 // Edge Function: gerar_diagnostico
-// Prioriza a TRANSCRIÇÃO da reunião (texto/documento). Sem transcrição, usa dados do cadastro.
-// mode=diagnostico → preenche o JSON do diagnóstico
-// mode=acoes → transforma fala/notas em plano de ação numerado
+// mode=diagnostico → diagnóstico consolidado (visível ao cliente; sem plano/demandas)
+// mode=acoes → sugestões internas de demanda (NÃO publicar no portal do médico)
 // Requer ANTHROPIC_API_KEY no ambiente Supabase.
 
 // @ts-expect-error Deno global
@@ -21,6 +20,34 @@ function json(body: unknown, status = 200) {
 
 function stripFences(raw: string) {
   return raw.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+}
+
+function stripHtml(html: string) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function fetchFonteUrl(url: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: { "User-Agent": "TabghaDiagnosticoBot/1.0" },
+  });
+  if (!res.ok) {
+    throw new Error(`Não foi possível abrir o link (${res.status}).`);
+  }
+  const ctype = res.headers.get("content-type") ?? "";
+  const raw = await res.text();
+  if (ctype.includes("html") || raw.trimStart().startsWith("<")) {
+    return stripHtml(raw);
+  }
+  return raw.trim();
 }
 
 async function callClaude(prompt: string, maxTokens = 4096) {
@@ -66,6 +93,7 @@ Deno.serve(async (req: Request) => {
     diferencial?: string;
     canais_aquisicao?: string;
     transcricao?: string;
+    fonte_url?: string;
     notas_acoes?: string;
     diagnostico_atual?: Record<string, unknown>;
   };
@@ -77,92 +105,135 @@ Deno.serve(async (req: Request) => {
   }
 
   const mode = body.mode === "acoes" ? "acoes" : "diagnostico";
-  const transcricao = body.transcricao?.trim() ?? "";
+  let transcricao = body.transcricao?.trim() ?? "";
   const notasAcoes = body.notas_acoes?.trim() ?? "";
+  const fonteUrl = body.fonte_url?.trim() ?? "";
 
   try {
-    if (mode === "acoes") {
-      const fonte = notasAcoes || transcricao;
-      if (!fonte) {
+    if (fonteUrl) {
+      try {
+        const fetched = await fetchFonteUrl(fonteUrl);
+        if (fetched) {
+          transcricao = transcricao
+            ? `${transcricao}\n\n--- Conteúdo do link ---\n${fetched}`
+            : fetched;
+        }
+      } catch (e) {
         return json(
-          { error: "Cole ou dite as próximas ações (texto/áudio transcrito) para estruturar." },
+          { error: e instanceof Error ? e.message : "Falha ao ler o link HTML." },
+          400,
+        );
+      }
+    }
+
+    if (mode === "acoes") {
+      const diag = body.diagnostico_atual ?? {};
+      const resumo =
+        typeof diag.resumo === "string" ? diag.resumo : "";
+      const fonte = notasAcoes || transcricao;
+      if (!fonte && !resumo) {
+        return json(
+          {
+            error:
+              "Gere o diagnóstico primeiro (ou cole notas) para sugerir demandas internas.",
+          },
           400,
         );
       }
 
-      const prompt = `Você é estrategista de marketing para clínicas de saúde da Tabgha.
-Transforme as notas abaixo em um PLANO DE AÇÃO claro para a clínica "${body.nome ?? "cliente"}".
+      const prompt = `Você é estrategista de marketing da Tabgha (agência).
+Com base no DIAGNÓSTICO do cliente "${body.nome ?? "cliente"}", sugira DEMANDAS INTERNAS para a operação Tabgha incluir no backlog deste cliente.
 
-REGRAS:
-- Retorne SOMENTE um JSON válido: { "plano_acao": "string" }
-- plano_acao = lista numerada (1. 2. 3. …), uma ação por linha
-- Cada linha: ação concreta + prazo sugerido (ex.: "2 semanas") + quem executa se der para inferir (Tabgha / clínica)
-- Máximo 8 ações; priorize o que foi falado; não invente campanhas fora do contexto
-- Linguagem direta em português do Brasil
+IMPORTANTE:
+- Isso NÃO é um plano mostrado ao médico
+- São sugestões de trabalho/demanda para a equipe Tabgha
+- Retorne SOMENTE JSON: { "demandas_sugeridas": "string" }
+- demandas_sugeridas = lista numerada (1. 2. 3. …), máx. 8 itens
+- Cada item: demanda concreta + prazo sugerido + responsável (Tabgha / clínica) se fizer sentido
+- Priorize o diagnóstico; use as notas extras só como complemento
+- Português do Brasil, direto
 
-NOTAS / FALA / TRANSCRIÇÃO:
+DIAGNÓSTICO (resumo e contexto):
 """
-${fonte.slice(0, 60000)}
+${resumo.slice(0, 12000)}
 """
 
-DADOS DO CLIENTE (contexto):
-- Especialidade: ${body.especialidade ?? "não informada"}
-- Cidade: ${body.cidade ?? "não informada"}`;
+JSON do diagnóstico (trechos):
+${JSON.stringify(diag).slice(0, 20000)}
+
+NOTAS EXTRAS / FALA DA EQUIPE:
+"""
+${(fonte || "—").slice(0, 20000)}
+"""
+
+Especialidade: ${body.especialidade ?? "não informada"}
+Cidade: ${body.cidade ?? "não informada"}`;
 
       const raw = await callClaude(prompt, 2048);
-      let parsed: { plano_acao?: string };
+      let parsed: { demandas_sugeridas?: string; plano_acao?: string };
       try {
         parsed = JSON.parse(stripFences(raw));
       } catch {
         return json({ error: "Resposta Claude não é JSON válido.", raw }, 502);
       }
-      if (!parsed.plano_acao) {
-        return json({ error: "Claude não retornou plano_acao.", raw }, 502);
+      const demandas = parsed.demandas_sugeridas || parsed.plano_acao;
+      if (!demandas) {
+        return json({ error: "Claude não retornou demandas_sugeridas.", raw }, 502);
       }
-      return json({ plano_acao: parsed.plano_acao });
+      return json({ demandas_sugeridas: demandas, plano_acao: demandas });
     }
 
-    // ── Diagnóstico completo ──
-    const prompt = `Você é um especialista em marketing para saúde (agência Tabgha).
-Sua missão: preencher o DIAGNÓSTICO ESTRATÉGICO do consultório com base principalmente na TRANSCRIÇÃO da reunião de discovery/estratégia. Os campos do cadastro são só complemento.
+    // ── Diagnóstico consolidado (portal do cliente) ──
+    if (!transcricao) {
+      return json(
+        {
+          error:
+            "Cole a transcrição, anexe um arquivo ou informe um link HTML antes de gerar.",
+        },
+        400,
+      );
+    }
 
-${
-  transcricao
-    ? `TRANSCRIÇÃO DA REUNIÃO (fonte principal — use fatos ditos aqui):
+    const prompt = `Você é especialista em marketing para saúde (agência Tabgha).
+Gere um DIAGNÓSTICO ESTRATÉGICO CONSOLIDADO do consultório, pronto para o MÉDICO ler no portal.
+Fonte principal: TRANSCRIÇÃO / documento / conteúdo do link.
+Cadastro é só complemento.
+
+TRANSCRIÇÃO / FONTE:
 """
 ${transcricao.slice(0, 80000)}
-"""`
-    : `AVISO: não há transcrição. Infira com cuidado a partir dos dados cadastrais e marque hipóteses de forma explícita quando inventar benchmarks.`
-}
+"""
 
-DADOS CADASTRAIS (complemento):
+DADOS CADASTRAIS:
 - Nome/Clínica: ${body.nome ?? "não informado"}
 - Especialidade: ${body.especialidade ?? "não informada"}
 - Cidade: ${body.cidade ?? "não informada"}
-- Público-alvo (já preenchido): ${body.publico_alvo ?? "—"}
+- Público-alvo: ${body.publico_alvo ?? "—"}
 - Ticket médio: ${body.ticket_medio ?? "—"}
 - Tempo de mercado: ${body.tempo_mercado ?? "—"}
-- Diferencial declarado: ${body.diferencial ?? "—"}
-- Canais atuais: ${body.canais_aquisicao ?? "—"}
+- Diferencial: ${body.diferencial ?? "—"}
+- Canais: ${body.canais_aquisicao ?? "—"}
 
 REGRAS:
-- Prefira o que a reunião disse; não contradiga a transcrição
-- Se algo não foi dito, escreva "Não mencionado na reunião — sugerido: …" em vez de inventar como fato
-- Linguagem direta, acionável, sem jargão vazio
-- Retorne SOMENTE um JSON válido (sem markdown) com exatamente esta estrutura:
+- Prefira o que a reunião/documento disse; não contradiga a fonte
+- Se algo não foi dito: "Não mencionado — sugerido: …"
+- Linguagem clara para o médico (sem jargão de agência)
+- NÃO inclua plano de ação nem demandas internas da Tabgha neste JSON
+- Retorne SOMENTE JSON válido:
 {
+  "resumo": "string — 2 a 4 parágrafos consolidados: situação atual, oportunidades e foco estratégico (o médico lê isto primeiro)",
   "perfil": {
     "especialidade": "string",
     "cidade": "string",
     "tempo_mercado": "string",
-    "publico_alvo": "string — avatar do paciente ideal",
+    "publico_alvo": "string",
     "ticket_medio": "string",
-    "diferencial": "string — diferencial real, específico"
+    "diferencial": "string"
   },
   "jornada": {
     "canais_aquisicao": "string",
-    "funil": "string — da descoberta à consulta",
-    "objecoes": "string — 3-5 objeções",
+    "funil": "string",
+    "objecoes": "string",
     "taxa_agendamento": "string",
     "taxa_conversao": "string"
   },
@@ -171,8 +242,7 @@ REGRAS:
     "marketing": "string",
     "operacional": "string"
   },
-  "concorrentes": "string",
-  "plano_acao": "string — 5 ações prioritárias 90 dias, numeradas, com prazo"
+  "concorrentes": "string"
 }`;
 
     const raw = await callClaude(prompt, 4096);
@@ -183,15 +253,12 @@ REGRAS:
       return json({ error: "Resposta Claude não é JSON válido.", raw }, 502);
     }
 
-    return json({ diagnostico });
+    return json({ diagnostico, fonte_chars: transcricao.length });
   } catch (e) {
     if (e && typeof e === "object" && "status" in e && "body" in e) {
       const err = e as { status: number; body: unknown };
       return json(err.body, err.status);
     }
-    return json(
-      { error: e instanceof Error ? e.message : String(e) },
-      500,
-    );
+    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
 });

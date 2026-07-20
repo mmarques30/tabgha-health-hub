@@ -53,6 +53,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { WhatsappConnectCard } from "@/components/whatsapp/WhatsappConnectCard";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export const Route = createFileRoute("/_authenticated/admin/clientes/$id")({
   component: ClienteFichaPage,
@@ -339,8 +340,8 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
             <p className="text-sm font-semibold">Diagnóstico estratégico</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {diagPreenchido
-                ? "Preenchido — clique para editar ou regenerar"
-                : "Não preenchido — gere com IA em segundos"}
+                ? "Publicado no portal — envie nova fonte para regenerar"
+                : "Cole a transcrição ou anexe arquivo para gerar e publicar"}
             </p>
           </div>
           <span
@@ -349,7 +350,7 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
               diagPreenchido ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700",
             )}
           >
-            {diagPreenchido ? "Preenchido" : "Pendente"}
+            {diagPreenchido ? "Publicado" : "Pendente"}
           </span>
           <ChevronDown
             className={cn(
@@ -368,6 +369,7 @@ function TabCadastro({ cliente }: { cliente: Cliente }) {
 
 // ── DiagnosticoData types ─────────────────────────────────────────────────────
 type DiagnosticoData = {
+  resumo: string;
   perfil: {
     especialidade: string;
     cidade: string;
@@ -385,10 +387,13 @@ type DiagnosticoData = {
   };
   dores: { principais: string; marketing: string; operacional: string };
   concorrentes: string;
-  plano_acao: string;
+  /** Interno Tabgha — sugestões de demanda; NÃO exibir no portal do médico */
+  demandas_sugeridas: string;
+  gerado_em?: string;
 };
 
 const EMPTY_DIAG: DiagnosticoData = {
+  resumo: "",
   perfil: {
     especialidade: "",
     cidade: "",
@@ -406,7 +411,7 @@ const EMPTY_DIAG: DiagnosticoData = {
   },
   dores: { principais: "", marketing: "", operacional: "" },
   concorrentes: "",
-  plano_acao: "",
+  demandas_sugeridas: "",
 };
 
 function parseDiag(raw: unknown): DiagnosticoData {
@@ -424,7 +429,9 @@ function parseDiag(raw: unknown): DiagnosticoData {
     r.dores && typeof r.dores === "object" && !Array.isArray(r.dores)
       ? (r.dores as Record<string, unknown>)
       : {};
+  const demandasRaw = r.demandas_sugeridas ?? r.plano_acao;
   return {
+    resumo: typeof r.resumo === "string" ? r.resumo : "",
     perfil: {
       especialidade: String(perfil.especialidade ?? ""),
       cidade: String(perfil.cidade ?? ""),
@@ -451,15 +458,20 @@ function parseDiag(raw: unknown): DiagnosticoData {
         : Array.isArray(r.concorrentes)
           ? r.concorrentes.join("\n")
           : "",
-    plano_acao:
-      typeof r.plano_acao === "string"
-        ? r.plano_acao
-        : Array.isArray(r.plano_acao)
-          ? r.plano_acao
+    demandas_sugeridas:
+      typeof demandasRaw === "string"
+        ? demandasRaw
+        : Array.isArray(demandasRaw)
+          ? demandasRaw
               .map((a: unknown) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
               .join("\n")
           : "",
+    gerado_em: typeof r.gerado_em === "string" ? r.gerado_em : undefined,
   };
+}
+
+function diagPreenchidoCheck(d: DiagnosticoData) {
+  return Boolean(d.resumo.trim() || d.perfil.especialidade.trim() || d.dores.principais.trim());
 }
 
 type SpeechRecognitionLike = {
@@ -493,10 +505,10 @@ async function invokeDiagnosticoEdge(body: Record<string, unknown>) {
     detail?: string;
     diagnostico?: unknown;
     plano_acao?: string;
+    demandas_sugeridas?: string;
   } | null;
 
   if (error) {
-    // Tenta ler body do FunctionsHttpError (500/400 da edge)
     let fromContext: string | undefined;
     try {
       const ctx = (error as { context?: Response }).context;
@@ -519,6 +531,18 @@ async function invokeDiagnosticoEdge(body: Record<string, unknown>) {
   return payload;
 }
 
+function PreviewField({ label, value }: { label: string; value: string }) {
+  if (!value?.trim()) return null;
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
+      <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">{value}</p>
+    </div>
+  );
+}
+
 // ── Tab: Diagnóstico ──────────────────────────────────────────────────────────
 function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   const qc = useQueryClient();
@@ -526,6 +550,7 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   const [generating, setGenerating] = useState(false);
   const [structuringActions, setStructuringActions] = useState(false);
   const [transcricao, setTranscricao] = useState("");
+  const [fonteUrl, setFonteUrl] = useState("");
   const [genError, setGenError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [acoesError, setAcoesError] = useState<string | null>(null);
@@ -533,20 +558,6 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const notasBrutasRef = useRef("");
   const autoEstruturarRef = useRef(false);
-
-  function setField(sec: keyof DiagnosticoData, key?: string) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setD((prev) => {
-        if (key) return { ...prev, [sec]: { ...(prev[sec] as object), [key]: e.target.value } };
-        return { ...prev, [sec]: e.target.value };
-      });
-    };
-  }
-
-  function get(sec: keyof DiagnosticoData, key?: string): string {
-    if (key) return (d[sec] as Record<string, string>)[key] ?? "";
-    return (d[sec] as string) ?? "";
-  }
 
   function appendNotasBrutas(chunk: string) {
     const text = chunk.trim();
@@ -556,51 +567,49 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
     setNotasBrutas(next);
   }
 
-  async function onTranscriptFile(file: File | null) {
-    if (!file) return;
-    const ok = file.type.startsWith("text/") || /\.(txt|md|markdown|csv|json)$/i.test(file.name);
-    if (!ok) {
-      toast.error("Envie um arquivo de texto (.txt, .md, .csv). PDF/Word em breve.");
-      return;
-    }
-    try {
-      const text = await file.text();
-      setTranscricao((prev) => (prev ? `${prev.trim()}\n\n${text.trim()}` : text.trim()));
-      toast.success(`Arquivo “${file.name}” carregado.`);
-    } catch {
-      toast.error("Não foi possível ler o arquivo.");
-    }
+  async function persistDiagnostico(next: DiagnosticoData) {
+    const toSave = {
+      ...next,
+      plano_acao: next.demandas_sugeridas,
+    };
+    const { error } = await supabase
+      .from("clientes")
+      .update({ diagnostico: toSave as never })
+      .eq("id", cliente.id);
+    if (error) throw error;
+    void qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
+    void qc.invalidateQueries({ queryKey: ["cliente", "diagnostico"] });
   }
 
-  async function gerarComIA() {
+  async function gerarEPublicar(opts?: { transcricaoOverride?: string; urlOverride?: string }) {
+    const fonte = (opts?.transcricaoOverride ?? transcricao).trim();
+    const url = (opts?.urlOverride ?? fonteUrl).trim();
+    if (!fonte && !url) {
+      setGenError("Cole a transcrição, anexe um arquivo ou informe um link HTML.");
+      return;
+    }
     setGenerating(true);
     setGenError(null);
     try {
-      if (!transcricao.trim()) {
-        setGenError(
-          "Cole a transcrição da reunião (ou anexe um .txt/.md) antes de gerar. Assim o diagnóstico fica fiel ao que foi falado.",
-        );
-        return;
-      }
       const payload = await invokeDiagnosticoEdge({
         mode: "diagnostico",
         nome: cliente.nome,
-        especialidade: cliente.especialidade ?? d.perfil.especialidade,
+        especialidade: cliente.especialidade ?? undefined,
         cidade: d.perfil.cidade || undefined,
-        publico_alvo: d.perfil.publico_alvo || undefined,
-        ticket_medio: d.perfil.ticket_medio || undefined,
-        tempo_mercado: d.perfil.tempo_mercado || undefined,
-        diferencial: d.perfil.diferencial || undefined,
-        canais_aquisicao: d.jornada.canais_aquisicao || undefined,
-        transcricao: transcricao.trim(),
-        diagnostico_atual: d,
+        transcricao: fonte || undefined,
+        fonte_url: url || undefined,
       });
-      if (payload?.diagnostico) {
-        setD(parseDiag(payload.diagnostico));
-        toast.success("Diagnóstico gerado a partir da reunião. Revise e salve.");
-      } else {
+      if (!payload?.diagnostico) {
         throw new Error("A IA não retornou o diagnóstico.");
       }
+      const next = {
+        ...parseDiag(payload.diagnostico),
+        demandas_sugeridas: d.demandas_sugeridas,
+        gerado_em: new Date().toISOString(),
+      };
+      setD(next);
+      await persistDiagnostico(next);
+      toast.success("Diagnóstico gerado e publicado no portal do cliente.");
     } catch (e) {
       const msg =
         e instanceof Error
@@ -608,20 +617,36 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
           : "Erro ao gerar diagnóstico. Verifique a ANTHROPIC_API_KEY no Supabase.";
       setGenError(msg);
       toast.error(msg);
-      console.error(e);
     } finally {
       setGenerating(false);
     }
   }
 
-  async function estruturarAcoesComIA(notasOverride?: string) {
-    const notas =
-      notasOverride?.trim() ||
-      notasBrutasRef.current.trim() ||
-      notasBrutas.trim() ||
-      get("plano_acao").trim();
-    if (!notas) {
-      const msg = "Fale ou digite as próximas ações antes de estruturar.";
+  async function onTranscriptFile(file: File | null) {
+    if (!file) return;
+    const ok =
+      file.type.startsWith("text/") ||
+      file.type.includes("html") ||
+      /\.(txt|md|markdown|csv|json|html|htm)$/i.test(file.name);
+    if (!ok) {
+      toast.error("Envie texto ou HTML (.txt, .md, .html). PDF/Word em breve.");
+      return;
+    }
+    try {
+      const text = await file.text();
+      const merged = transcricao ? `${transcricao.trim()}\n\n${text.trim()}` : text.trim();
+      setTranscricao(merged);
+      toast.message(`Arquivo “${file.name}” carregado — gerando diagnóstico…`);
+      await gerarEPublicar({ transcricaoOverride: merged });
+    } catch {
+      toast.error("Não foi possível ler o arquivo.");
+    }
+  }
+
+  async function estruturarDemandasComIA(notasOverride?: string) {
+    const notas = notasOverride?.trim() || notasBrutasRef.current.trim() || notasBrutas.trim();
+    if (!diagPreenchidoCheck(d) && !notas) {
+      const msg = "Gere o diagnóstico antes (ou digite notas) para sugerir demandas.";
       setAcoesError(msg);
       toast.error(msg);
       return;
@@ -634,19 +659,20 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
         nome: cliente.nome,
         especialidade: cliente.especialidade ?? d.perfil.especialidade,
         cidade: d.perfil.cidade || undefined,
-        notas_acoes: notas,
+        notas_acoes: notas || undefined,
+        diagnostico_atual: d,
         transcricao: transcricao.trim() || undefined,
       });
-      if (payload?.plano_acao) {
-        setD((prev) => ({ ...prev, plano_acao: payload.plano_acao! }));
-        setNotasBrutas("");
-        notasBrutasRef.current = "";
-        toast.success("Próximas ações estruturadas com IA. Revise e salve.");
-      } else {
-        throw new Error("A IA não retornou as ações.");
-      }
+      const demandas = payload?.demandas_sugeridas || payload?.plano_acao;
+      if (!demandas) throw new Error("A IA não retornou demandas.");
+      const next = { ...d, demandas_sugeridas: demandas };
+      setD(next);
+      setNotasBrutas("");
+      notasBrutasRef.current = "";
+      await persistDiagnostico(next);
+      toast.success("Sugestões de demanda salvas (só visão Tabgha — não vão ao portal).");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Falha ao estruturar ações.";
+      const msg = e instanceof Error ? e.message : "Falha ao sugerir demandas.";
       setAcoesError(msg);
       toast.error(msg);
     } finally {
@@ -700,10 +726,10 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
         autoEstruturarRef.current = false;
         const notas = notasBrutasRef.current.trim();
         if (notas) {
-          toast.message("Estruturando o que você falou com IA…");
-          void estruturarAcoesComIA(notas);
+          toast.message("Gerando sugestões de demanda…");
+          void estruturarDemandasComIA(notas);
         } else {
-          toast.error("Não captamos áudio. Tente de novo ou digite as ações.");
+          toast.error("Não captamos áudio. Tente de novo ou digite as notas.");
         }
       }
     };
@@ -712,82 +738,73 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
     rec.start();
     setListening(true);
     setAcoesError(null);
-    toast.message("Ouvindo… fale as próximas ações. Ao parar, a IA estrutura automaticamente.");
+    toast.message("Ouvindo… ao parar, sugerimos demandas internas com base no diagnóstico.");
   }
 
-  const save = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from("clientes")
-        .update({ diagnostico: d as any })
-        .eq("id", cliente.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Diagnóstico salvo.");
-      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
-    },
-    onError: (e: Error) => toast.error(e.message || "Erro ao salvar."),
-  });
+  const filled = diagPreenchidoCheck(d);
 
   return (
-    <div className="space-y-4 py-5">
-      {/* ── AI generation: transcrição → diagnóstico ── */}
+    <div className="space-y-5 py-5">
       <div className="space-y-3 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-primary">Gerar diagnóstico com IA</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              Cole a transcrição da reunião (ou anexe um documento de texto). A IA preenche perfil,
-              jornada, dores, concorrentes e plano de ação — você só revisa e salva.
-            </p>
-          </div>
-          <Button
-            onClick={() => void gerarComIA()}
-            disabled={generating}
-            className="shrink-0 gap-2"
-          >
-            {generating ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Gerando…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" />
-                {d.perfil.especialidade ? "Regenerar diagnóstico" : "Gerar diagnóstico"}
-              </>
-            )}
-          </Button>
+        <div>
+          <p className="text-sm font-bold text-primary">Fonte → diagnóstico publicado</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            Cole a transcrição, anexe .txt/.html ou informe um link. A IA gera o diagnóstico
+            consolidado e já publica no portal do médico. Campos manuais redundantes foram
+            removidos.
+          </p>
         </div>
 
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <Label className="flex items-center gap-1.5 text-xs font-semibold">
               <FileText className="h-3.5 w-3.5 text-primary" />
-              Transcrição da reunião
+              Transcrição ou texto
             </Label>
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-secondary/50">
               <Upload className="h-3.5 w-3.5" />
-              Anexar .txt / .md
+              Anexar arquivo
               <input
                 type="file"
-                accept=".txt,.md,.markdown,.csv,text/plain"
+                accept=".txt,.md,.markdown,.csv,.html,.htm,text/plain,text/html"
                 className="hidden"
                 onChange={(e) => void onTranscriptFile(e.target.files?.[0] ?? null)}
               />
             </label>
           </div>
           <Textarea
-            rows={7}
+            rows={6}
             value={transcricao}
             onChange={(e) => setTranscricao(e.target.value)}
-            placeholder="Cole aqui a transcrição do discovery / reunião estratégica com o médico…"
+            placeholder="Cole aqui a transcrição da reunião / discovery…"
             className="resize-y font-mono text-xs leading-relaxed"
           />
-          <p className="text-[11px] text-muted-foreground">
-            Fonte principal da IA. Sem isso, o botão avisa e não inventa diagnóstico genérico.
-          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs font-semibold">Link HTML (opcional)</Label>
+          <Input
+            value={fonteUrl}
+            onChange={(e) => setFonteUrl(e.target.value)}
+            placeholder="https://… página ou export com o conteúdo da reunião"
+            className="text-sm"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => void gerarEPublicar()} disabled={generating} className="gap-2">
+            {generating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Gerando e publicando…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                {filled ? "Regenerar e publicar" : "Gerar e publicar no portal"}
+              </>
+            )}
+          </Button>
         </div>
 
         {genError ? (
@@ -797,275 +814,130 @@ function TabDiagnostico({ cliente }: { cliente: Cliente }) {
         ) : null}
       </div>
 
-      {/* ── Row 1: Perfil + Jornada ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Perfil */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <div className="flex items-center gap-2.5 border-b border-blue-100 bg-blue-50/60 px-5 py-3">
-            <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-blue-700">
-              Perfil do consultório
-            </p>
-          </div>
-          <div className="p-5 grid grid-cols-2 gap-4">
-            <Field label="Especialidade">
-              <Input
-                value={get("perfil", "especialidade")}
-                onChange={setField("perfil", "especialidade")}
-              />
-            </Field>
-            <Field label="Cidade">
-              <Input value={get("perfil", "cidade")} onChange={setField("perfil", "cidade")} />
-            </Field>
-            <Field label="Tempo de mercado">
-              <Input
-                value={get("perfil", "tempo_mercado")}
-                onChange={setField("perfil", "tempo_mercado")}
-              />
-            </Field>
-            <Field label="Ticket médio">
-              <Input
-                value={get("perfil", "ticket_medio")}
-                onChange={setField("perfil", "ticket_medio")}
-              />
-            </Field>
-            <div className="col-span-2">
-              <Field label="Público-alvo">
-                <Textarea
-                  rows={2}
-                  value={get("perfil", "publico_alvo")}
-                  onChange={setField("perfil", "publico_alvo")}
-                />
-              </Field>
+      {filled ? (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-[10.5px] font-bold uppercase tracking-widest text-sky-700">
+                Visão do cliente (publicada)
+              </p>
+              {d.gerado_em ? (
+                <p className="text-[10px] text-muted-foreground">
+                  Gerado em {new Date(d.gerado_em).toLocaleString("pt-BR")}
+                </p>
+              ) : null}
             </div>
-            <div className="col-span-2">
-              <Field label="Diferencial competitivo">
-                <Textarea
-                  rows={2}
-                  value={get("perfil", "diferencial")}
-                  onChange={setField("perfil", "diferencial")}
-                />
-              </Field>
+            {d.resumo ? (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
+                {d.resumo}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Sem resumo narrativo — regenere para consolidar a leitura do médico.
+              </p>
+            )}
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <PreviewField label="Público-alvo" value={d.perfil.publico_alvo} />
+              <PreviewField label="Diferencial" value={d.perfil.diferencial} />
+              <PreviewField label="Canais" value={d.jornada.canais_aquisicao} />
+              <PreviewField label="Funil" value={d.jornada.funil} />
+              <PreviewField label="Dores (paciente)" value={d.dores.principais} />
+              <PreviewField label="Dores (marketing)" value={d.dores.marketing} />
+              <div className="sm:col-span-2">
+                <PreviewField label="Concorrentes & posicionamento" value={d.concorrentes} />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Jornada */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <div className="flex items-center gap-2.5 border-b border-violet-100 bg-violet-50/60 px-5 py-3">
-            <span className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-violet-700">
-              Jornada do paciente
-            </p>
-          </div>
-          <div className="p-5 space-y-4">
-            <Field label="Canais de aquisição">
-              <Input
-                value={get("jornada", "canais_aquisicao")}
-                onChange={setField("jornada", "canais_aquisicao")}
-                placeholder="Meta Ads, Indicação, Orgânico…"
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Taxa agendamento">
-                <Input
-                  value={get("jornada", "taxa_agendamento")}
-                  onChange={setField("jornada", "taxa_agendamento")}
-                  placeholder="ex: 40%"
-                />
-              </Field>
-              <Field label="Taxa conversão">
-                <Input
-                  value={get("jornada", "taxa_conversao")}
-                  onChange={setField("jornada", "taxa_conversao")}
-                  placeholder="ex: 25%"
-                />
-              </Field>
+          <div className="overflow-hidden rounded-2xl border border-amber-200/80 bg-amber-50/40 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/70 px-5 py-3">
+              <div>
+                <p className="text-[10.5px] font-bold uppercase tracking-widest text-amber-800">
+                  Sugestões de demanda (interno Tabgha)
+                </p>
+                <p className="mt-0.5 text-[11px] text-amber-900/70">
+                  Não aparece no portal do médico — use para incluir demandas neste cliente.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={listening ? "destructive" : "default"}
+                  className="gap-1.5"
+                  disabled={structuringActions}
+                  onClick={() => {
+                    if (listening) stopDictation(true);
+                    else startDictation();
+                  }}
+                >
+                  {listening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                  {listening ? "Parar e sugerir" : "Falar notas"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="gap-1.5"
+                  disabled={structuringActions || listening}
+                  onClick={() => void estruturarDemandasComIA()}
+                >
+                  {structuringActions ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  Sugerir a partir do diagnóstico
+                </Button>
+              </div>
             </div>
-            <Field label="Descrição do funil">
+            <div className="space-y-3 p-5">
               <Textarea
                 rows={3}
-                value={get("jornada", "funil")}
-                onChange={setField("jornada", "funil")}
-              />
-            </Field>
-            <Field label="Objeções frequentes">
-              <Textarea
-                rows={3}
-                value={get("jornada", "objecoes")}
-                onChange={setField("jornada", "objecoes")}
-              />
-            </Field>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Row 2: Dores + Concorrentes ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Dores */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <div className="flex items-center gap-2.5 border-b border-rose-100 bg-rose-50/60 px-5 py-3">
-            <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-rose-700">
-              Dores identificadas
-            </p>
-          </div>
-          <div className="p-5 space-y-4">
-            <Field label="Principais dores do paciente">
-              <Textarea
-                rows={3}
-                value={get("dores", "principais")}
-                onChange={setField("dores", "principais")}
-              />
-            </Field>
-            <Field label="Dores de marketing">
-              <Textarea
-                rows={3}
-                value={get("dores", "marketing")}
-                onChange={setField("dores", "marketing")}
-              />
-            </Field>
-            <Field label="Dores operacionais">
-              <Textarea
-                rows={3}
-                value={get("dores", "operacional")}
-                onChange={setField("dores", "operacional")}
-              />
-            </Field>
-          </div>
-        </div>
-
-        {/* Concorrentes */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <div className="flex items-center gap-2.5 border-b border-amber-100 bg-amber-50/60 px-5 py-3">
-            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-amber-700">
-              Concorrentes & posicionamento
-            </p>
-          </div>
-          <div className="p-5">
-            <Field label="Cenário competitivo e estratégia de diferenciação">
-              <Textarea
-                rows={11}
-                value={get("concorrentes")}
-                onChange={setField("concorrentes")}
-                className="resize-none"
-              />
-            </Field>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Row 3: Próximas ações — falar → estruturar com IA ── */}
-      <div
-        className="overflow-hidden rounded-2xl border border-primary/20 shadow-[0_2px_8px_rgba(26,95,173,0.10)]"
-        style={{
-          background: "linear-gradient(135deg, rgba(26,95,173,0.04) 0%, rgba(26,95,173,0.01) 100%)",
-        }}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/15 bg-primary/8 px-5 py-3">
-          <div className="flex items-center gap-2.5">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-primary">
-              Próximas ações — 90 dias
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={listening ? "destructive" : "default"}
-              className="gap-1.5"
-              disabled={structuringActions}
-              onClick={() => {
-                if (listening) stopDictation(true);
-                else startDictation();
-              }}
-            >
-              {listening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-              {listening ? "Parar e estruturar com IA" : "Falar ações"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              className="gap-1.5"
-              disabled={structuringActions || listening}
-              onClick={() => void estruturarAcoesComIA()}
-            >
-              {structuringActions ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5" />
-              )}
-              Estruturar com IA
-            </Button>
-          </div>
-        </div>
-        <div className="space-y-4 p-5">
-          <div className="space-y-2">
-            <Field label="1. Fale ou digite as ações em bruto (como você pensa)">
-              <Textarea
-                rows={4}
                 value={notasBrutas}
                 onChange={(e) => {
                   setNotasBrutas(e.target.value);
                   notasBrutasRef.current = e.target.value;
                 }}
-                placeholder="Ex.: preciso subir campanha de joelho, revisar WhatsApp, alinhar conteúdo com o doutor…"
+                placeholder="Notas opcionais da equipe (ex.: priorizar joelho, revisar WhatsApp)…"
                 className="resize-none text-sm"
               />
-            </Field>
-            <p className="text-[11px] text-muted-foreground">
-              Clique em <strong>Falar ações</strong> (Chrome/Edge). Ao parar, a IA estrutura
-              sozinha. Ou digite e clique em <strong>Estruturar com IA</strong>.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Field label="2. Ações estruturadas (resultado da IA — revise e salve)">
               <Textarea
                 rows={6}
-                value={get("plano_acao")}
-                onChange={setField("plano_acao")}
-                placeholder={"1. Criar campanha Meta — 2 semanas — Tabgha\n2. …"}
+                value={d.demandas_sugeridas}
+                onChange={(e) => setD((prev) => ({ ...prev, demandas_sugeridas: e.target.value }))}
+                placeholder={"1. …\n2. …"}
                 className="resize-none font-mono text-sm"
               />
-            </Field>
-          </div>
-
-          {listening ? (
-            <p className="animate-pulse text-xs font-medium text-rose-700">
-              Gravando… fale as próximas ações deste cliente.
-            </p>
-          ) : null}
-          {structuringActions ? (
-            <p className="animate-pulse text-xs font-medium text-primary">Estruturando com IA…</p>
-          ) : null}
-          {acoesError ? (
-            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {acoesError}
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => {
+                  void persistDiagnostico(d)
+                    .then(() => toast.success("Demandas internas atualizadas."))
+                    .catch((err: Error) => toast.error(err.message));
+                }}
+              >
+                <Save className="h-3.5 w-3.5" />
+                Salvar demandas
+              </Button>
+              {listening ? (
+                <p className="animate-pulse text-xs font-medium text-rose-700">Gravando…</p>
+              ) : null}
+              {acoesError ? (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {acoesError}
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          </div>
         </div>
-      </div>
-
-      {/* ── Save bar ── */}
-      <div className="flex items-center gap-3 border-t border-border pt-4">
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
-          {save.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="mr-2 h-4 w-4" />
-          )}
-          Salvar diagnóstico
-        </Button>
-        {generating && (
-          <p className="text-xs text-muted-foreground animate-pulse">
-            Claude está analisando os dados…
-          </p>
-        )}
-      </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+          Ainda sem diagnóstico publicado. Envie a fonte acima para gerar.
+        </p>
+      )}
     </div>
   );
 }
@@ -1346,27 +1218,37 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
   const zapi = (automacoes.zapi ?? {}) as Record<string, unknown>;
 
   const [metodo, setMetodo] = useState(agenteIa.metodo_qualificacao ?? "");
+  const [tom, setTom] = useState(agenteIa.tom ?? "acolhedor, claro e profissional");
+  const [nomeAgente, setNomeAgente] = useState(agenteIa.nome_agente ?? "assistente");
   const [agenteAtivo, setAgenteAtivo] = useState(
     zapi.agente_ativo === true || zapi.agente_ativo === "true",
   );
+  const [jsonOpen, setJsonOpen] = useState(false);
   const [json, setJson] = useState(JSON.stringify(extras, null, 2));
   const [jsonError, setJsonError] = useState("");
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
 
-  const saveMetodo = useMutation({
+  useEffect(() => {
+    setMetodo(agenteIa.metodo_qualificacao ?? "");
+    setTom(agenteIa.tom ?? "acolhedor, claro e profissional");
+    setNomeAgente(agenteIa.nome_agente ?? "assistente");
+    setAgenteAtivo(zapi.agente_ativo === true || zapi.agente_ativo === "true");
+    setJson(JSON.stringify(extras, null, 2));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when cliente payload changes
+  }, [cliente.id, cliente.dados_extras]);
+
+  const saveAgente = useMutation({
     mutationFn: async () => {
-      let base: Record<string, unknown>;
-      try {
-        base = JSON.parse(json);
-      } catch {
-        throw new Error("JSON inválido.");
-      }
+      const base = (cliente.dados_extras ?? {}) as Record<string, unknown>;
       const baseAutomacoes = (base.automacoes ?? {}) as Record<string, unknown>;
       const baseZapi = (baseAutomacoes.zapi ?? {}) as Record<string, unknown>;
       const novoExtras = {
         ...base,
         agente_ia: {
           ...((base.agente_ia as object) ?? {}),
-          metodo_qualificacao: metodo || null,
+          metodo_qualificacao: metodo.trim() || null,
+          tom: tom.trim() || "acolhedor, claro e profissional",
+          nome_agente: nomeAgente.trim() || "assistente",
         },
         automacoes: {
           ...baseAutomacoes,
@@ -1403,8 +1285,8 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
       setJson(JSON.stringify(novoExtras, null, 2));
     },
     onSuccess: () => {
-      toast.success("Agente salvo.");
-      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
+      toast.success("Agente WhatsApp salvo.");
+      void qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
       setJsonError("");
     },
     onError: (e: Error) => {
@@ -1429,7 +1311,7 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
     },
     onSuccess: () => {
       toast.success("JSON salvo.");
-      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
+      void qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
       setJsonError("");
     },
     onError: (e: Error) => {
@@ -1447,7 +1329,7 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("whatsapp_instances")
-        .select("id, instance_id, token, status, dados_extras")
+        .select("id, instance_id, token, status, phone, dados_extras")
         .eq("cliente_id", cliente.id)
         .order("atualizado_em", { ascending: false })
         .limit(1)
@@ -1457,12 +1339,45 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
     },
   });
 
+  const { data: ops } = useQuery({
+    queryKey: ["admin", "cliente", cliente.id, "wpp-ops"],
+    queryFn: async () => {
+      const { data: convs, error } = await supabase
+        .from("whatsapp_conversations")
+        .select("id, bot_score, owner_state")
+        .eq("cliente_id", cliente.id);
+      if (error) throw error;
+      const ids = (convs ?? []).map((c) => c.id);
+      let botMsgs = 0;
+      if (ids.length > 0) {
+        const { count, error: msgErr } = await supabase
+          .from("whatsapp_messages")
+          .select("id", { count: "exact", head: true })
+          .in("conversation_id", ids)
+          .eq("sender_type", "bot");
+        if (msgErr) throw msgErr;
+        botMsgs = count ?? 0;
+      }
+      const scores = (convs ?? [])
+        .map((c) => c.bot_score)
+        .filter((n): n is number => typeof n === "number");
+      const avgScore =
+        scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+      return {
+        conversations: convs?.length ?? 0,
+        botMsgs,
+        avgScore,
+        withBot: (convs ?? []).filter((c) => c.owner_state === "bot").length,
+      };
+    },
+  });
+
   useEffect(() => {
     if (!wppInstance) return;
     setInstanceId(wppInstance.instance_id ?? "");
     setInstanceToken(wppInstance.token ?? "");
-    const extras = (wppInstance.dados_extras ?? {}) as Record<string, string>;
-    setClientToken(extras.client_token ?? "");
+    const ex = (wppInstance.dados_extras ?? {}) as Record<string, string>;
+    setClientToken(ex.client_token ?? "");
   }, [wppInstance]);
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-inbound`;
@@ -1485,6 +1400,7 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
         dados_extras: {
           ...((wppInstance?.dados_extras as object) ?? {}),
           client_token: clientToken.trim() || null,
+          agente_ativo: agenteAtivo,
         },
       };
       if (wppInstance?.id) {
@@ -1499,97 +1415,160 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
       }
     },
     onSuccess: () => {
-      toast.success("Instância WhatsApp salva. Gere o QR ao lado para conectar.");
-      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id, "wpp-instance"] });
-      qc.invalidateQueries({ queryKey: ["whatsapp-connect", cliente.id] });
+      toast.success("Credenciais Z-API salvas. Agora gere o QR e escaneie.");
+      void qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id, "wpp-instance"] });
+      void qc.invalidateQueries({ queryKey: ["whatsapp-connect", cliente.id] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const hasZapiInstance = Boolean(wppInstance?.instance_id && wppInstance?.token);
-  const wppStatus = wppInstance?.status ?? "none";
-  const metaExtras = (extras.meta ?? null) as Record<string, unknown> | null;
-  const hasMeta = Boolean(metaExtras?.page_id || metaExtras?.ad_account_id);
+  const wppConnected = wppInstance?.status === "connected";
+  const agentLive = hasZapiInstance && wppConnected && agenteAtivo;
+
+  const steps = [
+    {
+      ok: hasZapiInstance,
+      label: "1. Credenciais Z-API",
+      detail: hasZapiInstance ? "Instância salva" : "Cole Instance ID + Token (só admin)",
+    },
+    {
+      ok: wppConnected,
+      label: "2. WhatsApp online",
+      detail: wppConnected
+        ? `Conectado${wppInstance?.phone ? ` · ${wppInstance.phone}` : ""}`
+        : "Gerar QR e escanear com o celular do consultório",
+    },
+    {
+      ok: agenteAtivo,
+      label: "3. Agente ligado",
+      detail: agenteAtivo
+        ? "Pietro responde nas conversas do bot"
+        : "Ative o switch e salve o agente",
+    },
+  ];
+
+  async function copyWebhook() {
+    try {
+      await navigator.clipboard.writeText(webhookUrl);
+      setCopiedWebhook(true);
+      toast.success("Webhook copiado.");
+      setTimeout(() => setCopiedWebhook(false), 1500);
+    } catch {
+      toast.error("Não foi possível copiar.");
+    }
+  }
 
   return (
-    <div className="space-y-4 py-5">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-border bg-card px-4 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Meta Ads
+    <div className="space-y-5 py-5">
+      <div>
+        <h3 className="text-base font-semibold tracking-tight">WhatsApp & agente Pietro</h3>
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          Esta aba é só para o canal de atendimento. Meta Ads fica em{" "}
+          <Link
+            to="/admin/config-meta"
+            className="font-medium text-sky-700 underline-offset-2 hover:underline"
+          >
+            Conectar Meta BM
+          </Link>
+          . Depois de conectar, as conversas aparecem em Atendimento; insights e tempo no funil
+          ficam em Leads / ROI.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {steps.map((s) => (
+          <div
+            key={s.label}
+            className={cn(
+              "rounded-xl border px-4 py-3",
+              s.ok ? "border-emerald-200 bg-emerald-50/70" : "border-border bg-card",
+            )}
+          >
+            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              {s.label}
+            </p>
+            <p
+              className={cn("mt-1 text-sm font-medium", s.ok ? "text-emerald-800" : "text-foreground")}
+            >
+              {s.ok ? "Pronto" : "Pendente"}
+            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{s.detail}</p>
+          </div>
+        ))}
+      </div>
+
+      <div
+        className={cn(
+          "rounded-xl border px-4 py-3 text-sm",
+          agentLive
+            ? "border-emerald-200 bg-emerald-50/80 text-emerald-950"
+            : "border-amber-200 bg-amber-50/70 text-amber-950",
+        )}
+      >
+        {agentLive ? (
+          <p>
+            <strong>Agente no ar.</strong> Mensagens novas no WhatsApp entram no Atendimento; o
+            Pietro responde com o tom e a metodologia salvos abaixo, gera score/notas e move o lead
+            no funil quando fizer sentido.
           </p>
-          <p className="mt-1 text-sm font-semibold text-foreground">
-            {hasMeta ? "Conectado (dados reais no JSON)" : "Ainda não conectado"}
+        ) : (
+          <p>
+            <strong>Ainda não está respondendo sozinho.</strong> Complete os 3 passos. Credenciais
+            Z-API fazem sentido (é o provedor real do WhatsApp neste produto) — sem elas o QR não
+            existe.
           </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            {hasMeta
-              ? `Página: ${String(metaExtras?.page_name ?? metaExtras?.page_id ?? "—")}`
-              : "Conecte em Config Meta / Marketing Pago."}
-          </p>
-        </div>
-        <div className="rounded-xl border border-border bg-card px-4 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            WhatsApp / Pietro
-          </p>
-          <p className="mt-1 text-sm font-semibold text-foreground">
-            {!hasZapiInstance
-              ? "Sem instância Z-API"
-              : wppStatus === "connected"
-                ? agenteAtivo
-                  ? "Conectado + agente ligado"
-                  : "Conectado (agente desligado)"
-                : "Instância salva — falta escanear QR"}
-          </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            O agente só responde depois: instância salva → QR conectado → Agente ativo ligado.
-          </p>
+        )}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline" className="h-8">
+            <Link to="/admin/atendimento">Abrir Atendimento</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="h-8">
+            <Link to="/admin/leads" search={{ cliente: cliente.id, periodo: 30, canal: "", q: "" }}>
+              Ver funil de leads
+            </Link>
+          </Button>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-5 py-4 text-sm text-amber-950">
-        <p className="text-[10.5px] font-bold uppercase tracking-widest text-amber-800">
-          Como conectar a automação WhatsApp (é real — não é mock)
-        </p>
-        <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-xs leading-relaxed">
-          <li>
-            Na Z-API, crie/abra a instância do consultório e copie Instance ID + Token (+
-            Client-Token se houver).
-          </li>
-          <li>Cole os dados em “Provisionar Z-API” abaixo e salve.</li>
-          <li>
-            Na Z-API, configure o webhook de recebimento (Receive) para:
-            <code className="mt-1 block break-all rounded-md bg-white/80 px-2 py-1.5 text-[11px] text-slate-800">
-              {webhookUrl}
-            </code>
-          </li>
-          <li>
-            Clique em “Gerar QR Code” no card ao lado e escaneie com o celular do consultório.
-          </li>
-          <li>
-            Ative “Agente ativo”, salve a metodologia — aí o inbound chama o Pietro (
-            <span className="font-mono">ai-respond</span>) nas conversas com o bot.
-          </li>
-        </ol>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Conversas", value: String(ops?.conversations ?? "—") },
+          { label: "Msgs do bot", value: String(ops?.botMsgs ?? "—") },
+          {
+            label: "Score médio IA",
+            value: ops?.avgScore != null ? String(ops.avgScore) : "—",
+          },
+          { label: "Com bot ativo", value: String(ops?.withBot ?? "—") },
+        ].map((kpi) => (
+          <div key={kpi.label} className="rounded-xl border border-border bg-card px-3 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {kpi.label}
+            </p>
+            <p className="mt-1 text-xl font-bold tracking-tight">{kpi.value}</p>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-4">
-          <WhatsappConnectCard clienteId={cliente.id} />
-          <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
-              Provisionar Z-API (admin)
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {hasZapiInstance
-                ? "Instância já salva neste cliente. Atualize só se trocar na Z-API."
-                : "Ainda não há instância neste cliente — por isso o card diz “Aguardando provisionamento”. Isso é o estado real."}
-            </p>
+          <div className="space-y-3 rounded-2xl border border-border bg-card p-5">
+            <div>
+              <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
+                Credenciais Z-API (só Tabgha)
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Passo técnico do admin: cola Instance ID + Token da Z-API deste consultório. O
+                médico só escaneia o QR depois disso.
+              </p>
+            </div>
             <div className="space-y-2">
               <Label>Instance ID</Label>
               <Input
                 value={instanceId}
                 onChange={(e) => setInstanceId(e.target.value)}
-                placeholder="3A..."
+                placeholder="ID da instância na Z-API"
+                autoComplete="off"
               />
             </div>
             <div className="space-y-2">
@@ -1597,16 +1576,33 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
               <Input
                 value={instanceToken}
                 onChange={(e) => setInstanceToken(e.target.value)}
-                placeholder="token da instância"
+                placeholder="Token da instância"
+                autoComplete="off"
               />
             </div>
             <div className="space-y-2">
-              <Label>Client-Token (opcional)</Label>
+              <Label>Client-Token (se a Z-API pedir)</Label>
               <Input
                 value={clientToken}
                 onChange={(e) => setClientToken(e.target.value)}
-                placeholder="security token da conta Z-API"
+                placeholder="Opcional"
+                autoComplete="off"
               />
+            </div>
+            <div className="rounded-lg border border-border bg-secondary/40 px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Webhook Receive (Z-API)
+              </p>
+              <code className="mt-1 block break-all text-[11px] text-foreground">{webhookUrl}</code>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="mt-1 h-7 px-2 text-xs"
+                onClick={() => void copyWebhook()}
+              >
+                {copiedWebhook ? "Copiado" : "Copiar webhook"}
+              </Button>
             </div>
             <Button
               size="sm"
@@ -1619,17 +1615,17 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              Salvar instância
+              Salvar credenciais
             </Button>
           </div>
+
+          <WhatsappConnectCard clienteId={cliente.id} />
         </div>
 
-        {/* ── Método de qualificação ── */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <div className="flex items-center gap-2.5 border-b border-sky-100 bg-sky-50/60 px-5 py-3">
-            <span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="border-b border-sky-100 bg-sky-50/60 px-5 py-3">
             <p className="text-[10.5px] font-bold uppercase tracking-widest text-sky-700">
-              Pietro · Agente WhatsApp
+              Pietro · o que ele fala e como
             </p>
           </div>
           <div className="space-y-3 p-5">
@@ -1637,38 +1633,70 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
               <div>
                 <p className="text-sm font-medium">Agente ativo</p>
                 <p className="text-xs text-muted-foreground">
-                  Só faz efeito com WhatsApp conectado. Liga o Pietro nas conversas do bot.
+                  Com WhatsApp online, o Pietro responde sozinho nas conversas do bot.
                 </p>
               </div>
               <Switch checked={agenteAtivo} onCheckedChange={setAgenteAtivo} />
             </div>
-            {!hasZapiInstance ? (
-              <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
-                Ainda não há instância Z-API. Salvar o agente agora só guarda a configuração — ele{" "}
-                <strong>não</strong> fala no WhatsApp até provisionar + QR.
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="nome-agente">Nome do agente</Label>
+                <Input
+                  id="nome-agente"
+                  value={nomeAgente}
+                  onChange={(e) => setNomeAgente(e.target.value)}
+                  placeholder="assistente"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="tom-agente">Tom / entonação</Label>
+                <Input
+                  id="tom-agente"
+                  value={tom}
+                  onChange={(e) => setTom(e.target.value)}
+                  placeholder="acolhedor, claro e profissional"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-secondary/20 px-3 py-2 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">Como as mensagens nascem</p>
+              <ul className="mt-1 list-disc space-y-1 pl-4">
+                <li>Não é template fixo: o Pietro gera 1–3 frases em português, no tom salvo.</li>
+                <li>Qualifica intenção, urgência, fit e capacidade; não inventa preço/horário.</li>
+                <li>
+                  Em emergência ou pedido de humano, faz handoff para a equipe no Atendimento.
+                </li>
+                <li>
+                  Qualidade aparece como score (0–100) + notas na conversa e no detalhe do lead.
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="metodo-agente">Metodologia de qualificação</Label>
+              <Textarea
+                id="metodo-agente"
+                rows={7}
+                placeholder="Ex.: (1) o que busca (2) urgência (3) fit com a clínica (4) disposição para agendar. Sem interrogatório."
+                value={metodo}
+                onChange={(e) => setMetodo(e.target.value)}
+                className="resize-none text-sm"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Vazio = usa o padrão genérico do Pietro. O placeholder cinza não é dado salvo.
               </p>
-            ) : null}
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Metodologia do Pietro neste cliente. Campo vazio = usa o padrão genérico. O texto
-              cinza no campo é só exemplo (placeholder), não é dado salvo.
-            </p>
-            <Textarea
-              rows={10}
-              placeholder={
-                "Exemplo (não é dado real até você digitar e salvar):\n(1) Urgência — já tem pacientes interessados?\n(2) Volume — quantos atendimentos por semana?\n(3) Disposição — aberto a investir em marketing?\nConduza de forma natural, sem parecer interrogatório."
-              }
-              value={metodo}
-              onChange={(e) => setMetodo(e.target.value)}
-              className="resize-none text-sm"
-            />
-            {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
+            </div>
+
+            {jsonError ? <p className="text-xs text-destructive">{jsonError}</p> : null}
             <Button
               size="sm"
-              onClick={() => saveMetodo.mutate()}
-              disabled={saveMetodo.isPending}
+              onClick={() => saveAgente.mutate()}
+              disabled={saveAgente.isPending}
               className="gap-2"
             >
-              {saveMetodo.isPending ? (
+              {saveAgente.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Save className="h-4 w-4" />
@@ -1679,48 +1707,59 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
         </div>
       </div>
 
-      {/* ── JSON avançado (sempre visível — dados reais do cliente) ── */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-        <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50/60 px-5 py-3">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
-          <p className="text-[10.5px] font-bold uppercase tracking-widest text-slate-600">
-            JSON Avançado
-          </p>
+      <Collapsible open={jsonOpen} onOpenChange={setJsonOpen}>
+        <div className="rounded-2xl border border-border bg-card">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-5 py-3 text-left"
+            >
+              <div>
+                <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Avançado · JSON técnico
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Só para suporte. Prefira os formulários acima.
+                </p>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform",
+                  jsonOpen && "rotate-180",
+                )}
+              />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="space-y-3 border-t border-border px-5 py-4">
+              <Textarea
+                className="resize-none font-mono text-xs"
+                rows={8}
+                value={json}
+                onChange={(e) => {
+                  setJson(e.target.value);
+                  setJsonError("");
+                }}
+              />
+              {jsonError ? <p className="text-xs text-destructive">{jsonError}</p> : null}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => saveJson.mutate()}
+                disabled={saveJson.isPending}
+                className="gap-2"
+              >
+                {saveJson.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Salvar JSON
+              </Button>
+            </div>
+          </CollapsibleContent>
         </div>
-        <div className="space-y-3 p-5">
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Isto <strong className="font-semibold text-foreground">não é inventado</strong>: é o{" "}
-            <span className="font-mono text-[11px]">dados_extras</span> real deste cliente no banco.
-            O bloco <span className="font-mono text-[11px]">meta</span> veio da conexão Meta BM
-            (página DR. Pedro, ad accounts, tokens). WhatsApp / Z-API entra aqui depois de
-            provisionar. Não ocultamos este painel — é a visão técnica da operação.
-          </p>
-          <Textarea
-            className="font-mono text-xs resize-none"
-            rows={8}
-            value={json}
-            onChange={(e) => {
-              setJson(e.target.value);
-              setJsonError("");
-            }}
-          />
-          {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => saveJson.mutate()}
-            disabled={saveJson.isPending}
-            className="gap-2"
-          >
-            {saveJson.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Salvar JSON
-          </Button>
-        </div>
-      </div>
+      </Collapsible>
     </div>
   );
 }

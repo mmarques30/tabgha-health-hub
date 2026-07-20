@@ -8,7 +8,7 @@ import { FunilHeader, KanbanBoard } from "@/components/crm/KanbanBoard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useClientesOptions } from "@/hooks/useClientesOptions";
-import { useLeads } from "@/hooks/useLeads";
+import { useLeads, type Lead } from "@/hooks/useLeads";
 
 export const Route = createFileRoute("/_authenticated/admin/leads")({
   component: AdminLeadsPage,
@@ -27,6 +27,7 @@ function AdminLeadsPage() {
   const { data: clientes = [] } = useClientesOptions();
   const [localSearch, setLocalSearch] = useState(search.q);
   const [showCreate, setShowCreate] = useState(false);
+  const [focusLead, setFocusLead] = useState<Lead | null>(null);
 
   useEffect(() => {
     if (!search.cliente && clientes[0]?.id) {
@@ -133,7 +134,7 @@ function AdminLeadsPage() {
         <div className="flex flex-1 items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : leads.length === 0 ? (
+      ) : leads.length === 0 && !focusLead ? (
         <div className="flex flex-1 items-center justify-center px-6">
           <EmptyState
             icon={<Users className="h-6 w-6" />}
@@ -156,7 +157,12 @@ function AdminLeadsPage() {
               Pipeline
             </p>
             <div className="min-h-0 flex-1">
-              <KanbanBoard leads={leads} isAdmin />
+              <KanbanBoard
+                leads={leads}
+                isAdmin
+                focusLead={focusLead}
+                onFocusLeadConsumed={() => setFocusLead(null)}
+              />
             </div>
           </div>
         </div>
@@ -167,6 +173,7 @@ function AdminLeadsPage() {
           open={showCreate}
           onClose={() => setShowCreate(false)}
           clienteId={search.cliente}
+          onCreated={(lead) => setFocusLead(lead)}
         />
       ) : null}
     </div>

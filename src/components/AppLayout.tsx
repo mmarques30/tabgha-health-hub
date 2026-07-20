@@ -4,7 +4,7 @@ const AssistantBubble = lazy(() =>
 );
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { canSeeNavPermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -393,6 +393,9 @@ function SidebarNav({
   simulatedClientNome,
   onStartSimulation,
   onStopSimulation,
+  canSwitchAreas,
+  activeArea,
+  onSwitchArea,
 }: {
   groups: NavGroup[];
   pathname: string;
@@ -409,6 +412,9 @@ function SidebarNav({
   simulatedClientNome: string | null;
   onStartSimulation: (id: string, nome: string) => void;
   onStopSimulation: () => void;
+  canSwitchAreas: boolean;
+  activeArea: "admin" | "cliente" | null;
+  onSwitchArea: (area: "admin" | "cliente") => void;
 }) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({
@@ -656,6 +662,63 @@ function SidebarNav({
           </div>
         )}
 
+        {/* Dual-role: trocar entre painel admin e portal do consultório */}
+        {canSwitchAreas && !isSimulating && (
+          <div className={cn(collapsed ? "flex flex-col items-center gap-1" : "space-y-1 px-0.5")}>
+            {!collapsed && (
+              <p className="px-2.5 text-[9.5px] font-semibold uppercase tracking-widest text-sidebar-foreground/35">
+                Área
+              </p>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => onSwitchArea("admin")}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md text-[11px] font-medium transition-colors",
+                    collapsed ? "h-8 w-8 justify-center" : "w-full px-2.5 py-2",
+                    activeArea === "admin"
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/50 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                  )}
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                  {!collapsed && <span>Painel Admin</span>}
+                </button>
+              </TooltipTrigger>
+              {collapsed && (
+                <TooltipContent side="right" className="text-xs">
+                  Painel Admin
+                </TooltipContent>
+              )}
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => onSwitchArea("cliente")}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md text-[11px] font-medium transition-colors",
+                    collapsed ? "h-8 w-8 justify-center" : "w-full px-2.5 py-2",
+                    activeArea === "cliente"
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/50 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                  )}
+                >
+                  <UserCheck className="h-3.5 w-3.5 shrink-0" />
+                  {!collapsed && <span>Portal do médico</span>}
+                </button>
+              </TooltipTrigger>
+              {collapsed && (
+                <TooltipContent side="right" className="text-xs">
+                  Portal do médico
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </div>
+        )}
+
         {/* Client simulation picker (admin only, not simulating) */}
         {isAdmin && !isSimulating && (
           <ClientPicker collapsed={collapsed} onSelect={onStartSimulation} />
@@ -751,7 +814,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const {
     profile,
     role,
-    realRole,
+    roles,
+    setActiveRole,
     user,
     signOut,
     isSimulating,
@@ -768,7 +832,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const isAdmin = realRole === "admin";
+  const isAdmin = roles.includes("admin");
+  const canSwitchAreas =
+    roles.includes("admin") && roles.includes("cliente") && Boolean(profile?.cliente_id);
 
   const allGroups = role === "admin" ? ADMIN_NAV : CLIENTE_NAV;
 
@@ -776,11 +842,19 @@ export function AppLayout({ children }: { children: ReactNode }) {
     .map((g) => ({
       ...g,
       items: g.items
-        .filter((i) => hasPermission(profile?.permissoes, i.perm))
-        .map((i) => ({
-          ...i,
-          children: i.children?.filter((c) => hasPermission(profile?.permissoes, c.perm)),
-        })),
+        .map((item) => ({
+          ...item,
+          children: item.children?.filter((c) =>
+            canSeeNavPermission(profile?.permissoes, c.perm, {
+              simulatingAsCliente: isSimulating,
+            }),
+          ),
+        }))
+        .filter((i) =>
+          canSeeNavPermission(profile?.permissoes, i.perm, {
+            simulatingAsCliente: isSimulating,
+          }),
+        ),
     }))
     .filter((g) => g.items.length > 0);
 
@@ -796,10 +870,22 @@ export function AppLayout({ children }: { children: ReactNode }) {
     isSimulating,
     simulatedClientId,
     simulatedClientNome,
-    onStartSimulation: startSimulation,
+    onStartSimulation: (id: string, nome: string) => {
+      startSimulation(id, nome);
+      navigate({ to: "/cliente/dashboard", replace: true });
+    },
     onStopSimulation: () => {
       stopSimulation();
       navigate({ to: "/admin/dashboard", replace: true });
+    },
+    canSwitchAreas,
+    activeArea: (isSimulating ? "cliente" : role) as "admin" | "cliente" | null,
+    onSwitchArea: (area: "admin" | "cliente") => {
+      setActiveRole(area);
+      navigate({
+        to: area === "admin" ? "/admin/dashboard" : "/cliente/dashboard",
+        replace: true,
+      });
     },
   };
 

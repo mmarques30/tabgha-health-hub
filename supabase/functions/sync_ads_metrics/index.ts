@@ -10,6 +10,7 @@ type MetaConfig = {
   access_token?: string;
   user_access_token?: string;
   ad_account_id?: string;
+  ad_account_name?: string | null;
   page_name?: string;
   page_id?: string;
 };
@@ -162,21 +163,21 @@ function rankAdAccounts(accounts: AdAccount[], pageName?: string | null): AdAcco
   });
 }
 
-/** Persists only the linked account id — never the full BM catalog. */
+/** Persists only the linked account id/name — never the full BM catalog. */
 async function persistLinkedAdAccount(
   cliente: ClienteRow,
   adAccountId: string,
   accountName?: string | null,
 ) {
   const extras = { ...(cliente.dados_extras ?? {}) } as Record<string, unknown>;
-  const meta = { ...((extras.meta as MetaConfig | undefined) ?? {}) };
+  const meta = { ...((extras.meta as MetaConfig | undefined) ?? {}) } as Record<string, unknown>;
   meta.ad_account_id = adAccountId;
-  const nextMeta: Record<string, unknown> = { ...meta };
-  if (accountName) nextMeta.ad_account_name = accountName;
-  // Drop any previously stored BM catalog.
-  delete nextMeta.ad_accounts;
-  delete nextMeta.pages;
-  extras.meta = nextMeta;
+  meta.ad_account_name =
+    accountName ?? (meta.ad_account_name as string | null | undefined) ?? null;
+  // Catálogo da BM não deve ir para o cliente (UI / outros sistemas).
+  delete meta.ad_accounts;
+  delete meta.pages;
+  extras.meta = meta;
 
   const { error } = await supabase
     .from("clientes")
@@ -253,7 +254,12 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
     }
 
     if (!adAccountId) {
-      return { inseridos: 0, skipped: true, motivo: "ad_account_missing" };
+      return {
+        inseridos: 0,
+        skipped: true,
+        motivo: "ad_account_missing",
+        ad_accounts_count: accounts.length,
+      };
     }
 
     let campaignRows = await fetchCampaignOrAccountInsights(
@@ -283,6 +289,10 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
           break;
         }
       }
+    } else if (accounts.length > 0 && !config?.ad_account_name) {
+      // Só grava o nome da conta vinculada (sem catálogo da BM).
+      const linked = ranked.find((a) => a.account_id === usedAccount);
+      await persistLinkedAdAccount(cliente, usedAccount, linked?.name);
     }
 
     let adRows: Array<Record<string, unknown>> = [];
@@ -307,6 +317,9 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
       inseridos += 1;
     }
 
+    const linkedName =
+      ranked.find((a) => a.account_id === usedAccount)?.name ?? config?.ad_account_name ?? null;
+
     await supabase.from("automation_logs").insert({
       cliente_id: cliente.id,
       action: "meta_ads_synced",
@@ -317,7 +330,9 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
         campanhas: campaignRows.length,
         anuncios: adRows.length,
         ad_account_id: usedAccount,
+        ad_account_name: linkedName,
         auto_switched: autoSwitched,
+        ad_accounts_count: ranked.length,
       },
     });
 
@@ -328,9 +343,11 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
       since,
       until,
       ad_account_id: usedAccount,
+      ad_account_name: linkedName,
       auto_switched: autoSwitched,
       motivo:
         campaignRows.length === 0 && adRows.length === 0 ? "no_insights_in_range" : undefined,
+      ad_accounts_count: ranked.length,
     };
   } catch (error) {
     await supabase.from("webhook_errors").insert({

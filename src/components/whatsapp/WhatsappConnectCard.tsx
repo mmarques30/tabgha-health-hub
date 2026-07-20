@@ -112,12 +112,16 @@ export function WhatsappConnectCard({ clienteId, compact = false }: WhatsappConn
             {connected
               ? `Conectado${statusQuery.data?.phone ? ` · ${statusQuery.data.phone}` : ""}`
               : provisioned
-                ? "Pronto para conectar"
-                : "Aguardando provisionamento"}
+                ? "Pronto para escanear o QR"
+                : "Falta a Tabgha salvar as credenciais Z-API"}
           </p>
           {!compact ? (
             <p className="mt-1 text-xs text-muted-foreground">
-              Escaneie o QR Code com o WhatsApp do consultório (Aparelhos conectados).
+              {connected
+                ? "Conversas novas aparecem em Atendimento. Se o agente estiver ligado, o Pietro responde sozinho."
+                : provisioned
+                  ? "Escaneie com o WhatsApp do consultório (Aparelhos conectados)."
+                  : "Peça à equipe Tabgha para preencher Instance ID + Token na ficha do cliente (Conexões)."}
             </p>
           ) : null}
         </div>
@@ -138,7 +142,7 @@ export function WhatsappConnectCard({ clienteId, compact = false }: WhatsappConn
       {!provisioned ? (
         <p className="rounded-xl border border-dashed border-border bg-secondary/30 p-3 text-xs text-muted-foreground">
           {statusQuery.data?.message ??
-            "A Tabgha ainda não provisionou a instância Z-API deste cliente. No admin: Clientes → ficha → Conexões → preencher Instance ID e Token."}
+            "Ainda sem credenciais Z-API neste cliente. Admin: Clientes → ficha → Conexões → Credenciais Z-API."}
         </p>
       ) : (
         <div className="space-y-3">

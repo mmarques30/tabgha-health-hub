@@ -79,19 +79,50 @@ export const CLIENT_PERMISSION_LABELS: Record<ClientPermissionGroup, string> = {
 /** Resumo legível das permissões para listagens */
 export function summarizePermissions(
   permissoes: string[] | null | undefined,
-  role: string | null,
+  role: string | null | string[],
 ): string {
   if (!permissoes || permissoes.length === 0) return "Sem permissões";
   if (permissoes.includes("*")) return "Acesso total";
 
-  const labels = role === "cliente" ? CLIENT_PERMISSION_LABELS : ADMIN_PERMISSION_LABELS;
-  const groups = role === "cliente" ? CLIENT_PERMISSION_GROUPS : ADMIN_PERMISSION_GROUPS;
+  const roleList = Array.isArray(role) ? role : role ? [role] : [];
+  const includeAdmin = roleList.includes("admin") || roleList.length === 0;
+  const includeCliente = roleList.includes("cliente") || roleList.length === 0;
 
-  const matched = (Object.keys(groups) as Array<keyof typeof groups>)
-    .filter((key) => permissoes.includes(groups[key]))
-    .map((key) => labels[key as keyof typeof labels]);
+  const matched: string[] = [];
+  if (includeAdmin) {
+    matched.push(
+      ...(Object.keys(ADMIN_PERMISSION_GROUPS) as AdminPermissionGroup[])
+        .filter((key) => permissoes.includes(ADMIN_PERMISSION_GROUPS[key]))
+        .map((key) => ADMIN_PERMISSION_LABELS[key]),
+    );
+  }
+  if (includeCliente) {
+    matched.push(
+      ...(Object.keys(CLIENT_PERMISSION_GROUPS) as ClientPermissionGroup[])
+        .filter((key) => permissoes.includes(CLIENT_PERMISSION_GROUPS[key]))
+        .map((key) => CLIENT_PERMISSION_LABELS[key]),
+    );
+  }
 
   if (matched.length === 0) return `${permissoes.length} permissão(ões)`;
   if (matched.length <= 2) return matched.join(", ");
   return `${matched.slice(0, 2).join(", ")} +${matched.length - 2}`;
+}
+
+/** Em simulação (admin vendo portal), libera abas cliente se o admin tem acesso amplo. */
+export function canSeeNavPermission(
+  permissoes: string[] | null | undefined,
+  required: string,
+  opts?: { simulatingAsCliente?: boolean },
+): boolean {
+  if (hasPermission(permissoes, required)) return true;
+  if (
+    opts?.simulatingAsCliente &&
+    required.startsWith("cliente.") &&
+    (hasPermission(permissoes, "*") ||
+      (permissoes ?? []).some((p) => p.startsWith("admin.")))
+  ) {
+    return true;
+  }
+  return false;
 }

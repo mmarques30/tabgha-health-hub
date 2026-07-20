@@ -2,13 +2,18 @@ import { z } from "zod";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-const schema = z.object({
-  email: z.string().email(),
-  nome: z.string().min(2),
-  role: z.enum(["admin", "cliente"]),
-  cliente_id: z.string().uuid().nullable(),
-  permissoes: z.array(z.string()),
-});
+const schema = z
+  .object({
+    email: z.string().email(),
+    nome: z.string().min(2),
+    role: z.enum(["admin", "cliente"]).optional(),
+    roles: z.array(z.enum(["admin", "cliente"])).min(1).optional(),
+    cliente_id: z.string().uuid().nullable(),
+    permissoes: z.array(z.string()),
+  })
+  .refine((d) => Boolean(d.role || (d.roles && d.roles.length > 0)), {
+    message: "Informe ao menos um perfil (admin ou cliente).",
+  });
 
 type Input = z.infer<typeof schema>;
 
@@ -18,6 +23,7 @@ export type CreateUserResult = {
   reused_existing?: boolean;
   temporary_password: string;
   role?: string;
+  roles?: string[];
 };
 
 type EdgePayload = {
@@ -28,6 +34,7 @@ type EdgePayload = {
   reused_existing?: boolean;
   temporary_password?: string | null;
   role?: string;
+  roles?: string[];
 };
 
 async function readEdgeError(error: unknown, fallbackData: EdgePayload | null): Promise<string> {
@@ -44,29 +51,37 @@ async function readEdgeError(error: unknown, fallbackData: EdgePayload | null): 
 
   if (error instanceof Error && error.message) {
     if (error.message.includes("non-2xx")) {
-      return "Não foi possível criar o acesso. Verifique se o email já existe com outro perfil.";
+      return "Não foi possível criar o acesso. Verifique se o email já existe.";
     }
     return error.message;
   }
   return "Falha ao criar usuário.";
 }
 
+function resolveRoles(data: Input): Array<"admin" | "cliente"> {
+  if (data.roles?.length) return [...new Set(data.roles)];
+  if (data.role) return [data.role];
+  return [];
+}
+
 /**
  * Cria usuário via edge `admin-create-user`.
  * Retorna senha provisória (Tabgha{ano}) para o admin copiar/enviar.
+ * Aceita um ou dois papéis (admin e/ou cliente).
  */
 export async function createUserWithRole(input: { data: Input }): Promise<CreateUserResult> {
   const data = schema.parse(input.data);
+  const roles = resolveRoles(data);
 
-  if (data.role === "cliente" && !data.cliente_id) {
-    throw new Error("Selecione o cliente ao criar um usuário com perfil Cliente.");
+  if (roles.includes("cliente") && !data.cliente_id) {
+    throw new Error("Selecione o consultório ao liberar o portal do médico.");
   }
 
   const { data: result, error } = await supabase.functions.invoke("admin-create-user", {
     body: {
       email: data.email.trim().toLowerCase(),
       nome: data.nome.trim(),
-      role: data.role,
+      roles,
       cliente_id: data.cliente_id,
       permissoes: data.permissoes,
     },
@@ -86,6 +101,7 @@ export async function createUserWithRole(input: { data: Input }): Promise<Create
     email: payload.email || data.email.trim().toLowerCase(),
     reused_existing: payload.reused_existing,
     temporary_password: payload.temporary_password,
-    role: payload.role || data.role,
+    role: payload.role || roles[0],
+    roles: payload.roles || roles,
   };
 }

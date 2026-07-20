@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createLeadManual } from "@/functions/leads/createLeadManual.functions";
+import type { Lead } from "@/hooks/useLeads";
 
 type Props = {
   open: boolean;
@@ -22,6 +23,8 @@ type Props = {
   clienteId: string;
   /** Canais extras no select (admin/cliente) */
   showCanalSelect?: boolean;
+  /** Chamado após criar — útil para abrir o detalhe no funil. */
+  onCreated?: (lead: Lead) => void;
 };
 
 const CANAIS = [
@@ -33,7 +36,13 @@ const CANAIS = [
   { value: "site", label: "Site" },
 ];
 
-export function CreateLeadDialog({ open, onClose, clienteId, showCanalSelect = true }: Props) {
+export function CreateLeadDialog({
+  open,
+  onClose,
+  clienteId,
+  showCanalSelect = true,
+  onCreated,
+}: Props) {
   const queryClient = useQueryClient();
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
@@ -61,11 +70,12 @@ export function CreateLeadDialog({ open, onClose, clienteId, showCanalSelect = t
           observacoes,
         },
       }),
-    onSuccess: () => {
-      toast.success("Lead criado.");
+    onSuccess: (lead) => {
+      toast.success("Lead criado — abrindo detalhes.");
       void queryClient.invalidateQueries({ queryKey: ["leads-kanban"] });
       reset();
       onClose();
+      onCreated?.(lead);
     },
     onError: (err: Error) => toast.error(err.message),
   });

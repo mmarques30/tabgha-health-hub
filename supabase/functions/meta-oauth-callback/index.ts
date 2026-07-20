@@ -203,22 +203,23 @@ Deno.serve(async (req) => {
     }
 
     const extras = (cliente.dados_extras as Record<string, unknown> | null) ?? {};
+    const prevMeta = {
+      ...((extras.meta as Record<string, unknown> | undefined) ?? {}),
+    };
+    // Nunca persistir catálogo da BM (outras contas/páginas + gasto histórico).
+    delete prevMeta.ad_accounts;
+    delete prevMeta.pages;
+    const selectedAdAccount = adAccounts.find((a) => a.id === adAccountId) ?? null;
     const nextExtras = {
       ...extras,
       meta: {
-        ...((extras.meta as Record<string, unknown> | undefined) ?? {}),
+        ...prevMeta,
         access_token: pageToken,
         user_access_token: longLived.access_token,
         page_id: pageId,
         page_name: page?.name ?? null,
         ad_account_id: adAccountId,
-        ad_accounts: adAccounts.map((a) => ({
-          id: a.id,
-          name: a.name,
-          amount_spent: a.amount_spent,
-          currency: a.currency ?? null,
-        })),
-        pages: pages.map((p) => ({ id: p.id, name: p.name })),
+        ad_account_name: selectedAdAccount?.name ?? null,
         leadgen_subscribed: leadgenSubscribe?.ok ?? false,
         expires_at: expiresAt,
         connected_at: new Date().toISOString(),
@@ -239,7 +240,8 @@ Deno.serve(async (req) => {
         page_id: pageId,
         page_name: page?.name ?? null,
         ad_account_id: adAccountId,
-        ad_accounts: adAccounts.slice(0, 12),
+        ad_account_name: selectedAdAccount?.name ?? null,
+        ad_accounts_count: adAccounts.length,
         leadgen_subscribed: leadgenSubscribe?.ok ?? false,
         leadgen_subscribe_error: leadgenSubscribe?.ok === false ? leadgenSubscribe.error : null,
         expires_at: expiresAt,

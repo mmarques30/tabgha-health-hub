@@ -38,19 +38,12 @@ export const Route = createFileRoute("/_authenticated/admin/config-meta")({
   head: () => ({ meta: [{ title: "Conectar Meta BM — Admin" }] }),
 });
 
-type MetaAdAccountOption = {
-  id: string;
-  name?: string;
-  amount_spent?: number;
-  currency?: string | null;
-};
-
 type MetaExtras = {
   access_token?: string;
   page_id?: string;
   page_name?: string;
   ad_account_id?: string;
-  ad_accounts?: MetaAdAccountOption[];
+  ad_account_name?: string | null;
   expires_at?: string;
   connected_at?: string;
   leadgen_subscribed?: boolean;
@@ -180,8 +173,14 @@ function ConfigMetaPage() {
         string,
         unknown
       >;
-      const nextMeta = {
+      const prevMeta = {
         ...((extras.meta as Record<string, unknown> | undefined) ?? {}),
+      };
+      // Não reexpor catálogo da BM se ainda existir em dados antigos.
+      delete prevMeta.ad_accounts;
+      delete prevMeta.pages;
+      const nextMeta = {
+        ...prevMeta,
         ad_account_id: adAccountId.trim() || null,
       };
       const { error } = await supabase
@@ -517,36 +516,23 @@ function ConfigMetaPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="adAccount">Ad Account (conta de anúncios)</Label>
-                  {(meta?.ad_accounts?.length ?? 0) > 0 ? (
-                    <select
-                      id="adAccount"
-                      value={adAccountId}
-                      onChange={(e) => setAdAccountId(e.target.value)}
-                      className="w-full max-w-lg rounded-xl border border-input bg-background px-3 py-2.5 text-sm"
-                    >
-                      {meta?.ad_accounts?.map((acc) => (
-                        <option key={acc.id} value={acc.id}>
-                          {acc.name ?? acc.id}
-                          {typeof acc.amount_spent === "number"
-                            ? ` · gasto hist. ${(acc.amount_spent / 100).toLocaleString("pt-BR", {
-                                style: "currency",
-                                currency: acc.currency === "USD" ? "USD" : "BRL",
-                              })}`
-                            : ""}{" "}
-                          ({acc.id})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <Input
-                      id="adAccount"
-                      value={adAccountId}
-                      onChange={(e) => setAdAccountId(e.target.value)}
-                      placeholder="123456789012345"
-                      className="w-full max-w-lg"
-                    />
-                  )}
+                  <Label htmlFor="adAccount">Ad Account deste cliente</Label>
+                  <div className="max-w-lg rounded-xl border border-emerald-200/80 bg-white/70 px-3 py-2.5 text-sm">
+                    <p className="font-medium text-slate-900">
+                      {meta?.ad_account_name?.trim() || "Conta vinculada"}
+                    </p>
+                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                      act_{adAccountId.trim() || meta?.ad_account_id || "—"}
+                    </p>
+                  </div>
+                  <Input
+                    id="adAccount"
+                    value={adAccountId}
+                    onChange={(e) => setAdAccountId(e.target.value)}
+                    placeholder="ID da Ad Account (somente desta clínica)"
+                    className="w-full max-w-lg"
+                    autoComplete="off"
+                  />
                   <div className="flex max-w-lg flex-wrap gap-2">
                     <Button
                       variant="outline"
@@ -563,8 +549,8 @@ function ConfigMetaPage() {
                     </Button>
                   </div>
                   <p className="max-w-lg text-xs text-muted-foreground">
-                    OAuth pode pegar a conta errada da BM. Prefira a conta com o nome da clínica e
-                    gasto histórico. Sync também tenta auto-corrigir se vier 0 insights.
+                    Só a conta deste cliente fica visível aqui. Outras contas da BM não são listadas.
+                    Se o sync vier sem insights, o servidor pode auto-corrigir a conta vinculada.
                   </p>
                 </div>
 

@@ -28,6 +28,8 @@ type AdAccount = {
   currency?: string;
 };
 
+type InsightLevel = "campaign" | "ad" | "account";
+
 function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -75,30 +77,41 @@ async function fetchMetaInsights(
   adAccountId: string,
   since: string,
   until: string,
+  level: InsightLevel,
 ): Promise<Array<Record<string, unknown>>> {
   const path = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
-  const base =
+  const fields =
+    level === "ad"
+      ? "campaign_name,ad_id,ad_name,spend,impressions,clicks,actions,action_values,date_start"
+      : "campaign_name,spend,impressions,clicks,actions,action_values,date_start";
+  const url =
     `https://graph.facebook.com/${GRAPH_VERSION}/${path}/insights` +
     `?access_token=${encodeURIComponent(accessToken)}` +
-    `&fields=campaign_name,spend,impressions,clicks,actions,action_values,date_start` +
+    `&fields=${fields}` +
     `&time_range=${encodeURIComponent(JSON.stringify({ since, until }))}` +
     `&time_increment=1` +
+    `&level=${level}` +
     `&limit=500`;
 
-  // Preferência: nível campanha. Fallback: conta (quando não há breakdown).
-  for (const level of ["campaign", "account"]) {
-    const url = `${base}&level=${level}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Meta API ${response.status}: ${await response.text()}`);
-    }
-    const payload = (await response.json()) as {
-      data?: Array<Record<string, unknown>>;
-    };
-    const rows = payload.data ?? [];
-    if (rows.length > 0 || level === "account") return rows;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Meta API ${response.status} (${level}): ${await response.text()}`);
   }
-  return [];
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>;
+  };
+  return payload.data ?? [];
+}
+
+async function fetchCampaignOrAccountInsights(
+  accessToken: string,
+  adAccountId: string,
+  since: string,
+  until: string,
+): Promise<Array<Record<string, unknown>>> {
+  const campaignRows = await fetchMetaInsights(accessToken, adAccountId, since, until, "campaign");
+  if (campaignRows.length > 0) return campaignRows;
+  return fetchMetaInsights(accessToken, adAccountId, since, until, "account");
 }
 
 async function listAdAccounts(accessToken: string): Promise<AdAccount[]> {
@@ -149,23 +162,21 @@ function rankAdAccounts(accounts: AdAccount[], pageName?: string | null): AdAcco
   });
 }
 
-async function persistAdAccount(
+/** Persists only the linked account id — never the full BM catalog. */
+async function persistLinkedAdAccount(
   cliente: ClienteRow,
   adAccountId: string,
-  accounts: AdAccount[],
+  accountName?: string | null,
 ) {
   const extras = { ...(cliente.dados_extras ?? {}) } as Record<string, unknown>;
   const meta = { ...((extras.meta as MetaConfig | undefined) ?? {}) };
   meta.ad_account_id = adAccountId;
-  extras.meta = {
-    ...meta,
-    ad_accounts: accounts.map((a) => ({
-      id: a.account_id,
-      name: a.name,
-      amount_spent: a.amount_spent,
-      currency: a.currency ?? null,
-    })),
-  };
+  const nextMeta: Record<string, unknown> = { ...meta };
+  if (accountName) nextMeta.ad_account_name = accountName;
+  // Drop any previously stored BM catalog.
+  delete nextMeta.ad_accounts;
+  delete nextMeta.pages;
+  extras.meta = nextMeta;
 
   const { error } = await supabase
     .from("clientes")
@@ -176,13 +187,24 @@ async function persistAdAccount(
   cliente.dados_extras = extras as ClienteRow["dados_extras"];
 }
 
-async function upsertMetrica(clienteId: string, date: string, row: Record<string, unknown>) {
-  const campaign = String(row.campaign_name ?? "Conta Meta");
+async function upsertMetrica(
+  clienteId: string,
+  date: string,
+  row: Record<string, unknown>,
+  nivel: "campaign" | "ad" | "account",
+) {
+  const campaign = String(row.campaign_name ?? "Conta Meta").trim() || "Conta Meta";
+  const adId = nivel === "ad" ? String(row.ad_id ?? "").trim() : "";
+  const anuncio =
+    nivel === "ad"
+      ? String(row.ad_name ?? "").trim() || (adId ? `Anúncio ${adId}` : null)
+      : null;
   const investimento = Number(row.spend ?? 0);
   const leads = parseLeads(
     (row.actions as Array<{ action_type?: string; value?: string }> | undefined) ?? [],
   );
-  const clicks = Number(row.clicks ?? 0);
+  const impressoes = Math.round(Number(row.impressions ?? 0));
+  const cliques = Math.round(Number(row.clicks ?? 0));
 
   const { error } = await supabase.from("metricas_ads").upsert(
     {
@@ -190,18 +212,23 @@ async function upsertMetrica(clienteId: string, date: string, row: Record<string
       data: date,
       plataforma: "meta",
       campanha: campaign,
+      ad_id: adId,
+      anuncio,
+      nivel: nivel === "account" ? "campaign" : nivel,
       investimento,
       leads,
       conversoes: leads,
+      impressoes,
+      cliques,
       cpl: leads > 0 ? investimento / leads : null,
       cpa: leads > 0 ? investimento / leads : null,
       roas: null,
     },
-    { onConflict: "cliente_id,data,plataforma,campanha" },
+    { onConflict: "cliente_id,data,plataforma,campanha,ad_id" },
   );
 
   if (error) throw error;
-  return { campanha: campaign, investimento, leads, clicks };
+  return { campanha: campaign, ad_id: adId, investimento, leads, cliques, impressoes };
 }
 
 async function syncMetaForClient(cliente: ClienteRow, since: string, until: string) {
@@ -221,45 +248,62 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
     if (!adAccountId) {
       adAccountId = ranked[0]?.account_id ?? null;
       if (adAccountId) {
-        await persistAdAccount(cliente, adAccountId, accounts);
+        await persistLinkedAdAccount(cliente, adAccountId, ranked[0]?.name);
       }
     }
 
     if (!adAccountId) {
-      return { inseridos: 0, skipped: true, motivo: "ad_account_missing", ad_accounts: accounts.length };
+      return { inseridos: 0, skipped: true, motivo: "ad_account_missing" };
     }
 
-    let rows = await fetchMetaInsights(accessToken, adAccountId, since, until);
+    let campaignRows = await fetchCampaignOrAccountInsights(
+      accessToken,
+      adAccountId,
+      since,
+      until,
+    );
     let usedAccount = adAccountId;
     let autoSwitched = false;
 
     // Conta errada (comum: OAuth pega a 1ª com gasto 0) → tenta as demais por ranking.
-    if (rows.length === 0 && ranked.length > 1) {
+    if (campaignRows.length === 0 && ranked.length > 1) {
       for (const candidate of ranked) {
         if (candidate.account_id === adAccountId) continue;
-        const candidateRows = await fetchMetaInsights(
+        const candidateRows = await fetchCampaignOrAccountInsights(
           accessToken,
           candidate.account_id,
           since,
           until,
         );
         if (candidateRows.length > 0) {
-          rows = candidateRows;
+          campaignRows = candidateRows;
           usedAccount = candidate.account_id;
           autoSwitched = true;
-          await persistAdAccount(cliente, usedAccount, accounts);
+          await persistLinkedAdAccount(cliente, usedAccount, candidate.name);
           break;
         }
       }
-    } else if (accounts.length > 0) {
-      // Mantém catálogo de contas para o picker da UI.
-      await persistAdAccount(cliente, usedAccount, accounts);
+    }
+
+    let adRows: Array<Record<string, unknown>> = [];
+    try {
+      adRows = await fetchMetaInsights(accessToken, usedAccount, since, until, "ad");
+    } catch (adError) {
+      // Conta sem permissão de breakdown por ad — campanhas ainda valem.
+      console.warn("meta_ad_insights_failed", adError);
     }
 
     let inseridos = 0;
-    for (const row of rows) {
+    for (const row of campaignRows) {
       const date = String(row.date_start ?? since);
-      await upsertMetrica(cliente.id, date, row);
+      const hasCampaignName = Boolean(row.campaign_name);
+      await upsertMetrica(cliente.id, date, row, hasCampaignName ? "campaign" : "account");
+      inseridos += 1;
+    }
+    for (const row of adRows) {
+      const date = String(row.date_start ?? since);
+      if (!String(row.ad_id ?? "").trim()) continue;
+      await upsertMetrica(cliente.id, date, row, "ad");
       inseridos += 1;
     }
 
@@ -270,30 +314,23 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
         since,
         until,
         linhas: inseridos,
+        campanhas: campaignRows.length,
+        anuncios: adRows.length,
         ad_account_id: usedAccount,
         auto_switched: autoSwitched,
-        ad_accounts: ranked.slice(0, 12).map((a) => ({
-          id: a.account_id,
-          name: a.name,
-          amount_spent: a.amount_spent,
-        })),
       },
     });
 
     return {
       inseridos,
-      linhas: rows.length,
+      campanhas: campaignRows.length,
+      anuncios: adRows.length,
       since,
       until,
       ad_account_id: usedAccount,
       auto_switched: autoSwitched,
-      motivo: rows.length === 0 ? "no_insights_in_range" : undefined,
-      ad_accounts: ranked.slice(0, 12).map((a) => ({
-        id: a.account_id,
-        name: a.name,
-        amount_spent: a.amount_spent,
-        currency: a.currency ?? null,
-      })),
+      motivo:
+        campaignRows.length === 0 && adRows.length === 0 ? "no_insights_in_range" : undefined,
     };
   } catch (error) {
     await supabase.from("webhook_errors").insert({

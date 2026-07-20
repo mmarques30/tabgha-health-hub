@@ -21,7 +21,6 @@ import {
   Link2,
   LogOut,
   MessageSquare,
-  Megaphone,
   Menu,
   ChevronRight,
   ChevronLeft,
@@ -36,6 +35,7 @@ type NavChild = {
   to: string;
   label: string;
   perm: string;
+  search?: Record<string, string>;
 };
 
 type NavItem = {
@@ -45,6 +45,25 @@ type NavItem = {
   perm: string;
   children?: NavChild[];
 };
+
+function navChildActive(
+  child: NavChild,
+  pathname: string,
+  searchParams: Record<string, unknown>,
+): boolean {
+  if (pathname !== child.to) {
+    if (child.to === "/admin/dashboard") return false;
+    if (!pathname.startsWith(child.to + "/")) return false;
+  }
+  if (!child.search) {
+    // Exact match for dashboard root; other bare links match path only.
+    if (child.to === "/admin/dashboard") return pathname === "/admin/dashboard";
+    return true;
+  }
+  return Object.entries(child.search).every(
+    ([key, value]) => String(searchParams[key] ?? "") === String(value),
+  );
+}
 
 type NavGroup = {
   group: string;
@@ -65,8 +84,39 @@ const ADMIN_NAV: NavGroup[] = [
           { to: "/admin/dashboard-clientes", label: "Clientes", perm: "admin.dashboard" },
         ],
       },
-      { to: "/admin/roi", label: "ROI da operação", icon: TrendingUp, perm: "admin.roi" },
-      { to: "/admin/meta-ads", label: "Marketing Pago", icon: Megaphone, perm: "admin.meta_ads" },
+      {
+        to: "/admin/roi",
+        label: "ROI da operação",
+        icon: TrendingUp,
+        perm: "admin.roi",
+        children: [
+          { to: "/admin/roi", label: "Operação", perm: "admin.roi", search: { tab: "operacao" } },
+          {
+            to: "/admin/roi",
+            label: "Clientes gerados",
+            perm: "admin.roi",
+            search: { tab: "clientes" },
+          },
+          {
+            to: "/admin/roi",
+            label: "Oportunidades",
+            perm: "admin.roi",
+            search: { tab: "oportunidades" },
+          },
+          {
+            to: "/admin/roi",
+            label: "Campanhas",
+            perm: "admin.roi",
+            search: { tab: "campanhas" },
+          },
+          {
+            to: "/admin/roi",
+            label: "Marketing pago",
+            perm: "admin.meta_ads",
+            search: { tab: "marketing" },
+          },
+        ],
+      },
     ],
   },
   {
@@ -130,12 +180,32 @@ const CLIENTE_NAV: NavGroup[] = [
         icon: LayoutDashboard,
         perm: "cliente.dashboard",
       },
-      { to: "/cliente/roi", label: "ROI", icon: TrendingUp, perm: "cliente.roi" },
       {
-        to: "/cliente/meta-ads",
-        label: "Marketing Pago",
-        icon: Megaphone,
-        perm: "cliente.meta_ads",
+        to: "/cliente/roi",
+        label: "ROI",
+        icon: TrendingUp,
+        perm: "cliente.roi",
+        children: [
+          { to: "/cliente/roi", label: "Operação", perm: "cliente.roi", search: { tab: "operacao" } },
+          {
+            to: "/cliente/roi",
+            label: "Oportunidades",
+            perm: "cliente.roi",
+            search: { tab: "oportunidades" },
+          },
+          {
+            to: "/cliente/roi",
+            label: "Campanhas",
+            perm: "cliente.roi",
+            search: { tab: "campanhas" },
+          },
+          {
+            to: "/cliente/roi",
+            label: "Marketing pago",
+            perm: "cliente.meta_ads",
+            search: { tab: "marketing" },
+          },
+        ],
       },
     ],
   },
@@ -310,6 +380,7 @@ function ClientPicker({
 function SidebarNav({
   groups,
   pathname,
+  searchParams,
   profile,
   user,
   onNavigate,
@@ -325,6 +396,7 @@ function SidebarNav({
 }: {
   groups: NavGroup[];
   pathname: string;
+  searchParams: Record<string, unknown>;
   profile: ReturnType<typeof useAuth>["profile"];
   user: ReturnType<typeof useAuth>["user"];
   onNavigate?: () => void;
@@ -341,6 +413,8 @@ function SidebarNav({
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({
     "/admin/dashboard": true,
+    "/admin/roi": true,
+    "/cliente/roi": true,
   });
 
   function toggleGroup(group: string) {
@@ -403,8 +477,7 @@ function SidebarNav({
             (i) =>
               pathname === i.to ||
               pathname.startsWith(i.to + "/") ||
-              (i.children?.some((c) => pathname === c.to || pathname.startsWith(c.to + "/")) ??
-                false),
+              (i.children?.some((c) => navChildActive(c, pathname, searchParams)) ?? false),
           );
           const isAdminGroup = key === "Administração";
 
@@ -442,9 +515,7 @@ function SidebarNav({
                 <div className={collapsed ? "flex flex-col gap-0.5 py-0.5" : ""}>
                   {g.items.map((it) => {
                     const childActive =
-                      it.children?.some(
-                        (c) => pathname === c.to || pathname.startsWith(c.to + "/"),
-                      ) ?? false;
+                      it.children?.some((c) => navChildActive(c, pathname, searchParams)) ?? false;
                     const active =
                       pathname === it.to || pathname.startsWith(it.to + "/") || childActive;
                     const Icon = it.icon;
@@ -513,19 +584,15 @@ function SidebarNav({
                           {submenuOpen ? (
                             <div className="mb-1 ml-4 border-l border-sidebar-border/50 pl-2">
                               {it.children!.map((child) => {
-                                const childIsActive =
-                                  pathname === child.to ||
-                                  (child.to !== "/admin/dashboard" &&
-                                    pathname.startsWith(child.to + "/"));
-                                // Tabgha = exact /admin/dashboard only
-                                const exactActive =
-                                  child.to === "/admin/dashboard"
-                                    ? pathname === "/admin/dashboard"
-                                    : childIsActive;
+                                const exactActive = navChildActive(child, pathname, searchParams);
+                                const childKey = child.search
+                                  ? `${child.to}?${new URLSearchParams(child.search).toString()}`
+                                  : child.to;
                                 return (
                                   <Link
-                                    key={child.to}
+                                    key={childKey}
                                     to={child.to as any}
+                                    search={(child.search ?? {}) as any}
                                     onClick={onNavigate}
                                     className={cn(
                                       "mx-2 mb-px flex items-center rounded-[7px] px-2.5 py-1.5 text-[12px] transition-all duration-150",
@@ -695,6 +762,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const searchParams = useRouterState({
+    select: (s) => (s.location.search ?? {}) as Record<string, unknown>,
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -705,13 +775,19 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const groups: NavGroup[] = allGroups
     .map((g) => ({
       ...g,
-      items: g.items.filter((i) => hasPermission(profile?.permissoes, i.perm)),
+      items: g.items
+        .filter((i) => hasPermission(profile?.permissoes, i.perm))
+        .map((i) => ({
+          ...i,
+          children: i.children?.filter((c) => hasPermission(profile?.permissoes, c.perm)),
+        })),
     }))
     .filter((g) => g.items.length > 0);
 
   const navProps = {
     groups,
     pathname,
+    searchParams,
     profile,
     user,
     signOut,

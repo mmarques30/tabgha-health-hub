@@ -335,44 +335,59 @@ export type Database = {
       }
       metricas_ads: {
         Row: {
-          campanha: string | null
+          ad_id: string
+          anuncio: string | null
+          campanha: string
           cliente_id: string
+          cliques: number
           conversoes: number
           cpa: number | null
           cpl: number | null
           criado_em: string
           data: string
           id: string
+          impressoes: number
           investimento: number
           leads: number
+          nivel: string
           plataforma: string
           roas: number | null
         }
         Insert: {
-          campanha?: string | null
+          ad_id?: string
+          anuncio?: string | null
+          campanha?: string
           cliente_id: string
+          cliques?: number
           conversoes?: number
           cpa?: number | null
           cpl?: number | null
           criado_em?: string
           data: string
           id?: string
+          impressoes?: number
           investimento?: number
           leads?: number
+          nivel?: string
           plataforma: string
           roas?: number | null
         }
         Update: {
-          campanha?: string | null
+          ad_id?: string
+          anuncio?: string | null
+          campanha?: string
           cliente_id?: string
+          cliques?: number
           conversoes?: number
           cpa?: number | null
           cpl?: number | null
           criado_em?: string
           data?: string
           id?: string
+          impressoes?: number
           investimento?: number
           leads?: number
+          nivel?: string
           plataforma?: string
           roas?: number | null
         }

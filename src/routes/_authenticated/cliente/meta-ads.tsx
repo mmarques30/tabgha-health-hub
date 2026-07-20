@@ -1,18 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { MetaAdsPage } from "@/components/meta/MetaAdsPage";
-import { useAuth } from "@/lib/auth";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/cliente/meta-ads")({
-  component: ClienteMetaAds,
-  head: () => ({ meta: [{ title: "Marketing Pago — Tabgha" }] }),
+  component: ClienteMetaAdsRedirect,
+  head: () => ({ meta: [{ title: "Marketing pago — Tabgha" }] }),
 });
 
-function ClienteMetaAds() {
-  const { profile } = useAuth();
-
-  return (
-    <div className="space-y-4 px-6 py-6">
-      <MetaAdsPage fixedClienteId={profile?.cliente_id ?? null} />
-    </div>
-  );
+function ClienteMetaAdsRedirect() {
+  return <Navigate to="/cliente/roi" search={{ tab: "marketing" }} replace />;
 }

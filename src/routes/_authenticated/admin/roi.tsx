@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowRight, ArrowUp, Loader2, TrendingUp } from "lucide-react";
@@ -28,6 +28,7 @@ import {
 } from "@/components/analytics/InsightPanel";
 import { SubTabs } from "@/components/analytics/SubTabs";
 import { EmptyState } from "@/components/EmptyState";
+import { MetaAdsPage } from "@/components/meta/MetaAdsPage";
 import { useClientesOptions } from "@/hooks/useClientesOptions";
 import {
   buildCampaignInsights,
@@ -43,12 +44,23 @@ import { calcCaq } from "@/lib/analytics-range";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
+const ROI_TABS = [
+  "operacao",
+  "clientes",
+  "oportunidades",
+  "campanhas",
+  "marketing",
+] as const;
+
+type TabId = (typeof ROI_TABS)[number];
+
 export const Route = createFileRoute("/_authenticated/admin/roi")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: ROI_TABS.includes(search.tab as TabId) ? (search.tab as TabId) : ("operacao" as TabId),
+  }),
   component: RoiAdminPage,
   head: () => ({ meta: [{ title: "ROI da operação — Tabgha Admin" }] }),
 });
-
-type TabId = "operacao" | "clientes" | "oportunidades" | "campanhas";
 
 type Metrica = {
   id: string;
@@ -56,6 +68,9 @@ type Metrica = {
   data: string;
   plataforma: string;
   campanha: string | null;
+  ad_id?: string | null;
+  anuncio?: string | null;
+  nivel?: string | null;
   investimento: number;
   leads: number;
   conversoes: number;
@@ -64,6 +79,10 @@ type Metrica = {
   roas: number | null;
   clientes: { nome: string; especialidade: string | null } | null;
 };
+
+function isCampaignMetrica(m: Metrica) {
+  return !(m.ad_id ?? "").trim();
+}
 
 type LeadRow = {
   id: string;
@@ -128,10 +147,15 @@ function KpiCard({
 }
 
 function RoiAdminPage() {
-  const [tab, setTab] = useState<TabId>("operacao");
+  const { tab } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
   const [filters, setFilters] = useState<AnalyticsFiltersValue>(defaultAnalyticsFilters("30d"));
   const [showAllRows, setShowAllRows] = useState(false);
   const { data: clientesOptions = [] } = useClientesOptions();
+
+  function setTab(next: TabId) {
+    void navigate({ search: (prev) => ({ ...prev, tab: next }) });
+  }
 
   const { data: clientesFull = [] } = useQuery({
     queryKey: ["admin", "roi", "clientes-cat"],
@@ -194,8 +218,11 @@ function RoiAdminPage() {
   });
 
   const metricasFiltradas = useMemo(() => {
-    if (!clienteIdsByCategoria) return metricas;
-    return metricas.filter((m) => clienteIdsByCategoria.has(m.cliente_id));
+    const scoped = clienteIdsByCategoria
+      ? metricas.filter((m) => clienteIdsByCategoria.has(m.cliente_id))
+      : metricas;
+    // KPIs e rankings usam só nível campanha — evita somar campanha + anúncio.
+    return scoped.filter(isCampaignMetrica);
   }, [metricas, clienteIdsByCategoria]);
 
   const leadsFiltrados = useMemo(() => {
@@ -320,37 +347,39 @@ function RoiAdminPage() {
     <div className="space-y-5 px-6 py-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <span className="mb-2 inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800">
-            ROI
-          </span>
           <h1 className="text-xl font-bold tracking-tight">ROI da operação</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Análise gerencial clara — investimento, eficiência e onde o funil trava
+            Operação, clientes, oportunidades, campanhas e marketing pago no mesmo lugar
           </p>
         </div>
-        <AnalyticsFilters
-          value={filters}
-          onChange={(next) => {
-            setShowAllRows(false);
-            setFilters(next);
-          }}
-          clientes={clientesOptions}
-          categorias={categorias}
-        />
+        {tab !== "marketing" ? (
+          <AnalyticsFilters
+            value={filters}
+            onChange={(next) => {
+              setShowAllRows(false);
+              setFilters(next);
+            }}
+            clientes={clientesOptions}
+            categorias={categorias}
+          />
+        ) : null}
       </div>
 
       <SubTabs
         value={tab}
         onChange={setTab}
         tabs={[
-          { id: "operacao", label: "Operação", description: "KPIs e visão geral" },
-          { id: "clientes", label: "Clientes gerados", description: "Por clínica" },
-          { id: "oportunidades", label: "Oportunidades", description: "Funil de leads" },
-          { id: "campanhas", label: "Campanhas", description: "Análise de mídia" },
+          { id: "operacao", label: "Operação" },
+          { id: "clientes", label: "Clientes gerados" },
+          { id: "oportunidades", label: "Oportunidades" },
+          { id: "campanhas", label: "Campanhas" },
+          { id: "marketing", label: "Marketing pago" },
         ]}
       />
 
-      {isLoading ? (
+      {tab === "marketing" ? (
+        <MetaAdsPage isAdmin embedded defaultTab="anuncios" />
+      ) : isLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -358,7 +387,7 @@ function RoiAdminPage() {
         <EmptyState
           icon={<TrendingUp className="h-6 w-6" />}
           title="Nenhuma métrica no filtro"
-          description="Ajuste período, cliente ou sincronize Marketing Pago."
+          description="Ajuste período, cliente ou sincronize em Marketing pago."
         />
       ) : (
         <>
@@ -407,9 +436,6 @@ function RoiAdminPage() {
 
               {byCliente.length > 0 ? (
                 <div className="animate-fade-up rounded-2xl border border-border bg-gradient-to-br from-slate-50 to-sky-50/60 p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                    Visão geral
-                  </p>
                   <p className="mt-1 text-base font-bold text-foreground">
                     Investimento × Leads por cliente
                   </p>
@@ -700,12 +726,13 @@ function RoiAdminPage() {
               </div>
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold">Detalhe das campanhas</p>
-                <Link
-                  to="/admin/meta-ads"
+                <button
+                  type="button"
+                  onClick={() => setTab("marketing")}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline"
                 >
-                  Abrir Marketing Pago <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
+                  Ver anúncios <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </div>
               <div className="overflow-hidden rounded-2xl border border-border bg-card">
                 <table className="w-full text-sm">

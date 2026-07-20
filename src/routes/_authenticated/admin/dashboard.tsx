@@ -434,17 +434,20 @@ function DashboardTabghaPage() {
           {
             title: "ROI da operação",
             body: "Investimento, CAQ e retorno — sem misturar com gestão da carteira.",
-            to: "/admin/roi",
+            to: "/admin/roi" as const,
+            search: { tab: "operacao" as const },
           },
           {
             title: "Funil de leads",
             body: "Mover oportunidades no pipeline de cada cliente.",
-            to: "/admin/leads",
+            to: "/admin/leads" as const,
+            search: undefined,
           },
         ].map((card) => (
           <Link
             key={card.to}
             to={card.to as never}
+            search={(card.search ?? {}) as never}
             className="rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/30 hover:shadow-md"
           >
             <p className="text-sm font-bold">{card.title}</p>

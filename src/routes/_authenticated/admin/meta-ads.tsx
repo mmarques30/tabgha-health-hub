@@ -1,15 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { MetaAdsPage } from "@/components/meta/MetaAdsPage";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/admin/meta-ads")({
-  component: AdminMetaAds,
-  head: () => ({ meta: [{ title: "Marketing Pago — Tabgha Admin" }] }),
+  component: AdminMetaAdsRedirect,
+  head: () => ({ meta: [{ title: "Marketing pago — Tabgha Admin" }] }),
 });
 
-function AdminMetaAds() {
-  return (
-    <div className="space-y-4 px-6 py-6">
-      <MetaAdsPage isAdmin />
-    </div>
-  );
+function AdminMetaAdsRedirect() {
+  return <Navigate to="/admin/roi" search={{ tab: "marketing" }} replace />;
 }

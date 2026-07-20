@@ -46,6 +46,21 @@ type KanbanBoardProps = {
   isAdmin?: boolean;
 };
 
+/** Resolve coluna do funil: drop na coluna (status) ou em cima de outro card (lead id). */
+function resolveDropStatus(
+  overId: string | number | undefined | null,
+  leads: Lead[],
+): PipelineStatus | null {
+  if (overId == null) return null;
+  const id = String(overId);
+  if ((PIPELINE as readonly string[]).includes(id)) return id as PipelineStatus;
+  const target = leads.find((l) => l.id === id);
+  if (target && (PIPELINE as readonly string[]).includes(target.status)) {
+    return target.status as PipelineStatus;
+  }
+  return null;
+}
+
 function LeadCardContent({ lead }: { lead: Lead }) {
   const timeAgo = formatDistanceToNow(new Date(lead.atualizado_em || lead.criado_em), {
     addSuffix: false,
@@ -205,7 +220,7 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead; onClose: () => void }
   const [tab, setTab] = useState<"dados" | "conversas">("dados");
   const [obs, setObs] = useState(lead.observacoes ?? "");
   const [status, setStatus] = useState(lead.status as PipelineStatus);
-  const [motivo, setMotivo] = useState((lead as Lead & { motivo_perda?: string | null }).motivo_perda ?? "");
+  const [motivo, setMotivo] = useState(lead.motivo_perda ?? "");
   const [ticket, setTicket] = useState(() => String(parseTicket(lead.observacoes) ?? ""));
 
   const { data: messages = [], isLoading: loadingMsgs } = useQuery({
@@ -519,11 +534,10 @@ export function KanbanBoard({ leads }: KanbanBoardProps) {
   function onDragEnd(event: DragEndEvent) {
     setActiveLead(null);
     const lead = event.active.data.current?.lead as Lead | undefined;
-    const overId = event.over?.id;
-    if (!lead || !overId) return;
+    if (!lead) return;
 
-    const novo = String(overId) as PipelineStatus;
-    if (!PIPELINE.includes(novo) || lead.status === novo) return;
+    const novo = resolveDropStatus(event.over?.id, leads);
+    if (!novo || lead.status === novo) return;
 
     if (novo === "perdido") {
       setPendingPerda({ leadId: lead.id });

@@ -42,17 +42,21 @@ export const requireRoleAuth = createMiddleware({ type: "function" }).server(
 
     const [profileResult, roleResult] = await Promise.all([
       admin.from("profiles").select("cliente_id, permissoes").eq("id", user.id).maybeSingle(),
-      admin.from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
+      admin.from("user_roles").select("role").eq("user_id", user.id),
     ]);
 
-    if (profileResult.error || roleResult.error || !roleResult.data?.role) {
+    const roles = (roleResult.data ?? []).map((r) => r.role);
+    const primaryRole =
+      roles.find((r) => r === "admin") ?? roles[0] ?? null;
+
+    if (profileResult.error || roleResult.error || !primaryRole) {
       throw new Response("Forbidden", { status: 403 });
     }
 
     const auth: AuthContext = {
       userId: user.id,
       email: user.email,
-      role: roleResult.data.role,
+      role: primaryRole,
       clienteId: profileResult.data?.cliente_id ?? null,
       permissoes: profileResult.data?.permissoes ?? null,
       accessToken: token,

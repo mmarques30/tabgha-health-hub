@@ -3,6 +3,47 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
+type AccessType = "equipe" | "cliente";
+const ACTIVE_ROLE_KEY = "tabgha_active_role";
+
+function preferDestination(
+  roles: Array<{ role: string }>,
+  access: AccessType,
+): "/admin/dashboard" | "/cliente/dashboard" {
+  const hasAdmin = roles.some((r) => r.role === "admin");
+  const hasCliente = roles.some((r) => r.role === "cliente");
+  if (access === "equipe" && hasAdmin) {
+    try {
+      sessionStorage.setItem(ACTIVE_ROLE_KEY, "admin");
+    } catch {
+      /* ignore */
+    }
+    return "/admin/dashboard";
+  }
+  if (access === "cliente" && hasCliente) {
+    try {
+      sessionStorage.setItem(ACTIVE_ROLE_KEY, "cliente");
+    } catch {
+      /* ignore */
+    }
+    return "/cliente/dashboard";
+  }
+  if (hasAdmin) {
+    try {
+      sessionStorage.setItem(ACTIVE_ROLE_KEY, "admin");
+    } catch {
+      /* ignore */
+    }
+    return "/admin/dashboard";
+  }
+  try {
+    sessionStorage.setItem(ACTIVE_ROLE_KEY, "cliente");
+  } catch {
+    /* ignore */
+  }
+  return "/cliente/dashboard";
+}
+
 export const Route = createFileRoute("/login")({
   ssr: false,
   beforeLoad: async () => {
@@ -12,15 +53,15 @@ export const Route = createFileRoute("/login")({
         .from("user_roles")
         .select("role")
         .eq("user_id", data.user.id);
-      const isAdmin = roles?.some((r) => r.role === "admin");
-      throw redirect({ to: isAdmin ? "/admin/dashboard" : "/cliente/dashboard" });
+      const preferred =
+        typeof window !== "undefined" ? sessionStorage.getItem(ACTIVE_ROLE_KEY) : null;
+      const access: AccessType = preferred === "cliente" ? "cliente" : "equipe";
+      throw redirect({ to: preferDestination(roles ?? [], access) });
     }
   },
   component: LoginPage,
   head: () => ({ meta: [{ title: "Login — Tabgha" }] }),
 });
-
-type AccessType = "equipe" | "cliente";
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -42,8 +83,19 @@ function LoginPage() {
     const { data: roles, error: rolesError } = await supabase
       .from("user_roles").select("role").eq("user_id", userId);
     if (rolesError) { setError("Login realizado, mas não foi possível carregar seu perfil."); return; }
-    const isAdmin = roles?.some((r) => r.role === "admin");
-    navigate({ to: isAdmin ? "/admin/dashboard" : "/cliente/dashboard", replace: true });
+
+    const hasAdmin = roles?.some((r) => r.role === "admin");
+    const hasCliente = roles?.some((r) => r.role === "cliente");
+    if (access === "equipe" && !hasAdmin) {
+      setError("Este login não tem acesso de equipe (admin). Use Portal do Cliente ou peça o perfil Admin.");
+      return;
+    }
+    if (access === "cliente" && !hasCliente) {
+      setError("Este login não tem portal do médico. Use Equipe Tabgha ou peça o perfil Portal.");
+      return;
+    }
+
+    navigate({ to: preferDestination(roles ?? [], access), replace: true });
   }
 
   return (

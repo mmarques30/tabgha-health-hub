@@ -1,8 +1,14 @@
-// Cria usuário Auth + profile/role (admin only).
+// Cria/atualiza usuário Auth + profile/roles (admin only).
 // Senha provisória padrão: Tabgha{ano} (ex.: Tabgha2026).
-// Se o email já existir com o MESMO role: redefine senha e atualiza perfil.
-// Se existir com role diferente: erro claro (não converte cliente↔admin).
-// POST { email, nome, role, cliente_id?, permissoes? }
+//
+// POST {
+//   action?: "create" | "reset_password",
+//   email?, nome?,
+//   role?: "admin" | "cliente",          // legado (um papel)
+//   roles?: ("admin"|"cliente")[],       // preferido (um ou ambos)
+//   cliente_id?, permissoes?,
+//   user_id?                            // obrigatório em reset_password
+// }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -11,6 +17,8 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SB_PUBLISHABLE_KEY") ?? "";
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+
+type AppRole = "admin" | "cliente";
 
 function provisionalPassword(now = new Date()) {
   return `Tabgha${now.getFullYear()}`;
@@ -27,9 +35,21 @@ function json(body: Record<string, unknown>, status = 200) {
   });
 }
 
+function normalizeRoles(body: {
+  role?: AppRole;
+  roles?: AppRole[];
+}): AppRole[] {
+  const fromArray = (body.roles ?? []).filter(
+    (r): r is AppRole => r === "admin" || r === "cliente",
+  );
+  if (fromArray.length > 0) return [...new Set(fromArray)];
+  if (body.role === "admin" || body.role === "cliente") return [body.role];
+  return [];
+}
+
 async function findExistingByEmail(email: string): Promise<{
   userId: string;
-  role: string | null;
+  roles: AppRole[];
 } | null> {
   const { data: profile } = await admin
     .from("profiles")
@@ -38,25 +58,78 @@ async function findExistingByEmail(email: string): Promise<{
     .maybeSingle();
 
   if (profile?.id) {
-    const { data: roleRow } = await admin
+    const { data: roleRows } = await admin
       .from("user_roles")
       .select("role")
-      .eq("user_id", profile.id)
-      .maybeSingle();
-    return { userId: profile.id, role: roleRow?.role ?? null };
+      .eq("user_id", profile.id);
+    return {
+      userId: profile.id,
+      roles: (roleRows ?? []).map((r) => r.role as AppRole),
+    };
   }
 
-  // Fallback Auth (caso raro: user sem profile)
   const { data: listed, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
   if (error) throw error;
   const found = listed.users.find((u) => (u.email ?? "").toLowerCase() === email);
   if (!found) return null;
-  const { data: roleRow } = await admin
+  const { data: roleRows } = await admin
     .from("user_roles")
     .select("role")
-    .eq("user_id", found.id)
-    .maybeSingle();
-  return { userId: found.id, role: roleRow?.role ?? null };
+    .eq("user_id", found.id);
+  return {
+    userId: found.id,
+    roles: (roleRows ?? []).map((r) => r.role as AppRole),
+  };
+}
+
+async function syncRoles(userId: string, roles: AppRole[]) {
+  const { data: currentRows } = await admin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+  const current = new Set((currentRows ?? []).map((r) => r.role as AppRole));
+  const wanted = new Set(roles);
+
+  for (const role of wanted) {
+    if (!current.has(role)) {
+      const { error } = await admin.from("user_roles").insert({ user_id: userId, role });
+      if (error) throw error;
+    }
+  }
+  for (const role of current) {
+    if (!wanted.has(role)) {
+      const { error } = await admin
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId)
+        .eq("role", role);
+      if (error) throw error;
+    }
+  }
+}
+
+async function assertCallerIsAdmin(authHeader: string) {
+  if (!authHeader.startsWith("Bearer ")) {
+    return { ok: false as const, response: json({ ok: false, error: "unauthorized" }, 401) };
+  }
+
+  const userClient = createClient(SUPABASE_URL, ANON_KEY || SERVICE_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !userData.user) {
+    return { ok: false as const, response: json({ ok: false, error: "unauthorized" }, 401) };
+  }
+
+  const { data: isAdmin, error: roleErr } = await admin.rpc("has_role", {
+    _user_id: userData.user.id,
+    _role: "admin",
+  });
+  if (roleErr || !isAdmin) {
+    return { ok: false as const, response: json({ ok: false, error: "apenas admin" }, 403) };
+  }
+
+  return { ok: true as const, userId: userData.user.id };
 }
 
 Deno.serve(async (req) => {
@@ -65,57 +138,76 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) {
-      return json({ ok: false, error: "unauthorized" }, 401);
-    }
-
-    const userClient = createClient(SUPABASE_URL, ANON_KEY || SERVICE_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData.user) return json({ ok: false, error: "unauthorized" }, 401);
-
-    const { data: isAdmin, error: roleErr } = await admin.rpc("has_role", {
-      _user_id: userData.user.id,
-      _role: "admin",
-    });
-    if (roleErr || !isAdmin) return json({ ok: false, error: "apenas admin" }, 403);
+    const caller = await assertCallerIsAdmin(authHeader);
+    if (!caller.ok) return caller.response;
 
     const body = (await req.json()) as {
+      action?: "create" | "reset_password";
       email?: string;
       nome?: string;
-      role?: "admin" | "cliente";
+      role?: AppRole;
+      roles?: AppRole[];
       cliente_id?: string | null;
       permissoes?: string[];
+      user_id?: string;
     };
 
-    const email = body.email?.trim().toLowerCase();
-    const nome = body.nome?.trim();
-    const role = body.role;
-    if (!email || !nome || !role) {
-      return json({ ok: false, error: "email, nome e role são obrigatórios" }, 400);
-    }
-    if (role === "cliente" && !body.cliente_id) {
-      return json({ ok: false, error: "cliente_id obrigatório para perfil cliente" }, 400);
+    const action = body.action ?? "create";
+    const temporaryPassword = provisionalPassword();
+
+    // ── Reset de senha provisória (reexibe credenciais) ──────────────────────
+    if (action === "reset_password") {
+      const userId = body.user_id?.trim();
+      if (!userId) return json({ ok: false, error: "user_id obrigatório" }, 400);
+
+      const { data: profile, error: profileErr } = await admin
+        .from("profiles")
+        .select("id, email, nome")
+        .eq("id", userId)
+        .maybeSingle();
+      if (profileErr) return json({ ok: false, error: profileErr.message }, 400);
+      if (!profile) return json({ ok: false, error: "Usuário não encontrado." }, 404);
+
+      const { error: updateErr } = await admin.auth.admin.updateUserById(userId, {
+        password: temporaryPassword,
+        email_confirm: true,
+      });
+      if (updateErr) return json({ ok: false, error: updateErr.message }, 400);
+
+      const { data: roleRows } = await admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+
+      return json({
+        ok: true,
+        user_id: userId,
+        email: profile.email,
+        temporary_password: temporaryPassword,
+        reused_existing: true,
+        roles: (roleRows ?? []).map((r) => r.role),
+        message: "Senha provisória redefinida para Tabgha{ano}.",
+      });
     }
 
-    const temporaryPassword = provisionalPassword();
+    // ── Create / upsert acesso ───────────────────────────────────────────────
+    const email = body.email?.trim().toLowerCase();
+    const nome = body.nome?.trim();
+    const roles = normalizeRoles(body);
+    if (!email || !nome || roles.length === 0) {
+      return json({ ok: false, error: "email, nome e ao menos um perfil (admin/cliente) são obrigatórios" }, 400);
+    }
+
+    const wantsCliente = roles.includes("cliente");
+    if (wantsCliente && !body.cliente_id) {
+      return json({ ok: false, error: "cliente_id obrigatório quando o portal do médico está liberado" }, 400);
+    }
+
     let userId: string | null = null;
     let reusedExisting = false;
 
     const existing = await findExistingByEmail(email);
     if (existing) {
-      if (existing.role && existing.role !== role) {
-        const atual = existing.role === "cliente" ? "cliente (portal)" : "admin";
-        const pedido = role === "cliente" ? "cliente (portal)" : "admin";
-        return json(
-          {
-            ok: false,
-            error: `Este email já está cadastrado como ${atual}. Você pediu ${pedido}. Abra Usuários & acessos → Editar o membro existente, ou use outro email.`,
-          },
-          409,
-        );
-      }
       userId = existing.userId;
       reusedExisting = true;
       const { error: updateErr } = await admin.auth.admin.updateUserById(userId, {
@@ -135,9 +227,8 @@ Deno.serve(async (req) => {
           msg.toLowerCase().includes("already been registered") ||
           msg.toLowerCase().includes("email_exists");
         if (exists) {
-          // Auth tem o email mas profile/role não bateu — tenta recuperar e alinhar
           const again = await findExistingByEmail(email);
-          if (again && (!again.role || again.role === role)) {
+          if (again) {
             userId = again.userId;
             reusedExisting = true;
             const { error: updateErr } = await admin.auth.admin.updateUserById(userId, {
@@ -145,14 +236,6 @@ Deno.serve(async (req) => {
               email_confirm: true,
             });
             if (updateErr) return json({ ok: false, error: updateErr.message }, 400);
-          } else if (again && again.role && again.role !== role) {
-            return json(
-              {
-                ok: false,
-                error: `Este email já está cadastrado como ${again.role}. Abra Usuários & acessos → Editar, ou use outro email.`,
-              },
-              409,
-            );
           } else {
             return json(
               {
@@ -173,25 +256,31 @@ Deno.serve(async (req) => {
 
     if (!userId) return json({ ok: false, error: "Não foi possível obter o usuário." }, 500);
 
+    const clienteId = wantsCliente ? body.cliente_id ?? null : null;
+    const permissoes = body.permissoes ?? ["*"];
+
+    // Garante profile + ao menos o primeiro papel via RPC; depois sincroniza o conjunto.
+    const primaryRole = roles.includes("admin") ? "admin" : "cliente";
     const { error: rpcError } = await admin.rpc("admin_upsert_profile_role", {
       _user_id: userId,
-      _role: role,
-      _cliente_id: body.cliente_id ?? undefined,
-      _permissoes: body.permissoes ?? ["*"],
+      _role: primaryRole,
+      _cliente_id: clienteId ?? undefined,
+      _permissoes: permissoes,
     });
     if (rpcError) return json({ ok: false, error: rpcError.message }, 400);
 
-    await admin.from("user_roles").upsert({ user_id: userId, role }, { onConflict: "user_id,role" });
+    await syncRoles(userId, roles);
 
-    await admin
+    const { error: profileErr } = await admin
       .from("profiles")
       .update({
         nome,
         email,
-        cliente_id: role === "cliente" ? body.cliente_id : null,
-        permissoes: body.permissoes ?? ["*"],
+        cliente_id: clienteId,
+        permissoes,
       })
       .eq("id", userId);
+    if (profileErr) return json({ ok: false, error: profileErr.message }, 400);
 
     return json({
       ok: true,
@@ -199,7 +288,8 @@ Deno.serve(async (req) => {
       reused_existing: reusedExisting,
       temporary_password: temporaryPassword,
       email,
-      role,
+      role: primaryRole,
+      roles,
       message: reusedExisting
         ? "Usuário já existia — senha provisória redefinida para Tabgha{ano}."
         : "Usuário criado. Senha provisória: Tabgha{ano}.",

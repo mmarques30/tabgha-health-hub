@@ -163,7 +163,8 @@ function AddUserDialog({
       : roles.filter((r) => r !== role);
     form.setValue("roles", next, { shouldValidate: true });
     if (!next.includes("cliente")) form.setValue("cliente_id", null);
-    if (next.length > 0) setPermissoes(["*"]);
+    // Admin + Portal: acesso total evita menu vazio em uma das áreas.
+    if (next.includes("admin") && next.includes("cliente")) setPermissoes(["*"]);
   }
 
   const mutation = useMutation({

@@ -44,19 +44,19 @@ import { calcCaq } from "@/lib/analytics-range";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
-const ROI_TABS = [
-  "operacao",
-  "clientes",
-  "oportunidades",
-  "campanhas",
-  "marketing",
-] as const;
+const ROI_TABS = ["operacao", "clientes", "campanhas", "marketing"] as const;
 
 type TabId = (typeof ROI_TABS)[number];
 
+function resolveRoiTab(raw: unknown): TabId {
+  // Legado: oportunidades foi unificado em clientes.
+  if (raw === "oportunidades") return "clientes";
+  return ROI_TABS.includes(raw as TabId) ? (raw as TabId) : "operacao";
+}
+
 export const Route = createFileRoute("/_authenticated/admin/roi")({
   validateSearch: (search: Record<string, unknown>) => ({
-    tab: ROI_TABS.includes(search.tab as TabId) ? (search.tab as TabId) : ("operacao" as TabId),
+    tab: resolveRoiTab(search.tab),
   }),
   component: RoiAdminPage,
   head: () => ({ meta: [{ title: "ROI da operação — Tabgha Admin" }] }),
@@ -349,7 +349,7 @@ function RoiAdminPage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight">ROI da operação</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Operação, clientes, oportunidades, campanhas e marketing pago no mesmo lugar
+            Operação, clientes, campanhas e marketing pago no mesmo lugar
           </p>
         </div>
         {tab !== "marketing" ? (
@@ -370,8 +370,7 @@ function RoiAdminPage() {
         onChange={setTab}
         tabs={[
           { id: "operacao", label: "Operação" },
-          { id: "clientes", label: "Clientes gerados" },
-          { id: "oportunidades", label: "Oportunidades" },
+          { id: "clientes", label: "Clientes" },
           { id: "campanhas", label: "Campanhas" },
           { id: "marketing", label: "Marketing pago" },
         ]}
@@ -567,7 +566,13 @@ function RoiAdminPage() {
 
           {tab === "clientes" ? (
             <div className="space-y-4">
-              <InsightStack items={rankingInsights} />
+              <StoryBanner
+                title={`${kpis.leadsCrm} oportunidades · ${byCliente.length} clínicas no filtro`}
+                body={`${kpis.qualificados} já saíram do “novo” e ${kpis.convertidos} viraram paciente. Abaixo: mídia por clínica e onde o funil trava.`}
+                tone={kpis.convertidos > 0 ? "good" : "info"}
+              />
+              <InsightStack items={[...rankingInsights, ...funnelInsights].slice(0, 3)} />
+
               <div className="grid gap-4 lg:grid-cols-2">
                 <Panel title="Investimento por clínica" tone="soft">
                   <RankedBarChart
@@ -591,53 +596,7 @@ function RoiAdminPage() {
                   />
                 </Panel>
               </div>
-              <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-secondary/50 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      <th className="px-4 py-2.5 text-left">Cliente</th>
-                      <th className="px-4 py-2.5 text-right">Investimento</th>
-                      <th className="px-4 py-2.5 text-right">Leads</th>
-                      <th className="px-4 py-2.5 text-right">CAQ</th>
-                      <th className="px-4 py-2.5 text-right" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {byCliente.map((row) => (
-                      <tr key={row.id} className="hover:bg-secondary/30">
-                        <td className="px-4 py-3 font-medium">{row.nome}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {fmt(row.investimento)}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">{row.leads}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {row.caq != null ? fmt(row.caq) : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <Link
-                            to={"/admin/clientes/$id" as never}
-                            params={{ id: row.id } as never}
-                            className="text-xs font-semibold text-sky-700 hover:underline"
-                          >
-                            Abrir
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : null}
 
-          {tab === "oportunidades" ? (
-            <div className="space-y-4">
-              <StoryBanner
-                title={`${kpis.leadsCrm} oportunidades no funil`}
-                body={`${kpis.qualificados} já saíram do “novo” e ${kpis.convertidos} viraram paciente. Use o funil para mostrar ao cliente onde a equipe deve atacar.`}
-                tone={kpis.convertidos > 0 ? "good" : "info"}
-              />
-              <InsightStack items={funnelInsights} />
               <div className="grid gap-4 lg:grid-cols-2">
                 <Panel title="Funil" tone="soft">
                   <FunnelBars stages={funnel} />
@@ -646,40 +605,85 @@ function RoiAdminPage() {
                   <StatusChips items={statusBreakdown} />
                 </Panel>
               </div>
+
               <div className="overflow-hidden rounded-2xl border border-border bg-card">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-secondary/50 text-[10px] uppercase tracking-wide text-muted-foreground">
                       <th className="px-4 py-2.5 text-left">Cliente</th>
-                      <th className="px-4 py-2.5 text-right">Novos</th>
-                      <th className="px-4 py-2.5 text-right">Qualificação</th>
-                      <th className="px-4 py-2.5 text-right">Convertidos</th>
-                      <th className="px-4 py-2.5 text-right">Total</th>
+                      <th className="px-3 py-2.5 text-right">Invest.</th>
+                      <th className="px-3 py-2.5 text-right">Leads Ads</th>
+                      <th className="px-3 py-2.5 text-right">Novos</th>
+                      <th className="px-3 py-2.5 text-right">Qualif.</th>
+                      <th className="px-3 py-2.5 text-right">Conv.</th>
+                      <th className="px-3 py-2.5 text-right">CAQ</th>
+                      <th className="px-3 py-2.5 text-right" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {oportunidades.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="px-4 py-10 text-center text-sm text-muted-foreground"
-                        >
-                          Sem leads no CRM neste filtro.
-                        </td>
-                      </tr>
-                    ) : (
-                      oportunidades.map((row) => (
+                    {(() => {
+                      const oppById = new Map(oportunidades.map((o) => [o.id, o]));
+                      const ids = new Set([
+                        ...byCliente.map((r) => r.id),
+                        ...oportunidades.map((o) => o.id),
+                      ]);
+                      const rows = [...ids].map((id) => {
+                        const media = byCliente.find((r) => r.id === id);
+                        const opp = oppById.get(id);
+                        return {
+                          id,
+                          nome: media?.nome ?? opp?.nome ?? "Cliente",
+                          investimento: media?.investimento ?? 0,
+                          leadsAds: media?.leads ?? 0,
+                          novos: opp?.novos ?? 0,
+                          qualificacao: opp?.qualificacao ?? 0,
+                          convertidos: opp?.convertidos ?? 0,
+                          caq: media?.caq ?? null,
+                        };
+                      });
+                      rows.sort(
+                        (a, b) =>
+                          b.investimento - a.investimento ||
+                          b.novos + b.qualificacao + b.convertidos -
+                            (a.novos + a.qualificacao + a.convertidos),
+                      );
+                      if (rows.length === 0) {
+                        return (
+                          <tr>
+                            <td
+                              colSpan={8}
+                              className="px-4 py-10 text-center text-sm text-muted-foreground"
+                            >
+                              Sem clínicas nem leads neste filtro.
+                            </td>
+                          </tr>
+                        );
+                      }
+                      return rows.map((row) => (
                         <tr key={row.id} className="hover:bg-secondary/30">
                           <td className="px-4 py-3 font-medium">{row.nome}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{row.novos}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{row.qualificacao}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{row.convertidos}</td>
-                          <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                            {row.total}
+                          <td className="px-3 py-3 text-right tabular-nums">
+                            {row.investimento > 0 ? fmt(row.investimento) : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums">{row.leadsAds}</td>
+                          <td className="px-3 py-3 text-right tabular-nums">{row.novos}</td>
+                          <td className="px-3 py-3 text-right tabular-nums">{row.qualificacao}</td>
+                          <td className="px-3 py-3 text-right tabular-nums">{row.convertidos}</td>
+                          <td className="px-3 py-3 text-right tabular-nums">
+                            {row.caq != null ? fmt(row.caq) : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            <Link
+                              to={"/admin/clientes/$id" as never}
+                              params={{ id: row.id } as never}
+                              className="text-xs font-semibold text-sky-700 hover:underline"
+                            >
+                              Abrir
+                            </Link>
                           </td>
                         </tr>
-                      ))
-                    )}
+                      ));
+                    })()}
                   </tbody>
                 </table>
               </div>

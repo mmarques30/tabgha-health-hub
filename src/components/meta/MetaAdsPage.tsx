@@ -654,10 +654,10 @@ export function MetaAdsPage({
           {isAdmin && !embedded ? (
             <Link
               to="/admin/roi"
-              search={{ tab: "oportunidades" }}
+              search={{ tab: "clientes" }}
               className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline"
             >
-              Ver oportunidades no ROI <ArrowRight className="h-3.5 w-3.5" />
+              Ver clientes no ROI <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           ) : null}
         </>

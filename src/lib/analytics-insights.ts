@@ -339,24 +339,30 @@ export function buildCampaignInsights(
 }
 
 export function buildAdInsights(
-  rows: Array<{ anuncio: string; campanha: string; leads: number }>,
+  rows: Array<{ anuncio: string; campanha: string; leads: number; investimento?: number }>,
 ): PlainInsight[] {
   if (rows.length === 0) {
     return [
       {
-        title: "Anúncios ainda sem nome no funil",
-        body: "Os leads chegaram, mas não trouxeram o ID do criativo. Assim que o webhook gravar o Ad ID, dá para ver qual peça vende mais.",
+        title: "Ainda sem métricas por anúncio",
+        body: "Sincronize a Meta no período. As linhas de anúncio vêm do insights level=ad (investimento, leads, impressões e cliques).",
         tone: "info",
       },
     ];
   }
-  const sorted = [...rows].sort((a, b) => b.leads - a.leads);
+  const sorted = [...rows].sort(
+    (a, b) => b.leads - a.leads || (b.investimento ?? 0) - (a.investimento ?? 0),
+  );
   const top = sorted[0];
   const total = rows.reduce((s, r) => s + r.leads, 0);
+  const spendHint =
+    top.investimento != null && top.investimento > 0
+      ? ` com ${fmtMoneyCompact(top.investimento)} investidos`
+      : "";
   const out: PlainInsight[] = [
     {
       title: "Criativo que mais puxa gente",
-      body: `“${top.anuncio}” gerou ${top.leads} leads (${fmtPct(pct(top.leads, total))}) via ${top.campanha}. Esse é o formato para escalar ou clonar.`,
+      body: `“${top.anuncio}” gerou ${top.leads} leads (${fmtPct(pct(top.leads, total))}) via ${top.campanha}${spendHint}. Esse é o formato para escalar ou clonar.`,
       tone: "good",
     },
   ];

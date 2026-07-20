@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bar,
   BarChart,
@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2, RefreshCw } from "lucide-react";
 
 import {
   AnalyticsFilters,
@@ -20,11 +20,9 @@ import {
   type AnalyticsFiltersValue,
 } from "@/components/analytics/AnalyticsFilters";
 import {
-  FunnelBars,
   InsightStack,
   Panel,
   RankedBarChart,
-  StatusChips,
   StoryBanner,
 } from "@/components/analytics/InsightPanel";
 import { SubTabs } from "@/components/analytics/SubTabs";
@@ -42,13 +40,7 @@ import { useClientesOptions } from "@/hooks/useClientesOptions";
 import {
   buildAdInsights,
   buildCampaignInsights,
-  buildFunnelInsights,
-  buildHeadline,
-  countByStatus,
   fmtMoneyCompact,
-  funnelStages,
-  insightFromGap,
-  percentDiff,
 } from "@/lib/analytics-insights";
 import { calcCaq } from "@/lib/analytics-range";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,30 +49,44 @@ import { formatCurrency, META_TOOLTIP_STYLE } from "@/lib/types";
 type MetaAdsPageProps = {
   isAdmin?: boolean;
   fixedClienteId?: string | null;
+  /** When true, hides page chrome that duplicates the parent ROI shell. */
+  embedded?: boolean;
+  /** Prefer ad view when opened from Marketing pago. */
+  defaultTab?: "campanhas" | "anuncios";
 };
 
-type TabId = "campanhas" | "anuncios" | "oportunidades";
+type TabId = "campanhas" | "anuncios";
 
 type Metrica = {
   data: string;
   campanha: string | null;
+  ad_id: string | null;
+  anuncio: string | null;
+  nivel: string | null;
   investimento: number;
   leads: number;
+  impressoes: number | null;
+  cliques: number | null;
   cpl: number | null;
 };
 
-type LeadRow = {
-  id: string;
-  criado_em: string;
-  canal: string | null;
-  status: string;
-  observacoes: string | null;
-  utm_campaign: string | null;
-};
+function isCampaignRow(m: Metrica) {
+  return (m.ad_id ?? "").trim() === "";
+}
 
-export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsPageProps) {
+function isAdRow(m: Metrica) {
+  return (m.ad_id ?? "").trim() !== "";
+}
+
+export function MetaAdsPage({
+  isAdmin = false,
+  fixedClienteId = null,
+  embedded = false,
+  defaultTab = "anuncios",
+}: MetaAdsPageProps) {
   const { profile } = useAuth();
-  const [tab, setTab] = useState<TabId>("campanhas");
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState<TabId>(defaultTab);
   const [filters, setFilters] = useState<AnalyticsFiltersValue>(() => ({
     ...defaultAnalyticsFilters("30d"),
     clienteId: fixedClienteId,
@@ -90,6 +96,10 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
 
   const activeClienteId =
     fixedClienteId ?? filters.clienteId ?? (!isAdmin ? (profile?.cliente_id ?? null) : null);
+
+  useEffect(() => {
+    setTab(defaultTab);
+  }, [defaultTab]);
 
   useEffect(() => {
     if (fixedClienteId) {
@@ -103,6 +113,26 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
     const pick = pedro?.id ?? clientesOptions[0]?.id ?? null;
     if (pick) setFilters((f) => ({ ...f, clienteId: pick }));
   }, [fixedClienteId, isAdmin, filters.clienteId, clientesOptions]);
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeClienteId) throw new Error("Selecione um cliente");
+      const { data, error } = await supabase.functions.invoke("sync_ads_metrics", {
+        body: {
+          cliente_id: activeClienteId,
+          since: filters.range.since,
+          until: filters.range.until,
+        },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["marketing-pago"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "roi"] });
+      void queryClient.invalidateQueries({ queryKey: ["cliente", "roi"] });
+    },
+  });
 
   const dataQuery = useQuery({
     queryKey: ["marketing-pago", activeClienteId, filters.range],
@@ -122,56 +152,41 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
       const prevStartIso = prevStart.toISOString().slice(0, 10);
       const prevEndIso = prevEnd.toISOString().slice(0, 10);
 
-      const [{ data: metrics, error: metricsErr }, { data: leads, error: leadsErr }] =
-        await Promise.all([
-          supabase
-            .from("metricas_ads")
-            .select("data,campanha,investimento,leads,cpl")
-            .eq("cliente_id", activeClienteId!)
-            .eq("plataforma", "meta")
-            .gte("data", prevStartIso)
-            .lte("data", end)
-            .order("data", { ascending: true }),
-          supabase
-            .from("leads")
-            .select("id,criado_em,canal,status,observacoes,utm_campaign")
-            .eq("cliente_id", activeClienteId!)
-            .gte("criado_em", `${prevStartIso}T00:00:00.000Z`)
-            .lte("criado_em", `${end}T23:59:59.999Z`),
-        ]);
+      const { data: metrics, error: metricsErr } = await supabase
+        .from("metricas_ads")
+        .select("data,campanha,ad_id,anuncio,nivel,investimento,leads,impressoes,cliques,cpl")
+        .eq("cliente_id", activeClienteId!)
+        .eq("plataforma", "meta")
+        .gte("data", prevStartIso)
+        .lte("data", end)
+        .order("data", { ascending: true });
 
       if (metricsErr) throw metricsErr;
-      if (leadsErr) throw leadsErr;
 
       const allMetrics = (metrics ?? []) as Metrica[];
-      const allLeads = (leads ?? []) as LeadRow[];
-
       const inCurrent = (date: string) => date >= start && date <= end;
       const inPrev = (date: string) => date >= prevStartIso && date <= prevEndIso;
 
-      const currentMetrics = allMetrics.filter((m) => inCurrent(m.data));
-      const previousMetrics = allMetrics.filter((m) => inPrev(m.data));
-      const currentLeads = allLeads.filter((l) => inCurrent(l.criado_em.slice(0, 10)));
-      const previousLeads = allLeads.filter((l) => inPrev(l.criado_em.slice(0, 10)));
+      const currentAll = allMetrics.filter((m) => inCurrent(m.data));
+      const previousAll = allMetrics.filter((m) => inPrev(m.data));
+      const currentCampaigns = currentAll.filter(isCampaignRow);
+      const previousCampaigns = previousAll.filter(isCampaignRow);
+      const currentAds = currentAll.filter(isAdRow);
 
       const sum = (rows: Metrica[]) => ({
         investimento: rows.reduce((s, m) => s + Number(m.investimento ?? 0), 0),
         leadsAds: rows.reduce((s, m) => s + Number(m.leads ?? 0), 0),
+        impressoes: rows.reduce((s, m) => s + Number(m.impressoes ?? 0), 0),
+        cliques: rows.reduce((s, m) => s + Number(m.cliques ?? 0), 0),
       });
 
-      const cur = sum(currentMetrics);
-      const prev = sum(previousMetrics);
-      const leadsMeta = currentLeads.filter((l) => ["meta", "facebook"].includes(l.canal ?? ""));
-      const prevLeadsMeta = previousLeads.filter((l) =>
-        ["meta", "facebook"].includes(l.canal ?? ""),
-      );
-      const leadsCaptados = leadsMeta.length > 0 ? leadsMeta.length : cur.leadsAds;
-      const prevLeadsCaptados = prevLeadsMeta.length > 0 ? prevLeadsMeta.length : prev.leadsAds;
-      const caq = calcCaq(cur.investimento, leadsCaptados);
-      const prevCaq = calcCaq(prev.investimento, prevLeadsCaptados);
+      const cur = sum(currentCampaigns);
+      const prev = sum(previousCampaigns);
+      const caq = calcCaq(cur.investimento, cur.leadsAds);
+      const prevCaq = calcCaq(prev.investimento, prev.leadsAds);
 
       const byDay = new Map<string, { data: string; investimento: number; leads: number }>();
-      for (const row of currentMetrics) {
+      for (const row of currentCampaigns) {
         if (!byDay.has(row.data))
           byDay.set(row.data, { data: row.data, investimento: 0, leads: 0 });
         const t = byDay.get(row.data)!;
@@ -181,14 +196,24 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
 
       const byCampaign = new Map<
         string,
-        { campanha: string; investimento: number; leads: number }
+        { campanha: string; investimento: number; leads: number; impressoes: number; cliques: number }
       >();
-      for (const row of currentMetrics) {
+      for (const row of currentCampaigns) {
         const key = row.campanha ?? "Sem campanha";
-        if (!byCampaign.has(key)) byCampaign.set(key, { campanha: key, investimento: 0, leads: 0 });
+        if (!byCampaign.has(key)) {
+          byCampaign.set(key, {
+            campanha: key,
+            investimento: 0,
+            leads: 0,
+            impressoes: 0,
+            cliques: 0,
+          });
+        }
         const t = byCampaign.get(key)!;
         t.investimento += Number(row.investimento ?? 0);
         t.leads += Number(row.leads ?? 0);
+        t.impressoes += Number(row.impressoes ?? 0);
+        t.cliques += Number(row.cliques ?? 0);
       }
 
       const campaigns = [...byCampaign.values()]
@@ -199,99 +224,93 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
         }))
         .sort((a, b) => b.investimento - a.investimento);
 
-      const byAd = new Map<string, { anuncio: string; campanha: string; leads: number }>();
-      for (const l of leadsMeta) {
-        const adMatch = l.observacoes?.match(/Ad\s+(\d+)/i);
-        const key = adMatch?.[1] ?? l.utm_campaign ?? "sem-anuncio";
-        const label = adMatch
-          ? `Anúncio ${adMatch[1]}`
-          : (l.utm_campaign ?? "Sem anúncio identificado");
-        const prevRow = byAd.get(key) ?? {
-          anuncio: label,
-          campanha: l.utm_campaign ?? "—",
+      const byAd = new Map<
+        string,
+        {
+          ad_id: string;
+          anuncio: string;
+          campanha: string;
+          investimento: number;
+          leads: number;
+          impressoes: number;
+          cliques: number;
+        }
+      >();
+      for (const row of currentAds) {
+        const adId = (row.ad_id ?? "").trim();
+        if (!adId) continue;
+        const prevRow = byAd.get(adId) ?? {
+          ad_id: adId,
+          anuncio: row.anuncio?.trim() || `Anúncio ${adId}`,
+          campanha: row.campanha ?? "—",
+          investimento: 0,
           leads: 0,
+          impressoes: 0,
+          cliques: 0,
         };
-        prevRow.leads += 1;
-        byAd.set(key, prevRow);
+        prevRow.investimento += Number(row.investimento ?? 0);
+        prevRow.leads += Number(row.leads ?? 0);
+        prevRow.impressoes += Number(row.impressoes ?? 0);
+        prevRow.cliques += Number(row.cliques ?? 0);
+        if (row.anuncio?.trim()) prevRow.anuncio = row.anuncio.trim();
+        if (row.campanha) prevRow.campanha = row.campanha;
+        byAd.set(adId, prevRow);
       }
-      const anuncios = [...byAd.values()].sort((a, b) => b.leads - a.leads);
 
-      const oportunidades = {
-        total: leadsMeta.length,
-        novos: leadsMeta.filter((l) => l.status === "novo").length,
-        qualificacao: leadsMeta.filter((l) => l.status !== "novo" && l.status !== "convertido")
-          .length,
-        convertidos: leadsMeta.filter((l) => l.status === "convertido").length,
-        perdidos: leadsMeta.filter((l) => l.status === "perdido").length,
-      };
+      const anuncios = [...byAd.values()]
+        .map((a) => ({
+          ...a,
+          caq: calcCaq(a.investimento, a.leads),
+          ctr: a.impressoes > 0 ? (a.cliques / a.impressoes) * 100 : null,
+        }))
+        .sort((a, b) => b.investimento - a.investimento || b.leads - a.leads);
 
       return {
         current: {
           investimento: cur.investimento,
-          leadsCaptados,
           leadsAds: cur.leadsAds,
+          impressoes: cur.impressoes,
+          cliques: cur.cliques,
           caq,
-          cpl: calcCaq(cur.investimento, leadsCaptados),
+          cpl: calcCaq(cur.investimento, cur.leadsAds),
         },
         previous: {
           investimento: prev.investimento,
-          leadsCaptados: prevLeadsCaptados,
+          leadsAds: prev.leadsAds,
           caq: prevCaq,
         },
         chart: [...byDay.values()],
         campaigns,
         anuncios,
-        oportunidades,
-        leadStatuses: leadsMeta.map((l) => ({ status: l.status })),
       };
     },
   });
 
   const cards = useMemo(() => {
     const current = dataQuery.data?.current;
-    const previous = dataQuery.data?.previous;
-    if (!current || !previous) return [];
+    if (!current) return [];
     return [
-      {
-        label: "Investimento",
-        value: formatCurrency(current.investimento),
-        diff: percentDiff(current.investimento, previous.investimento),
-      },
-      {
-        label: "Leads captados",
-        value: String(current.leadsCaptados),
-        diff: percentDiff(current.leadsCaptados, previous.leadsCaptados),
-      },
+      { label: "Investimento", value: formatCurrency(current.investimento) },
+      { label: "Leads (Ads)", value: String(current.leadsAds) },
       {
         label: "CAQ",
         value: current.caq != null ? formatCurrency(current.caq) : "—",
-        diff:
-          current.caq != null && previous.caq != null ? percentDiff(current.caq, previous.caq) : 0,
       },
       {
-        label: "CPL",
-        value: current.cpl != null ? formatCurrency(current.cpl) : "—",
-        diff: 0,
+        label: "Impressões",
+        value: current.impressoes > 0 ? current.impressoes.toLocaleString("pt-BR") : "—",
       },
     ];
   }, [dataQuery.data]);
 
-  const headline = buildHeadline({
-    invest: dataQuery.data?.current.investimento ?? 0,
-    leadsCrm: dataQuery.data?.oportunidades.total ?? 0,
-    leadsAds: dataQuery.data?.current.leadsAds ?? 0,
-    caq: dataQuery.data?.current.caq ?? null,
-    convertidos: dataQuery.data?.oportunidades.convertidos ?? 0,
-    perdidos: dataQuery.data?.oportunidades.perdidos ?? 0,
-  });
   const campaignInsights = buildCampaignInsights(dataQuery.data?.campaigns ?? []);
-  const adInsights = buildAdInsights(dataQuery.data?.anuncios ?? []);
-  const funnelInsights = buildFunnelInsights(dataQuery.data?.leadStatuses ?? []);
-  const funnel = funnelStages(dataQuery.data?.leadStatuses ?? []);
-  const statusBreakdown = countByStatus(dataQuery.data?.leadStatuses ?? []);
-  const adsCrmGap = insightFromGap(
-    dataQuery.data?.current.leadsAds ?? 0,
-    dataQuery.data?.oportunidades.total ?? 0,
+  const adInsights = buildAdInsights(
+    (dataQuery.data?.anuncios ?? []).map((a) => ({
+      anuncio: a.anuncio,
+      campanha: a.campanha,
+      leads: a.leads,
+      investimento: a.investimento,
+    })),
   );
 
   const campaignSpendChart = (dataQuery.data?.campaigns ?? []).slice(0, 8).map((c) => ({
@@ -301,6 +320,10 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
   const campaignLeadsChart = (dataQuery.data?.campaigns ?? []).slice(0, 8).map((c) => ({
     name: c.campanha.length > 22 ? `${c.campanha.slice(0, 20)}…` : c.campanha,
     value: c.leads,
+  }));
+  const adSpendChart = (dataQuery.data?.anuncios ?? []).slice(0, 10).map((a) => ({
+    name: a.anuncio.length > 22 ? `${a.anuncio.slice(0, 20)}…` : a.anuncio,
+    value: a.investimento,
   }));
   const adLeadsChart = (dataQuery.data?.anuncios ?? []).slice(0, 10).map((a) => ({
     name: a.anuncio.length > 22 ? `${a.anuncio.slice(0, 20)}…` : a.anuncio,
@@ -321,31 +344,60 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <span className="mb-2 inline-flex rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800">
-            Sob ROI da operação
-          </span>
-          <h2 className="text-xl font-bold tracking-tight">Marketing Pago</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Em linguagem clara: o que a mídia está fazendo e onde o dinheiro rende
-          </p>
+          {!embedded ? (
+            <>
+              <h2 className="text-xl font-bold tracking-tight">Marketing pago</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Métricas reais da Meta por campanha e por anúncio
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Investimento, leads, impressões e cliques por anúncio — sem misturar com o funil CRM
+            </p>
+          )}
         </div>
-        <AnalyticsFilters
-          value={filters}
-          onChange={setFilters}
-          clientes={clientesOptions}
-          showCliente={isAdmin && !fixedClienteId}
-          showCategoria={false}
-          showPlataforma={false}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <AnalyticsFilters
+            value={filters}
+            onChange={setFilters}
+            clientes={clientesOptions}
+            showCliente={isAdmin && !fixedClienteId}
+            showCategoria={false}
+            showPlataforma={false}
+          />
+          <button
+            type="button"
+            disabled={!activeClienteId || syncMutation.isPending}
+            onClick={() => syncMutation.mutate()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary/60 disabled:opacity-50"
+          >
+            {syncMutation.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Sincronizar Meta
+          </button>
+        </div>
       </div>
+
+      {syncMutation.isError ? (
+        <p className="text-xs text-destructive">{(syncMutation.error as Error).message}</p>
+      ) : null}
+      {syncMutation.isSuccess ? (
+        <p className="text-xs text-emerald-700">
+          Sync concluído. Se a visão de anúncios estiver vazia, rode de novo no período com entrega
+          ou confira permissão ads_read na conta vinculada.
+        </p>
+      ) : null}
 
       <SubTabs
         value={tab}
         onChange={setTab}
         tabs={[
-          { id: "campanhas", label: "Performance por campanha" },
-          { id: "anuncios", label: "Performance por anúncio" },
-          { id: "oportunidades", label: "Oportunidades" },
+          { id: "campanhas", label: "Campanhas" },
+          { id: "anuncios", label: "Anúncios" },
         ]}
       />
 
@@ -365,11 +417,6 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
         </div>
       ) : (
         <>
-          <StoryBanner {...headline} />
-          {adsCrmGap ? (
-            <InsightStack items={[{ title: "Ads × funil", body: adsCrmGap, tone: "info" }]} />
-          ) : null}
-
           <div className="grid gap-3 md:grid-cols-4">
             {cards.map((card, i) => (
               <div
@@ -381,10 +428,6 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
                   {card.label}
                 </p>
                 <p className="mt-3 text-3xl font-black tracking-tight text-sky-800">{card.value}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  vs período anterior: {card.diff >= 0 ? "+" : ""}
-                  {card.diff.toFixed(1)}%
-                </p>
               </div>
             ))}
           </div>
@@ -396,7 +439,7 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
               <div className="grid gap-4 lg:grid-cols-2">
                 <Panel
                   title="Investimento × Leads (diário)"
-                  subtitle="Linha do tempo do que foi gasto e do que entrou"
+                  subtitle="Série da Meta no período"
                   tone="soft"
                 >
                   <div className="h-72">
@@ -466,18 +509,14 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <Panel
-                  title="Budget por campanha"
-                  subtitle="Quem está levando o investimento"
-                  tone="soft"
-                >
+                <Panel title="Budget por campanha" subtitle="Quem leva o investimento" tone="soft">
                   <RankedBarChart
                     data={campaignSpendChart}
                     formatValue={(v) => fmtMoneyCompact(v)}
                     color={["#0369a1", "#0284c7", "#0ea5e9", "#38bdf8", "#7dd3fc"]}
                   />
                 </Panel>
-                <Panel title="Leads por campanha" subtitle="Quem está trazendo gente">
+                <Panel title="Leads por campanha" subtitle="Quem traz volume">
                   <RankedBarChart
                     data={campaignLeadsChart}
                     color={["#0f766e", "#14b8a6", "#2dd4bf", "#5eead4", "#99f6e4"]}
@@ -485,23 +524,22 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
                 </Panel>
               </div>
 
-              <Panel
-                title="Tabela de campanhas"
-                subtitle="Detalhe para quem quiser cruzar número a número"
-              >
+              <Panel title="Tabela de campanhas" subtitle="Nível campanha (sem duplicar anúncios)">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Campanha</TableHead>
                       <TableHead className="text-right">Investimento</TableHead>
                       <TableHead className="text-right">Leads</TableHead>
+                      <TableHead className="text-right">Impressões</TableHead>
+                      <TableHead className="text-right">Cliques</TableHead>
                       <TableHead className="text-right">CAQ</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {(dataQuery.data?.campaigns ?? []).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                        <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                           Sem campanhas no período — sincronize a Meta BM.
                         </TableCell>
                       </TableRow>
@@ -513,6 +551,12 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
                             {formatCurrency(row.investimento)}
                           </TableCell>
                           <TableCell className="text-right">{row.leads}</TableCell>
+                          <TableCell className="text-right">
+                            {row.impressoes.toLocaleString("pt-BR")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {row.cliques.toLocaleString("pt-BR")}
+                          </TableCell>
                           <TableCell className="text-right">
                             {row.caq != null ? formatCurrency(row.caq) : "—"}
                           </TableCell>
@@ -530,63 +574,74 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
               <StoryBanner
                 title={
                   (dataQuery.data?.anuncios ?? []).length > 0
-                    ? "Dá para ver qual peça está trabalhando"
-                    : "Ainda não dá para apontar o criativo vencedor"
+                    ? "Métricas por anúncio da Meta"
+                    : "Ainda sem linhas de anúncio neste período"
                 }
                 body={
                   (dataQuery.data?.anuncios ?? []).length > 0
-                    ? "Abaixo está o ranking dos anúncios identificados nos leads do CRM. Use isso para decidir o que escalar e o que pausar — sem precisar abrir o Ads Manager."
-                    : "Os leads Meta deste período não trouxeram Ad ID. O volume geral continua válido; o detalhe por criativo aparece quando o webhook gravar o identificador."
+                    ? "Investimento, leads, impressões e cliques por criativo — vindos do sync level=ad. Use para escalar ou pausar peças sem abrir o Ads Manager."
+                    : "Clique em Sincronizar Meta para buscar insights no nível anúncio. Se campanhas já existem e anúncios não, a conta pode não ter breakdown por ad liberado."
                 }
                 tone={(dataQuery.data?.anuncios ?? []).length > 0 ? "good" : "warn"}
               />
               <InsightStack items={adInsights} />
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <Panel title="Ranking de anúncios" subtitle="Quem mais gerou leads" tone="soft">
+                <Panel title="Investimento por anúncio" subtitle="Budget no criativo" tone="soft">
                   <RankedBarChart
-                    data={adLeadsChart}
+                    data={adSpendChart}
+                    formatValue={(v) => fmtMoneyCompact(v)}
                     color={["#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd"]}
                   />
                 </Panel>
-                <Panel title="Leitura rápida" subtitle="Como usar este ranking">
-                  <ul className="space-y-3 text-sm leading-relaxed text-foreground/85">
-                    <li>
-                      <strong className="text-foreground">Topo do gráfico</strong> — clone criativo
-                      e publique variações semelhantes.
-                    </li>
-                    <li>
-                      <strong className="text-foreground">Base do gráfico</strong> — pause ou teste
-                      nova oferta; está ocupando entrega sem resultado.
-                    </li>
-                    <li>
-                      <strong className="text-foreground">Investimento por anúncio</strong> — ainda
-                      depende do sync criativo; por enquanto o score é por leads no funil.
-                    </li>
-                  </ul>
+                <Panel title="Leads por anúncio" subtitle="Volume reportado pela Meta">
+                  <RankedBarChart
+                    data={adLeadsChart}
+                    color={["#0f766e", "#14b8a6", "#2dd4bf", "#5eead4", "#99f6e4"]}
+                  />
                 </Panel>
               </div>
 
               <Panel title="Detalhe por anúncio" subtitle="Lista completa do período">
                 {(dataQuery.data?.anuncios ?? []).length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">
-                    Sem anúncios identificados nos leads deste período.
+                    Sem anúncios sincronizados neste período.
                   </p>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Anúncio</TableHead>
-                        <TableHead>Campanha / UTM</TableHead>
+                        <TableHead>Campanha</TableHead>
+                        <TableHead className="text-right">Investimento</TableHead>
                         <TableHead className="text-right">Leads</TableHead>
+                        <TableHead className="text-right">Impressões</TableHead>
+                        <TableHead className="text-right">Cliques</TableHead>
+                        <TableHead className="text-right">CTR</TableHead>
+                        <TableHead className="text-right">CAQ</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {dataQuery.data!.anuncios.map((row) => (
-                        <TableRow key={row.anuncio + row.campanha}>
+                        <TableRow key={row.ad_id}>
                           <TableCell className="font-medium">{row.anuncio}</TableCell>
                           <TableCell className="text-muted-foreground">{row.campanha}</TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(row.investimento)}
+                          </TableCell>
                           <TableCell className="text-right font-semibold">{row.leads}</TableCell>
+                          <TableCell className="text-right">
+                            {row.impressoes.toLocaleString("pt-BR")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {row.cliques.toLocaleString("pt-BR")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {row.ctr != null ? `${row.ctr.toFixed(2)}%` : "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {row.caq != null ? formatCurrency(row.caq) : "—"}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -596,80 +651,14 @@ export function MetaAdsPage({ isAdmin = false, fixedClienteId = null }: MetaAdsP
             </>
           ) : null}
 
-          {tab === "oportunidades" ? (
-            <>
-              <StoryBanner
-                title={
-                  (dataQuery.data?.oportunidades.convertidos ?? 0) > 0
-                    ? "Parte dos leads Meta já virou paciente"
-                    : "Os leads Meta ainda precisam avançar no funil"
-                }
-                body={
-                  (dataQuery.data?.oportunidades.total ?? 0) === 0
-                    ? "Nenhuma oportunidade Meta neste filtro. Confira o período, a conexão WhatsApp/Meta ou se os leads estão com canal correto."
-                    : `Há ${dataQuery.data!.oportunidades.total} oportunidades vindas da mídia: ${dataQuery.data!.oportunidades.novos} novas, ${dataQuery.data!.oportunidades.qualificacao} em andamento e ${dataQuery.data!.oportunidades.convertidos} convertidas. O gráfico abaixo mostra onde a fila trava.`
-                }
-                tone={
-                  (dataQuery.data?.oportunidades.convertidos ?? 0) > 0
-                    ? "good"
-                    : (dataQuery.data?.oportunidades.novos ?? 0) >
-                        (dataQuery.data?.oportunidades.total ?? 0) * 0.5
-                      ? "warn"
-                      : "info"
-                }
-              />
-              <InsightStack items={funnelInsights} />
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {[
-                  { label: "Oportunidades", value: dataQuery.data?.oportunidades.total ?? 0 },
-                  { label: "Novas", value: dataQuery.data?.oportunidades.novos ?? 0 },
-                  { label: "Qualificação", value: dataQuery.data?.oportunidades.qualificacao ?? 0 },
-                  { label: "Convertidas", value: dataQuery.data?.oportunidades.convertidos ?? 0 },
-                ].map((card) => (
-                  <div
-                    key={card.label}
-                    className="rounded-2xl border border-border bg-card px-5 py-4"
-                  >
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {card.label}
-                    </p>
-                    <p className="mt-2 text-3xl font-black text-sky-800">{card.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                <Panel
-                  title="Funil Meta → paciente"
-                  subtitle="Onde as oportunidades param"
-                  tone="soft"
-                >
-                  <FunnelBars stages={funnel} />
-                </Panel>
-                <Panel title="Status dos leads Meta" subtitle="Distribuição atual no CRM">
-                  <StatusChips items={statusBreakdown} />
-                </Panel>
-              </div>
-
-              {isAdmin ? (
-                <Link
-                  to="/admin/leads"
-                  search={{ periodo: 30, canal: "meta", cliente: activeClienteId ?? "", q: "" }}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline"
-                >
-                  Abrir funil <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              ) : (
-                <Link
-                  to="/cliente/leads"
-                  search={{ periodo: 30, canal: "meta", q: "" }}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline"
-                >
-                  Abrir leads <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              )}
-            </>
+          {isAdmin && !embedded ? (
+            <Link
+              to="/admin/roi"
+              search={{ tab: "oportunidades" }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline"
+            >
+              Ver oportunidades no ROI <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           ) : null}
         </>
       )}

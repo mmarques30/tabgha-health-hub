@@ -330,13 +330,15 @@ function DashboardClientesPage() {
               Importar leads Meta
             </Link>
             <Link
-              to="/admin/meta-ads"
+              to="/admin/roi"
+              search={{ tab: "marketing" }}
               className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-semibold hover:bg-secondary"
             >
-              Marketing Pago
+              Marketing pago
             </Link>
             <Link
               to="/admin/roi"
+              search={{ tab: "operacao" }}
               className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-semibold hover:bg-secondary"
             >
               ROI

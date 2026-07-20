@@ -172,6 +172,8 @@ export function LeadDetailDialog({ lead, onClose }: Props) {
     onSuccess: () => {
       toast.success("Lead atualizado");
       void qc.invalidateQueries({ queryKey: ["leads-kanban"] });
+      void qc.invalidateQueries({ queryKey: ["admin", "cliente"] });
+      void qc.invalidateQueries({ queryKey: ["cliente", "pacientes"] });
       onClose();
     },
     onError: (err: Error) => toast.error(err.message || "Erro ao salvar"),
@@ -185,6 +187,8 @@ export function LeadDetailDialog({ lead, onClose }: Props) {
     onSuccess: () => {
       toast.success("Lead excluído");
       void qc.invalidateQueries({ queryKey: ["leads-kanban"] });
+      void qc.invalidateQueries({ queryKey: ["admin", "cliente"] });
+      void qc.invalidateQueries({ queryKey: ["cliente", "pacientes"] });
       onClose();
     },
     onError: (err: Error) => toast.error(err.message || "Não foi possível excluir o lead."),

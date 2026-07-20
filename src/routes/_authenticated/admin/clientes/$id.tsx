@@ -53,6 +53,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { WhatsappConnectCard } from "@/components/whatsapp/WhatsappConnectCard";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export const Route = createFileRoute("/_authenticated/admin/clientes/$id")({
   component: ClienteFichaPage,
@@ -1217,27 +1218,37 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
   const zapi = (automacoes.zapi ?? {}) as Record<string, unknown>;
 
   const [metodo, setMetodo] = useState(agenteIa.metodo_qualificacao ?? "");
+  const [tom, setTom] = useState(agenteIa.tom ?? "acolhedor, claro e profissional");
+  const [nomeAgente, setNomeAgente] = useState(agenteIa.nome_agente ?? "assistente");
   const [agenteAtivo, setAgenteAtivo] = useState(
     zapi.agente_ativo === true || zapi.agente_ativo === "true",
   );
+  const [jsonOpen, setJsonOpen] = useState(false);
   const [json, setJson] = useState(JSON.stringify(extras, null, 2));
   const [jsonError, setJsonError] = useState("");
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
 
-  const saveMetodo = useMutation({
+  useEffect(() => {
+    setMetodo(agenteIa.metodo_qualificacao ?? "");
+    setTom(agenteIa.tom ?? "acolhedor, claro e profissional");
+    setNomeAgente(agenteIa.nome_agente ?? "assistente");
+    setAgenteAtivo(zapi.agente_ativo === true || zapi.agente_ativo === "true");
+    setJson(JSON.stringify(extras, null, 2));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when cliente payload changes
+  }, [cliente.id, cliente.dados_extras]);
+
+  const saveAgente = useMutation({
     mutationFn: async () => {
-      let base: Record<string, unknown>;
-      try {
-        base = JSON.parse(json);
-      } catch {
-        throw new Error("JSON inválido.");
-      }
+      const base = (cliente.dados_extras ?? {}) as Record<string, unknown>;
       const baseAutomacoes = (base.automacoes ?? {}) as Record<string, unknown>;
       const baseZapi = (baseAutomacoes.zapi ?? {}) as Record<string, unknown>;
       const novoExtras = {
         ...base,
         agente_ia: {
           ...((base.agente_ia as object) ?? {}),
-          metodo_qualificacao: metodo || null,
+          metodo_qualificacao: metodo.trim() || null,
+          tom: tom.trim() || "acolhedor, claro e profissional",
+          nome_agente: nomeAgente.trim() || "assistente",
         },
         automacoes: {
           ...baseAutomacoes,
@@ -1274,8 +1285,8 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
       setJson(JSON.stringify(novoExtras, null, 2));
     },
     onSuccess: () => {
-      toast.success("Agente salvo.");
-      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
+      toast.success("Agente WhatsApp salvo.");
+      void qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
       setJsonError("");
     },
     onError: (e: Error) => {
@@ -1300,7 +1311,7 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
     },
     onSuccess: () => {
       toast.success("JSON salvo.");
-      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
+      void qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id] });
       setJsonError("");
     },
     onError: (e: Error) => {
@@ -1318,7 +1329,7 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("whatsapp_instances")
-        .select("id, instance_id, token, status, dados_extras")
+        .select("id, instance_id, token, status, phone, dados_extras")
         .eq("cliente_id", cliente.id)
         .order("atualizado_em", { ascending: false })
         .limit(1)
@@ -1328,12 +1339,45 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
     },
   });
 
+  const { data: ops } = useQuery({
+    queryKey: ["admin", "cliente", cliente.id, "wpp-ops"],
+    queryFn: async () => {
+      const { data: convs, error } = await supabase
+        .from("whatsapp_conversations")
+        .select("id, bot_score, owner_state")
+        .eq("cliente_id", cliente.id);
+      if (error) throw error;
+      const ids = (convs ?? []).map((c) => c.id);
+      let botMsgs = 0;
+      if (ids.length > 0) {
+        const { count, error: msgErr } = await supabase
+          .from("whatsapp_messages")
+          .select("id", { count: "exact", head: true })
+          .in("conversation_id", ids)
+          .eq("sender_type", "bot");
+        if (msgErr) throw msgErr;
+        botMsgs = count ?? 0;
+      }
+      const scores = (convs ?? [])
+        .map((c) => c.bot_score)
+        .filter((n): n is number => typeof n === "number");
+      const avgScore =
+        scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+      return {
+        conversations: convs?.length ?? 0,
+        botMsgs,
+        avgScore,
+        withBot: (convs ?? []).filter((c) => c.owner_state === "bot").length,
+      };
+    },
+  });
+
   useEffect(() => {
     if (!wppInstance) return;
     setInstanceId(wppInstance.instance_id ?? "");
     setInstanceToken(wppInstance.token ?? "");
-    const extras = (wppInstance.dados_extras ?? {}) as Record<string, string>;
-    setClientToken(extras.client_token ?? "");
+    const ex = (wppInstance.dados_extras ?? {}) as Record<string, string>;
+    setClientToken(ex.client_token ?? "");
   }, [wppInstance]);
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-inbound`;
@@ -1356,6 +1400,7 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
         dados_extras: {
           ...((wppInstance?.dados_extras as object) ?? {}),
           client_token: clientToken.trim() || null,
+          agente_ativo: agenteAtivo,
         },
       };
       if (wppInstance?.id) {
@@ -1370,97 +1415,160 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
       }
     },
     onSuccess: () => {
-      toast.success("Instância WhatsApp salva. Gere o QR ao lado para conectar.");
-      qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id, "wpp-instance"] });
-      qc.invalidateQueries({ queryKey: ["whatsapp-connect", cliente.id] });
+      toast.success("Credenciais Z-API salvas. Agora gere o QR e escaneie.");
+      void qc.invalidateQueries({ queryKey: ["admin", "cliente", cliente.id, "wpp-instance"] });
+      void qc.invalidateQueries({ queryKey: ["whatsapp-connect", cliente.id] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const hasZapiInstance = Boolean(wppInstance?.instance_id && wppInstance?.token);
-  const wppStatus = wppInstance?.status ?? "none";
-  const metaExtras = (extras.meta ?? null) as Record<string, unknown> | null;
-  const hasMeta = Boolean(metaExtras?.page_id || metaExtras?.ad_account_id);
+  const wppConnected = wppInstance?.status === "connected";
+  const agentLive = hasZapiInstance && wppConnected && agenteAtivo;
+
+  const steps = [
+    {
+      ok: hasZapiInstance,
+      label: "1. Credenciais Z-API",
+      detail: hasZapiInstance ? "Instância salva" : "Cole Instance ID + Token (só admin)",
+    },
+    {
+      ok: wppConnected,
+      label: "2. WhatsApp online",
+      detail: wppConnected
+        ? `Conectado${wppInstance?.phone ? ` · ${wppInstance.phone}` : ""}`
+        : "Gerar QR e escanear com o celular do consultório",
+    },
+    {
+      ok: agenteAtivo,
+      label: "3. Agente ligado",
+      detail: agenteAtivo
+        ? "Pietro responde nas conversas do bot"
+        : "Ative o switch e salve o agente",
+    },
+  ];
+
+  async function copyWebhook() {
+    try {
+      await navigator.clipboard.writeText(webhookUrl);
+      setCopiedWebhook(true);
+      toast.success("Webhook copiado.");
+      setTimeout(() => setCopiedWebhook(false), 1500);
+    } catch {
+      toast.error("Não foi possível copiar.");
+    }
+  }
 
   return (
-    <div className="space-y-4 py-5">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-border bg-card px-4 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Meta Ads
+    <div className="space-y-5 py-5">
+      <div>
+        <h3 className="text-base font-semibold tracking-tight">WhatsApp & agente Pietro</h3>
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          Esta aba é só para o canal de atendimento. Meta Ads fica em{" "}
+          <Link
+            to="/admin/config-meta"
+            className="font-medium text-sky-700 underline-offset-2 hover:underline"
+          >
+            Conectar Meta BM
+          </Link>
+          . Depois de conectar, as conversas aparecem em Atendimento; insights e tempo no funil
+          ficam em Leads / ROI.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {steps.map((s) => (
+          <div
+            key={s.label}
+            className={cn(
+              "rounded-xl border px-4 py-3",
+              s.ok ? "border-emerald-200 bg-emerald-50/70" : "border-border bg-card",
+            )}
+          >
+            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              {s.label}
+            </p>
+            <p
+              className={cn("mt-1 text-sm font-medium", s.ok ? "text-emerald-800" : "text-foreground")}
+            >
+              {s.ok ? "Pronto" : "Pendente"}
+            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{s.detail}</p>
+          </div>
+        ))}
+      </div>
+
+      <div
+        className={cn(
+          "rounded-xl border px-4 py-3 text-sm",
+          agentLive
+            ? "border-emerald-200 bg-emerald-50/80 text-emerald-950"
+            : "border-amber-200 bg-amber-50/70 text-amber-950",
+        )}
+      >
+        {agentLive ? (
+          <p>
+            <strong>Agente no ar.</strong> Mensagens novas no WhatsApp entram no Atendimento; o
+            Pietro responde com o tom e a metodologia salvos abaixo, gera score/notas e move o lead
+            no funil quando fizer sentido.
           </p>
-          <p className="mt-1 text-sm font-semibold text-foreground">
-            {hasMeta ? "Conectado (dados reais no JSON)" : "Ainda não conectado"}
+        ) : (
+          <p>
+            <strong>Ainda não está respondendo sozinho.</strong> Complete os 3 passos. Credenciais
+            Z-API fazem sentido (é o provedor real do WhatsApp neste produto) — sem elas o QR não
+            existe.
           </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            {hasMeta
-              ? `Página: ${String(metaExtras?.page_name ?? metaExtras?.page_id ?? "—")}`
-              : "Conecte em Config Meta / Marketing Pago."}
-          </p>
-        </div>
-        <div className="rounded-xl border border-border bg-card px-4 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            WhatsApp / Pietro
-          </p>
-          <p className="mt-1 text-sm font-semibold text-foreground">
-            {!hasZapiInstance
-              ? "Sem instância Z-API"
-              : wppStatus === "connected"
-                ? agenteAtivo
-                  ? "Conectado + agente ligado"
-                  : "Conectado (agente desligado)"
-                : "Instância salva — falta escanear QR"}
-          </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            O agente só responde depois: instância salva → QR conectado → Agente ativo ligado.
-          </p>
+        )}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline" className="h-8">
+            <Link to="/admin/atendimento">Abrir Atendimento</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="h-8">
+            <Link to="/admin/leads" search={{ cliente: cliente.id, periodo: 30, canal: "", q: "" }}>
+              Ver funil de leads
+            </Link>
+          </Button>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-5 py-4 text-sm text-amber-950">
-        <p className="text-[10.5px] font-bold uppercase tracking-widest text-amber-800">
-          Como conectar a automação WhatsApp (é real — não é mock)
-        </p>
-        <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-xs leading-relaxed">
-          <li>
-            Na Z-API, crie/abra a instância do consultório e copie Instance ID + Token (+
-            Client-Token se houver).
-          </li>
-          <li>Cole os dados em “Provisionar Z-API” abaixo e salve.</li>
-          <li>
-            Na Z-API, configure o webhook de recebimento (Receive) para:
-            <code className="mt-1 block break-all rounded-md bg-white/80 px-2 py-1.5 text-[11px] text-slate-800">
-              {webhookUrl}
-            </code>
-          </li>
-          <li>
-            Clique em “Gerar QR Code” no card ao lado e escaneie com o celular do consultório.
-          </li>
-          <li>
-            Ative “Agente ativo”, salve a metodologia — aí o inbound chama o Pietro (
-            <span className="font-mono">ai-respond</span>) nas conversas com o bot.
-          </li>
-        </ol>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Conversas", value: String(ops?.conversations ?? "—") },
+          { label: "Msgs do bot", value: String(ops?.botMsgs ?? "—") },
+          {
+            label: "Score médio IA",
+            value: ops?.avgScore != null ? String(ops.avgScore) : "—",
+          },
+          { label: "Com bot ativo", value: String(ops?.withBot ?? "—") },
+        ].map((kpi) => (
+          <div key={kpi.label} className="rounded-xl border border-border bg-card px-3 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {kpi.label}
+            </p>
+            <p className="mt-1 text-xl font-bold tracking-tight">{kpi.value}</p>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-4">
-          <WhatsappConnectCard clienteId={cliente.id} />
-          <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-            <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
-              Provisionar Z-API (admin)
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {hasZapiInstance
-                ? "Instância já salva neste cliente. Atualize só se trocar na Z-API."
-                : "Ainda não há instância neste cliente — por isso o card diz “Aguardando provisionamento”. Isso é o estado real."}
-            </p>
+          <div className="space-y-3 rounded-2xl border border-border bg-card p-5">
+            <div>
+              <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
+                Credenciais Z-API (só Tabgha)
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Passo técnico do admin: cola Instance ID + Token da Z-API deste consultório. O
+                médico só escaneia o QR depois disso.
+              </p>
+            </div>
             <div className="space-y-2">
               <Label>Instance ID</Label>
               <Input
                 value={instanceId}
                 onChange={(e) => setInstanceId(e.target.value)}
-                placeholder="3A..."
+                placeholder="ID da instância na Z-API"
+                autoComplete="off"
               />
             </div>
             <div className="space-y-2">
@@ -1468,16 +1576,33 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
               <Input
                 value={instanceToken}
                 onChange={(e) => setInstanceToken(e.target.value)}
-                placeholder="token da instância"
+                placeholder="Token da instância"
+                autoComplete="off"
               />
             </div>
             <div className="space-y-2">
-              <Label>Client-Token (opcional)</Label>
+              <Label>Client-Token (se a Z-API pedir)</Label>
               <Input
                 value={clientToken}
                 onChange={(e) => setClientToken(e.target.value)}
-                placeholder="security token da conta Z-API"
+                placeholder="Opcional"
+                autoComplete="off"
               />
+            </div>
+            <div className="rounded-lg border border-border bg-secondary/40 px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Webhook Receive (Z-API)
+              </p>
+              <code className="mt-1 block break-all text-[11px] text-foreground">{webhookUrl}</code>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="mt-1 h-7 px-2 text-xs"
+                onClick={() => void copyWebhook()}
+              >
+                {copiedWebhook ? "Copiado" : "Copiar webhook"}
+              </Button>
             </div>
             <Button
               size="sm"
@@ -1490,17 +1615,17 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              Salvar instância
+              Salvar credenciais
             </Button>
           </div>
+
+          <WhatsappConnectCard clienteId={cliente.id} />
         </div>
 
-        {/* ── Método de qualificação ── */}
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-          <div className="flex items-center gap-2.5 border-b border-sky-100 bg-sky-50/60 px-5 py-3">
-            <span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="border-b border-sky-100 bg-sky-50/60 px-5 py-3">
             <p className="text-[10.5px] font-bold uppercase tracking-widest text-sky-700">
-              Pietro · Agente WhatsApp
+              Pietro · o que ele fala e como
             </p>
           </div>
           <div className="space-y-3 p-5">
@@ -1508,38 +1633,70 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
               <div>
                 <p className="text-sm font-medium">Agente ativo</p>
                 <p className="text-xs text-muted-foreground">
-                  Só faz efeito com WhatsApp conectado. Liga o Pietro nas conversas do bot.
+                  Com WhatsApp online, o Pietro responde sozinho nas conversas do bot.
                 </p>
               </div>
               <Switch checked={agenteAtivo} onCheckedChange={setAgenteAtivo} />
             </div>
-            {!hasZapiInstance ? (
-              <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
-                Ainda não há instância Z-API. Salvar o agente agora só guarda a configuração — ele{" "}
-                <strong>não</strong> fala no WhatsApp até provisionar + QR.
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="nome-agente">Nome do agente</Label>
+                <Input
+                  id="nome-agente"
+                  value={nomeAgente}
+                  onChange={(e) => setNomeAgente(e.target.value)}
+                  placeholder="assistente"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="tom-agente">Tom / entonação</Label>
+                <Input
+                  id="tom-agente"
+                  value={tom}
+                  onChange={(e) => setTom(e.target.value)}
+                  placeholder="acolhedor, claro e profissional"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-secondary/20 px-3 py-2 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">Como as mensagens nascem</p>
+              <ul className="mt-1 list-disc space-y-1 pl-4">
+                <li>Não é template fixo: o Pietro gera 1–3 frases em português, no tom salvo.</li>
+                <li>Qualifica intenção, urgência, fit e capacidade; não inventa preço/horário.</li>
+                <li>
+                  Em emergência ou pedido de humano, faz handoff para a equipe no Atendimento.
+                </li>
+                <li>
+                  Qualidade aparece como score (0–100) + notas na conversa e no detalhe do lead.
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="metodo-agente">Metodologia de qualificação</Label>
+              <Textarea
+                id="metodo-agente"
+                rows={7}
+                placeholder="Ex.: (1) o que busca (2) urgência (3) fit com a clínica (4) disposição para agendar. Sem interrogatório."
+                value={metodo}
+                onChange={(e) => setMetodo(e.target.value)}
+                className="resize-none text-sm"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Vazio = usa o padrão genérico do Pietro. O placeholder cinza não é dado salvo.
               </p>
-            ) : null}
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Metodologia do Pietro neste cliente. Campo vazio = usa o padrão genérico. O texto
-              cinza no campo é só exemplo (placeholder), não é dado salvo.
-            </p>
-            <Textarea
-              rows={10}
-              placeholder={
-                "Exemplo (não é dado real até você digitar e salvar):\n(1) Urgência — já tem pacientes interessados?\n(2) Volume — quantos atendimentos por semana?\n(3) Disposição — aberto a investir em marketing?\nConduza de forma natural, sem parecer interrogatório."
-              }
-              value={metodo}
-              onChange={(e) => setMetodo(e.target.value)}
-              className="resize-none text-sm"
-            />
-            {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
+            </div>
+
+            {jsonError ? <p className="text-xs text-destructive">{jsonError}</p> : null}
             <Button
               size="sm"
-              onClick={() => saveMetodo.mutate()}
-              disabled={saveMetodo.isPending}
+              onClick={() => saveAgente.mutate()}
+              disabled={saveAgente.isPending}
               className="gap-2"
             >
-              {saveMetodo.isPending ? (
+              {saveAgente.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Save className="h-4 w-4" />
@@ -1550,48 +1707,59 @@ function TabConexoes({ cliente }: { cliente: Cliente }) {
         </div>
       </div>
 
-      {/* ── JSON avançado (sempre visível — dados reais do cliente) ── */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(15,27,53,0.04)]">
-        <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50/60 px-5 py-3">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
-          <p className="text-[10.5px] font-bold uppercase tracking-widest text-slate-600">
-            JSON Avançado
-          </p>
+      <Collapsible open={jsonOpen} onOpenChange={setJsonOpen}>
+        <div className="rounded-2xl border border-border bg-card">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-5 py-3 text-left"
+            >
+              <div>
+                <p className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Avançado · JSON técnico
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Só para suporte. Prefira os formulários acima.
+                </p>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform",
+                  jsonOpen && "rotate-180",
+                )}
+              />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="space-y-3 border-t border-border px-5 py-4">
+              <Textarea
+                className="resize-none font-mono text-xs"
+                rows={8}
+                value={json}
+                onChange={(e) => {
+                  setJson(e.target.value);
+                  setJsonError("");
+                }}
+              />
+              {jsonError ? <p className="text-xs text-destructive">{jsonError}</p> : null}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => saveJson.mutate()}
+                disabled={saveJson.isPending}
+                className="gap-2"
+              >
+                {saveJson.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Salvar JSON
+              </Button>
+            </div>
+          </CollapsibleContent>
         </div>
-        <div className="space-y-3 p-5">
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Isto <strong className="font-semibold text-foreground">não é inventado</strong>: é o{" "}
-            <span className="font-mono text-[11px]">dados_extras</span> real deste cliente no banco.
-            O bloco <span className="font-mono text-[11px]">meta</span> veio da conexão Meta BM
-            (página DR. Pedro, ad accounts, tokens). WhatsApp / Z-API entra aqui depois de
-            provisionar. Não ocultamos este painel — é a visão técnica da operação.
-          </p>
-          <Textarea
-            className="font-mono text-xs resize-none"
-            rows={8}
-            value={json}
-            onChange={(e) => {
-              setJson(e.target.value);
-              setJsonError("");
-            }}
-          />
-          {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => saveJson.mutate()}
-            disabled={saveJson.isPending}
-            className="gap-2"
-          >
-            {saveJson.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Salvar JSON
-          </Button>
-        </div>
-      </div>
+      </Collapsible>
     </div>
   );
 }

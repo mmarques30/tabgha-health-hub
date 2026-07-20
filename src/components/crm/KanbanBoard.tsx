@@ -138,13 +138,12 @@ function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex shrink-0 flex-col rounded-2xl border p-3",
+        "flex h-full min-h-0 w-[236px] shrink-0 flex-col rounded-2xl border p-3",
         style.col,
         isOver ? "border-sky-400 ring-2 ring-sky-200" : "border-border/70",
       )}
-      style={{ width: 236, minHeight: 360 }}
     >
-      <div className="mb-3 flex items-center justify-between border-b border-black/[0.06] pb-3">
+      <div className="mb-3 flex shrink-0 items-center justify-between border-b border-black/[0.06] pb-3">
         <h3 className={cn("text-[11.5px] font-bold uppercase tracking-[0.05em]", style.header)}>
           {STATUS_LABELS[status]}
         </h3>
@@ -152,7 +151,7 @@ function KanbanColumn({
           {leads.length}
         </span>
       </div>
-      <div className="flex flex-1 flex-col gap-2.5">
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto">
         {leads.map((lead) => (
           <LeadCard key={lead.id} lead={lead} onOpen={() => onOpen(lead)} />
         ))}
@@ -548,7 +547,7 @@ export function KanbanBoard({ leads }: KanbanBoardProps) {
   }
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -556,12 +555,12 @@ export function KanbanBoard({ leads }: KanbanBoardProps) {
         onDragEnd={onDragEnd}
       >
         <div
-          className="overflow-x-auto px-1"
+          className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-1"
           style={
             { scrollbarWidth: "thin", WebkitOverflowScrolling: "touch" } as React.CSSProperties
           }
         >
-          <div className="flex gap-3.5" style={{ minWidth: "max-content" }}>
+          <div className="flex h-full min-h-[360px] gap-3.5" style={{ minWidth: "max-content" }}>
             {PIPELINE.map((status) => (
               <KanbanColumn
                 key={status}
@@ -594,6 +593,6 @@ export function KanbanBoard({ leads }: KanbanBoardProps) {
       ) : null}
 
       {selected ? <LeadDetailDialog lead={selected} onClose={() => setSelected(null)} /> : null}
-    </>
+    </div>
   );
 }

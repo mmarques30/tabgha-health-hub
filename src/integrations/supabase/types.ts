@@ -277,7 +277,14 @@ export type Database = {
           email: string | null
           icp: string | null
           id: string
+          meta_ad_id: string | null
+          meta_ad_name: string | null
+          meta_campaign_id: string | null
+          meta_campaign_name: string | null
+          meta_form_id: string | null
+          meta_form_name: string | null
           meta_leadgen_id: string | null
+          meta_page_id: string | null
           motivo_perda: string | null
           nome: string | null
           observacoes: string | null
@@ -295,7 +302,14 @@ export type Database = {
           email?: string | null
           icp?: string | null
           id?: string
+          meta_ad_id?: string | null
+          meta_ad_name?: string | null
+          meta_campaign_id?: string | null
+          meta_campaign_name?: string | null
+          meta_form_id?: string | null
+          meta_form_name?: string | null
           meta_leadgen_id?: string | null
+          meta_page_id?: string | null
           motivo_perda?: string | null
           nome?: string | null
           observacoes?: string | null
@@ -313,7 +327,14 @@ export type Database = {
           email?: string | null
           icp?: string | null
           id?: string
+          meta_ad_id?: string | null
+          meta_ad_name?: string | null
+          meta_campaign_id?: string | null
+          meta_campaign_name?: string | null
+          meta_form_id?: string | null
+          meta_form_name?: string | null
           meta_leadgen_id?: string | null
+          meta_page_id?: string | null
           motivo_perda?: string | null
           nome?: string | null
           observacoes?: string | null

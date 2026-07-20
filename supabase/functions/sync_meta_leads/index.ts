@@ -3,6 +3,11 @@
 // Usa page_id + access_token em dados_extras.meta.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  createAttributionCache,
+  resolveMetaAttribution,
+  type MetaAttribution,
+} from "../_shared/meta_lead_attribution.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -35,16 +40,21 @@ function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
 }
 
-function pickField(fieldData: FieldData[], aliases: string[]): string | null {
+function pickField(fieldData: FieldData[], aliases: string[]): string[] {
   const lowered = aliases.map((a) => a.toLowerCase());
+  const out: string[] = [];
   for (const field of fieldData) {
     const name = (field.name ?? "").toLowerCase();
     if (lowered.includes(name)) {
       const value = field.values?.[0]?.trim();
-      if (value) return value;
+      if (value) out.push(value);
     }
   }
-  return null;
+  return out;
+}
+
+function pickOne(fieldData: FieldData[], aliases: string[]): string | null {
+  return pickField(fieldData, aliases)[0] ?? null;
 }
 
 function aliasesFor(map: FormMap, key: string): string[] {
@@ -92,6 +102,48 @@ async function fetchAllPages<T extends { id?: string }>(
     url = payload.paging?.next ?? null;
   }
   return out;
+}
+
+function needsAttributionEnrichment(row: {
+  meta_ad_id?: string | null;
+  meta_ad_name?: string | null;
+  meta_form_id?: string | null;
+  meta_form_name?: string | null;
+  meta_campaign_id?: string | null;
+  meta_campaign_name?: string | null;
+  meta_page_id?: string | null;
+}): boolean {
+  return (
+    !row.meta_ad_name ||
+    !row.meta_form_name ||
+    !row.meta_campaign_name ||
+    !row.meta_ad_id ||
+    !row.meta_form_id ||
+    !row.meta_campaign_id ||
+    !row.meta_page_id
+  );
+}
+
+async function enrichLeadRow(
+  leadId: string,
+  attribution: MetaAttribution,
+  campaignIdFallback: string | null,
+) {
+  const patch: Record<string, string> = {};
+  if (attribution.meta_ad_id) patch.meta_ad_id = attribution.meta_ad_id;
+  if (attribution.meta_ad_name) patch.meta_ad_name = attribution.meta_ad_name;
+  if (attribution.meta_campaign_id) patch.meta_campaign_id = attribution.meta_campaign_id;
+  if (attribution.meta_campaign_name) {
+    patch.meta_campaign_name = attribution.meta_campaign_name;
+  }
+  if (attribution.meta_form_id) patch.meta_form_id = attribution.meta_form_id;
+  if (attribution.meta_form_name) patch.meta_form_name = attribution.meta_form_name;
+  if (attribution.meta_page_id) patch.meta_page_id = attribution.meta_page_id;
+  const campaignLabel = attribution.meta_campaign_name ?? campaignIdFallback;
+  if (campaignLabel) patch.utm_campaign = campaignLabel;
+  if (Object.keys(patch).length === 0) return;
+  const { error } = await supabase.from("leads").update(patch).eq("id", leadId);
+  if (error) throw error;
 }
 
 Deno.serve(async (req: Request) => {
@@ -163,9 +215,11 @@ Deno.serve(async (req: Request) => {
       }
 
       let inseridos = 0;
+      let atualizados = 0;
       let ignorados = 0;
       let erros = 0;
       const formErrors: string[] = [];
+      const attrCache = createAttributionCache();
 
       for (const form of forms) {
         if (!form.id) continue;
@@ -195,20 +249,44 @@ Deno.serve(async (req: Request) => {
               continue;
             }
 
+            const attribution = await resolveMetaAttribution(
+              token,
+              GRAPH_VERSION,
+              {
+                ad_id: lead.ad_id,
+                campaign_id: lead.campaign_id,
+                form_id: lead.form_id ?? form.id,
+                form_name: form.name,
+                page_id: pageId,
+                page_name: meta?.page_name,
+              },
+              attrCache,
+            );
+
             const { data: existing } = await supabase
               .from("leads")
-              .select("id")
+              .select(
+                "id, meta_ad_id, meta_ad_name, meta_form_id, meta_form_name, meta_campaign_id, meta_campaign_name, meta_page_id, meta_leadgen_id",
+              )
               .eq("meta_leadgen_id", lead.id)
               .maybeSingle();
+
             if (existing) {
-              ignorados += 1;
+              if (needsAttributionEnrichment(existing)) {
+                await enrichLeadRow(existing.id, attribution, lead.campaign_id ?? null);
+                atualizados += 1;
+              } else {
+                ignorados += 1;
+              }
               continue;
             }
 
             // Fallback dedupe for rows inserted before meta_leadgen_id existia
             const { data: legacy } = await supabase
               .from("leads")
-              .select("id")
+              .select(
+                "id, meta_ad_id, meta_ad_name, meta_form_id, meta_form_name, meta_campaign_id, meta_campaign_name, meta_page_id",
+              )
               .eq("cliente_id", cliente.id)
               .eq("canal", "meta")
               .ilike("observacoes", `%leadgen ${lead.id}%`)
@@ -216,17 +294,24 @@ Deno.serve(async (req: Request) => {
             if (legacy) {
               await supabase
                 .from("leads")
-                .update({ meta_leadgen_id: lead.id })
+                .update({
+                  meta_leadgen_id: lead.id,
+                  ...attribution,
+                  utm_campaign:
+                    attribution.meta_campaign_name ?? lead.campaign_id ?? null,
+                  utm_source: "facebook",
+                  utm_medium: "paid",
+                })
                 .eq("id", legacy.id);
-              ignorados += 1;
+              atualizados += 1;
               continue;
             }
 
             const fieldData = lead.field_data ?? [];
             const nome =
-              pickField(fieldData, aliasesFor(formMap, "nome")) ?? "Lead Meta";
-            const telefoneRaw = pickField(fieldData, aliasesFor(formMap, "telefone"));
-            const email = pickField(fieldData, aliasesFor(formMap, "email"));
+              pickOne(fieldData, aliasesFor(formMap, "nome")) ?? "Lead Meta";
+            const telefoneRaw = pickOne(fieldData, aliasesFor(formMap, "telefone"));
+            const email = pickOne(fieldData, aliasesFor(formMap, "email"));
             const telefone = telefoneRaw ? normalizePhone(telefoneRaw) : null;
 
             const { error: insertError } = await supabase.from("leads").insert({
@@ -236,18 +321,19 @@ Deno.serve(async (req: Request) => {
               email,
               canal: "meta",
               utm_source: "facebook",
-              utm_campaign: lead.campaign_id ?? null,
+              utm_medium: "paid",
+              utm_campaign: attribution.meta_campaign_name ?? lead.campaign_id ?? null,
               status: "novo",
               meta_leadgen_id: lead.id,
+              meta_ad_id: attribution.meta_ad_id,
+              meta_ad_name: attribution.meta_ad_name,
+              meta_campaign_id: attribution.meta_campaign_id,
+              meta_campaign_name: attribution.meta_campaign_name,
+              meta_form_id: attribution.meta_form_id,
+              meta_form_name: attribution.meta_form_name,
+              meta_page_id: attribution.meta_page_id,
               criado_em: lead.created_time ?? new Date().toISOString(),
-              observacoes: [
-                lead.ad_id ? `Ad ${lead.ad_id}` : null,
-                `form ${form.id}`,
-                `leadgen ${lead.id}`,
-                "sync_meta_leads",
-              ]
-                .filter(Boolean)
-                .join(" | "),
+              observacoes: null,
             });
 
             if (insertError) {
@@ -262,7 +348,12 @@ Deno.serve(async (req: Request) => {
               metadata: {
                 leadgen_id: lead.id,
                 form_id: form.id,
+                form_name: form.name ?? null,
                 page_id: pageId,
+                ad_id: attribution.meta_ad_id,
+                ad_name: attribution.meta_ad_name,
+                campaign_id: attribution.meta_campaign_id,
+                campaign_name: attribution.meta_campaign_name,
                 source: "sync_meta_leads",
               },
             });
@@ -281,6 +372,7 @@ Deno.serve(async (req: Request) => {
         nome: cliente.nome,
         forms: forms.length,
         inseridos,
+        atualizados,
         ignorados,
         erros,
         formErrors: formErrors.slice(0, 5),

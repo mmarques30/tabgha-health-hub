@@ -215,6 +215,7 @@ function ConfigMetaPage() {
         error?: string;
         resultados?: Array<{
           inseridos?: number;
+          atualizados?: number;
           ignorados?: number;
           erros?: number;
           erro?: string;
@@ -231,7 +232,7 @@ function ConfigMetaPage() {
             ? "Meta sem permissão para ler formulários. Reconecte o Meta BM (aceite as novas permissões) e tente de novo."
             : first.erro.slice(0, 180),
         );
-      } else if ((first?.inseridos ?? 0) === 0) {
+      } else if ((first?.inseridos ?? 0) === 0 && (first?.atualizados ?? 0) === 0) {
         toast.message("Nenhum lead novo importado", {
           description:
             (first?.forms ?? 0) === 0
@@ -239,9 +240,13 @@ function ConfigMetaPage() {
               : `${first?.ignorados ?? 0} já estavam no CRM ou fora do período (90 dias).`,
         });
       } else {
-        toast.success(
-          `${first!.inseridos} lead(s) importados para o funil (${first?.ignorados ?? 0} já existentes).`,
-        );
+        const parts = [
+          (first?.inseridos ?? 0) > 0 ? `${first!.inseridos} novo(s)` : null,
+          (first?.atualizados ?? 0) > 0
+            ? `${first!.atualizados} com atribuição Meta atualizada`
+            : null,
+        ].filter(Boolean);
+        toast.success(parts.join(" · ") || "Importação concluída");
       }
       void queryClient.invalidateQueries({ queryKey: ["leads-kanban"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-clientes"] });

@@ -26,7 +26,6 @@ import {
   StatusChips,
   StoryBanner,
 } from "@/components/analytics/InsightPanel";
-import { SubTabs } from "@/components/analytics/SubTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { MetaAdsPage } from "@/components/meta/MetaAdsPage";
 import { useClientesOptions } from "@/hooks/useClientesOptions";
@@ -343,14 +342,21 @@ function RoiAdminPage() {
   const campaignInsights = buildCampaignInsights(byCampanha);
   const adsCrmGap = insightFromGap(kpis.totalLeadsAds, kpis.leadsCrm);
 
+  const pageTitle: Record<TabId, string> = {
+    operacao: "Operação",
+    clientes: "Clientes",
+    campanhas: "Campanhas",
+    marketing: "Marketing pago",
+  };
+
   return (
     <div className="space-y-5 px-6 py-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">ROI da operação</h1>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Operação, clientes, campanhas e marketing pago no mesmo lugar
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            ROI da operação
           </p>
+          <h1 className="mt-0.5 text-xl font-bold tracking-tight">{pageTitle[tab]}</h1>
         </div>
         {tab !== "marketing" ? (
           <AnalyticsFilters
@@ -364,17 +370,6 @@ function RoiAdminPage() {
           />
         ) : null}
       </div>
-
-      <SubTabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { id: "operacao", label: "Operação" },
-          { id: "clientes", label: "Clientes" },
-          { id: "campanhas", label: "Campanhas" },
-          { id: "marketing", label: "Marketing pago" },
-        ]}
-      />
 
       {tab === "marketing" ? (
         <MetaAdsPage isAdmin embedded defaultTab="anuncios" />

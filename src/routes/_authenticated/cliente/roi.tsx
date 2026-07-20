@@ -24,7 +24,6 @@ import {
   StatusChips,
   StoryBanner,
 } from "@/components/analytics/InsightPanel";
-import { SubTabs } from "@/components/analytics/SubTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { MetaAdsPage } from "@/components/meta/MetaAdsPage";
 import { useAuth } from "@/lib/auth";
@@ -212,14 +211,21 @@ function RoiPage() {
     value: c.leads,
   }));
 
+  const pageTitle: Record<TabId, string> = {
+    operacao: "Operação",
+    oportunidades: "Oportunidades",
+    campanhas: "Campanhas",
+    marketing: "Marketing pago",
+  };
+
   return (
     <div className="space-y-6 px-6 py-6">
       <div className="animate-fade-up flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">ROI da operação</h1>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Operação, oportunidades, campanhas e marketing pago
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            ROI
           </p>
+          <h1 className="mt-0.5 text-xl font-bold tracking-tight">{pageTitle[tab]}</h1>
         </div>
         {tab !== "marketing" ? (
           <div className="flex gap-1 rounded-xl border border-border bg-secondary/40 p-1">
@@ -240,17 +246,6 @@ function RoiPage() {
           </div>
         ) : null}
       </div>
-
-      <SubTabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { id: "operacao", label: "Operação" },
-          { id: "oportunidades", label: "Oportunidades" },
-          { id: "campanhas", label: "Campanhas" },
-          { id: "marketing", label: "Marketing pago" },
-        ]}
-      />
 
       {tab === "marketing" ? (
         <MetaAdsPage fixedClienteId={clienteId ?? null} embedded defaultTab="anuncios" />

@@ -25,8 +25,8 @@ import {
   RankedBarChart,
   StoryBanner,
 } from "@/components/analytics/InsightPanel";
-import { SubTabs } from "@/components/analytics/SubTabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -342,22 +342,76 @@ export function MetaAdsPage({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          {!embedded ? (
-            <>
-              <h2 className="text-xl font-bold tracking-tight">Marketing pago</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Métricas reais da Meta por campanha e por anúncio
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Investimento, leads, impressões e cliques por anúncio — sem misturar com o funil CRM
-            </p>
-          )}
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {!embedded ? (
+          <div>
+            <h2 className="text-xl font-bold tracking-tight">Marketing pago</h2>
+          </div>
+        ) : (
+          <div
+            className="inline-flex items-center gap-1 text-[12px] text-muted-foreground"
+            role="tablist"
+            aria-label="Nível de mídia"
+          >
+            {(
+              [
+                ["campanhas", "Campanhas"],
+                ["anuncios", "Anúncios"],
+              ] as const
+            ).map(([id, label], index) => (
+              <span key={id} className="inline-flex items-center gap-1">
+                {index > 0 ? <span className="text-border">·</span> : null}
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === id}
+                  onClick={() => setTab(id)}
+                  className={cn(
+                    "rounded px-1.5 py-0.5 transition-colors",
+                    tab === id
+                      ? "font-semibold text-foreground"
+                      : "hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
+          {!embedded ? (
+            <div
+              className="mr-1 inline-flex items-center gap-1 text-[12px] text-muted-foreground"
+              role="tablist"
+              aria-label="Nível de mídia"
+            >
+              {(
+                [
+                  ["campanhas", "Campanhas"],
+                  ["anuncios", "Anúncios"],
+                ] as const
+              ).map(([id, label], index) => (
+                <span key={id} className="inline-flex items-center gap-1">
+                  {index > 0 ? <span className="text-border">·</span> : null}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === id}
+                    onClick={() => setTab(id)}
+                    className={cn(
+                      "rounded px-1.5 py-0.5 transition-colors",
+                      tab === id
+                        ? "font-semibold text-foreground"
+                        : "hover:text-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
           <AnalyticsFilters
             value={filters}
             onChange={setFilters}
@@ -391,15 +445,6 @@ export function MetaAdsPage({
           ou confira permissão ads_read na conta vinculada.
         </p>
       ) : null}
-
-      <SubTabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { id: "campanhas", label: "Campanhas" },
-          { id: "anuncios", label: "Anúncios" },
-        ]}
-      />
 
       {!activeClienteId ? (
         <div className="rounded-2xl border border-border bg-card p-5">

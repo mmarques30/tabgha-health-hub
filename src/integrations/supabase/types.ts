@@ -277,6 +277,7 @@ export type Database = {
           email: string | null
           icp: string | null
           id: string
+          meta_leadgen_id: string | null
           motivo_perda: string | null
           nome: string | null
           observacoes: string | null
@@ -294,6 +295,7 @@ export type Database = {
           email?: string | null
           icp?: string | null
           id?: string
+          meta_leadgen_id?: string | null
           motivo_perda?: string | null
           nome?: string | null
           observacoes?: string | null
@@ -311,6 +313,7 @@ export type Database = {
           email?: string | null
           icp?: string | null
           id?: string
+          meta_leadgen_id?: string | null
           motivo_perda?: string | null
           nome?: string | null
           observacoes?: string | null

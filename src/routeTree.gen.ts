@@ -31,6 +31,7 @@ import { Route as AuthenticatedAdminLeadsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminEstrategiaRouteImport } from './routes/_authenticated/admin/estrategia'
 import { Route as AuthenticatedAdminDiagnosticosRouteImport } from './routes/_authenticated/admin/diagnosticos'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated/admin/dashboard'
+import { Route as AuthenticatedAdminDashboardClientesRouteImport } from './routes/_authenticated/admin/dashboard-clientes'
 import { Route as AuthenticatedAdminConfigMetaRouteImport } from './routes/_authenticated/admin/config-meta'
 import { Route as AuthenticatedAdminCalendarioRouteImport } from './routes/_authenticated/admin/calendario'
 import { Route as AuthenticatedAdminAutomacoesLeadsRouteImport } from './routes/_authenticated/admin/automacoes-leads'
@@ -162,6 +163,12 @@ const AuthenticatedAdminDashboardRoute =
     path: '/admin/dashboard',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminDashboardClientesRoute =
+  AuthenticatedAdminDashboardClientesRouteImport.update({
+    id: '/admin/dashboard-clientes',
+    path: '/admin/dashboard-clientes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminConfigMetaRoute =
   AuthenticatedAdminConfigMetaRouteImport.update({
     id: '/admin/config-meta',
@@ -208,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/admin/calendario': typeof AuthenticatedAdminCalendarioRoute
   '/admin/config-meta': typeof AuthenticatedAdminConfigMetaRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
+  '/admin/dashboard-clientes': typeof AuthenticatedAdminDashboardClientesRoute
   '/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
   '/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
   '/admin/leads': typeof AuthenticatedAdminLeadsRoute
@@ -237,6 +245,7 @@ export interface FileRoutesByTo {
   '/admin/calendario': typeof AuthenticatedAdminCalendarioRoute
   '/admin/config-meta': typeof AuthenticatedAdminConfigMetaRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
+  '/admin/dashboard-clientes': typeof AuthenticatedAdminDashboardClientesRoute
   '/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
   '/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
   '/admin/leads': typeof AuthenticatedAdminLeadsRoute
@@ -268,6 +277,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/calendario': typeof AuthenticatedAdminCalendarioRoute
   '/_authenticated/admin/config-meta': typeof AuthenticatedAdminConfigMetaRoute
   '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
+  '/_authenticated/admin/dashboard-clientes': typeof AuthenticatedAdminDashboardClientesRoute
   '/_authenticated/admin/diagnosticos': typeof AuthenticatedAdminDiagnosticosRoute
   '/_authenticated/admin/estrategia': typeof AuthenticatedAdminEstrategiaRoute
   '/_authenticated/admin/leads': typeof AuthenticatedAdminLeadsRoute
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/admin/calendario'
     | '/admin/config-meta'
     | '/admin/dashboard'
+    | '/admin/dashboard-clientes'
     | '/admin/diagnosticos'
     | '/admin/estrategia'
     | '/admin/leads'
@@ -328,6 +339,7 @@ export interface FileRouteTypes {
     | '/admin/calendario'
     | '/admin/config-meta'
     | '/admin/dashboard'
+    | '/admin/dashboard-clientes'
     | '/admin/diagnosticos'
     | '/admin/estrategia'
     | '/admin/leads'
@@ -358,6 +370,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/calendario'
     | '/_authenticated/admin/config-meta'
     | '/_authenticated/admin/dashboard'
+    | '/_authenticated/admin/dashboard-clientes'
     | '/_authenticated/admin/diagnosticos'
     | '/_authenticated/admin/estrategia'
     | '/_authenticated/admin/leads'
@@ -542,6 +555,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/dashboard-clientes': {
+      id: '/_authenticated/admin/dashboard-clientes'
+      path: '/admin/dashboard-clientes'
+      fullPath: '/admin/dashboard-clientes'
+      preLoaderRoute: typeof AuthenticatedAdminDashboardClientesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/config-meta': {
       id: '/_authenticated/admin/config-meta'
       path: '/admin/config-meta'
@@ -593,6 +613,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminCalendarioRoute: typeof AuthenticatedAdminCalendarioRoute
   AuthenticatedAdminConfigMetaRoute: typeof AuthenticatedAdminConfigMetaRoute
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
+  AuthenticatedAdminDashboardClientesRoute: typeof AuthenticatedAdminDashboardClientesRoute
   AuthenticatedAdminDiagnosticosRoute: typeof AuthenticatedAdminDiagnosticosRoute
   AuthenticatedAdminEstrategiaRoute: typeof AuthenticatedAdminEstrategiaRoute
   AuthenticatedAdminLeadsRoute: typeof AuthenticatedAdminLeadsRoute
@@ -621,6 +642,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminCalendarioRoute: AuthenticatedAdminCalendarioRoute,
   AuthenticatedAdminConfigMetaRoute: AuthenticatedAdminConfigMetaRoute,
   AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
+  AuthenticatedAdminDashboardClientesRoute: AuthenticatedAdminDashboardClientesRoute,
   AuthenticatedAdminDiagnosticosRoute: AuthenticatedAdminDiagnosticosRoute,
   AuthenticatedAdminEstrategiaRoute: AuthenticatedAdminEstrategiaRoute,
   AuthenticatedAdminLeadsRoute: AuthenticatedAdminLeadsRoute,

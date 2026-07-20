@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.sync_ads_metrics]
 verify_jwt = false
+
+[functions.sync_meta_leads]
+verify_jwt = false

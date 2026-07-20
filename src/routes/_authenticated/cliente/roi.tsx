@@ -5,6 +5,8 @@ import { ArrowRight, Loader2, TrendingUp } from "lucide-react";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -22,7 +24,6 @@ import {
   StatusChips,
   StoryBanner,
 } from "@/components/analytics/InsightPanel";
-import { SubTabs } from "@/components/analytics/SubTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { MetaAdsPage } from "@/components/meta/MetaAdsPage";
 import { useAuth } from "@/lib/auth";
@@ -210,14 +211,21 @@ function RoiPage() {
     value: c.leads,
   }));
 
+  const pageTitle: Record<TabId, string> = {
+    operacao: "Operação",
+    oportunidades: "Oportunidades",
+    campanhas: "Campanhas",
+    marketing: "Marketing pago",
+  };
+
   return (
     <div className="space-y-6 px-6 py-6">
       <div className="animate-fade-up flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">ROI da operação</h1>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Operação, oportunidades, campanhas e marketing pago
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            ROI
           </p>
+          <h1 className="mt-0.5 text-xl font-bold tracking-tight">{pageTitle[tab]}</h1>
         </div>
         {tab !== "marketing" ? (
           <div className="flex gap-1 rounded-xl border border-border bg-secondary/40 p-1">
@@ -238,17 +246,6 @@ function RoiPage() {
           </div>
         ) : null}
       </div>
-
-      <SubTabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { id: "operacao", label: "Operação" },
-          { id: "oportunidades", label: "Oportunidades" },
-          { id: "campanhas", label: "Campanhas" },
-          { id: "marketing", label: "Marketing pago" },
-        ]}
-      />
 
       {tab === "marketing" ? (
         <MetaAdsPage fixedClienteId={clienteId ?? null} embedded defaultTab="anuncios" />
@@ -301,6 +298,8 @@ function RoiPage() {
                   </div>
                 ))}
               </div>
+
+              <InsightStack items={[...campaignInsights, ...funnelInsights].slice(0, 3)} />
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <Panel title="Investimento × Leads" subtitle={`Últimos ${periodo} dias`} tone="soft">
@@ -390,6 +389,55 @@ function RoiPage() {
                   <FunnelBars stages={funnel} />
                 </Panel>
               </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Panel
+                  title="Budget por campanha"
+                  subtitle="Onde o investimento está concentrado"
+                  tone="soft"
+                >
+                  {campaignSpendChart.length === 0 ? (
+                    <p className="py-10 text-center text-sm text-muted-foreground">
+                      Sem campanhas no período
+                    </p>
+                  ) : (
+                    <RankedBarChart
+                      data={campaignSpendChart}
+                      formatValue={(v) => fmtMoneyCompact(v)}
+                      color={["#0369a1", "#0284c7", "#0ea5e9", "#38bdf8"]}
+                    />
+                  )}
+                </Panel>
+                <Panel title="Leads por campanha" subtitle="Quem está trazendo gente">
+                  {campaignLeadsChart.length === 0 ? (
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,27,53,0.06)" />
+                          <XAxis
+                            dataKey="data"
+                            tick={{ fontSize: 10 }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                          <Tooltip />
+                          <Bar dataKey="leads" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <RankedBarChart
+                      data={campaignLeadsChart}
+                      color={["#0f766e", "#14b8a6", "#2dd4bf", "#5eead4"]}
+                    />
+                  )}
+                </Panel>
+              </div>
+
+              <Panel title="Status dos leads" subtitle="Onde cada oportunidade está agora">
+                <StatusChips items={statusBreakdown} />
+              </Panel>
 
               <Panel title="Registros do período" subtitle="Linhas de mídia (nível campanha)">
                 <div className="overflow-x-auto">

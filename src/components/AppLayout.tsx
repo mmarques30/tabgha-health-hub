@@ -93,15 +93,9 @@ const ADMIN_NAV: NavGroup[] = [
           { to: "/admin/roi", label: "Operação", perm: "admin.roi", search: { tab: "operacao" } },
           {
             to: "/admin/roi",
-            label: "Clientes gerados",
+            label: "Clientes",
             perm: "admin.roi",
             search: { tab: "clientes" },
-          },
-          {
-            to: "/admin/roi",
-            label: "Oportunidades",
-            perm: "admin.roi",
-            search: { tab: "oportunidades" },
           },
           {
             to: "/admin/roi",

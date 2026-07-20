@@ -10,6 +10,7 @@ type MetaConfig = {
   access_token?: string;
   user_access_token?: string;
   ad_account_id?: string;
+  ad_account_name?: string | null;
   page_name?: string;
   page_id?: string;
 };
@@ -155,17 +156,14 @@ async function persistAdAccount(
   accounts: AdAccount[],
 ) {
   const extras = { ...(cliente.dados_extras ?? {}) } as Record<string, unknown>;
-  const meta = { ...((extras.meta as MetaConfig | undefined) ?? {}) };
+  const meta = { ...((extras.meta as MetaConfig | undefined) ?? {}) } as Record<string, unknown>;
+  const selected = accounts.find((a) => a.account_id === adAccountId);
   meta.ad_account_id = adAccountId;
-  extras.meta = {
-    ...meta,
-    ad_accounts: accounts.map((a) => ({
-      id: a.account_id,
-      name: a.name,
-      amount_spent: a.amount_spent,
-      currency: a.currency ?? null,
-    })),
-  };
+  meta.ad_account_name = selected?.name ?? (meta.ad_account_name as string | null | undefined) ?? null;
+  // Catálogo da BM não deve ir para o cliente (UI / outros sistemas).
+  delete meta.ad_accounts;
+  delete meta.pages;
+  extras.meta = meta;
 
   const { error } = await supabase
     .from("clientes")
@@ -226,7 +224,12 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
     }
 
     if (!adAccountId) {
-      return { inseridos: 0, skipped: true, motivo: "ad_account_missing", ad_accounts: accounts.length };
+      return {
+        inseridos: 0,
+        skipped: true,
+        motivo: "ad_account_missing",
+        ad_accounts_count: accounts.length,
+      };
     }
 
     let rows = await fetchMetaInsights(accessToken, adAccountId, since, until);
@@ -251,8 +254,8 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
           break;
         }
       }
-    } else if (accounts.length > 0) {
-      // Mantém catálogo de contas para o picker da UI.
+    } else if (accounts.length > 0 && !config?.ad_account_name) {
+      // Só grava o nome da conta vinculada (sem catálogo da BM).
       await persistAdAccount(cliente, usedAccount, accounts);
     }
 
@@ -263,6 +266,9 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
       inseridos += 1;
     }
 
+    const linkedName =
+      ranked.find((a) => a.account_id === usedAccount)?.name ?? config?.ad_account_name ?? null;
+
     await supabase.from("automation_logs").insert({
       cliente_id: cliente.id,
       action: "meta_ads_synced",
@@ -271,12 +277,9 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
         until,
         linhas: inseridos,
         ad_account_id: usedAccount,
+        ad_account_name: linkedName,
         auto_switched: autoSwitched,
-        ad_accounts: ranked.slice(0, 12).map((a) => ({
-          id: a.account_id,
-          name: a.name,
-          amount_spent: a.amount_spent,
-        })),
+        ad_accounts_count: ranked.length,
       },
     });
 
@@ -286,14 +289,10 @@ async function syncMetaForClient(cliente: ClienteRow, since: string, until: stri
       since,
       until,
       ad_account_id: usedAccount,
+      ad_account_name: linkedName,
       auto_switched: autoSwitched,
       motivo: rows.length === 0 ? "no_insights_in_range" : undefined,
-      ad_accounts: ranked.slice(0, 12).map((a) => ({
-        id: a.account_id,
-        name: a.name,
-        amount_spent: a.amount_spent,
-        currency: a.currency ?? null,
-      })),
+      ad_accounts_count: ranked.length,
     };
   } catch (error) {
     await supabase.from("webhook_errors").insert({

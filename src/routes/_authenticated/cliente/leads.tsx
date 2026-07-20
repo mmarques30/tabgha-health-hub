@@ -7,7 +7,7 @@ import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { FunilHeader, KanbanBoard } from "@/components/crm/KanbanBoard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useLeads } from "@/hooks/useLeads";
+import { useLeads, type Lead } from "@/hooks/useLeads";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated/cliente/leads")({
@@ -27,6 +27,7 @@ function LeadsPage() {
   const clienteId = profile?.cliente_id;
   const [localSearch, setLocalSearch] = useState(search.q);
   const [showCreate, setShowCreate] = useState(false);
+  const [focusLead, setFocusLead] = useState<Lead | null>(null);
 
   const filters = useMemo(
     () => ({
@@ -111,7 +112,7 @@ function LeadsPage() {
         <div className="flex flex-1 items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : leads.length === 0 ? (
+      ) : leads.length === 0 && !focusLead ? (
         <div className="flex flex-1 items-center justify-center px-6">
           <EmptyState
             icon={<Users className="h-6 w-6" />}
@@ -132,7 +133,11 @@ function LeadsPage() {
               Pipeline
             </p>
             <div className="min-h-0 flex-1">
-              <KanbanBoard leads={leads} />
+              <KanbanBoard
+                leads={leads}
+                focusLead={focusLead}
+                onFocusLeadConsumed={() => setFocusLead(null)}
+              />
             </div>
           </div>
         </div>
@@ -143,6 +148,7 @@ function LeadsPage() {
           open={showCreate}
           onClose={() => setShowCreate(false)}
           clienteId={clienteId}
+          onCreated={(lead) => setFocusLead(lead)}
         />
       ) : null}
     </div>

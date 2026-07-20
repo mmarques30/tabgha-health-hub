@@ -1,22 +1,24 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   closestCorners,
   type DragEndEvent,
   type DragStartEvent,
   useDroppable,
+  useDraggable,
 } from "@dnd-kit/core";
-import { useDraggable } from "@dnd-kit/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2, MessageSquare } from "lucide-react";
+import { GripVertical, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { LeadDetailDialog } from "@/components/crm/LeadDetailDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,10 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { converterLeadComTicket, moverLeadStatus, type Lead } from "@/hooks/useLeads";
-import { supabase } from "@/integrations/supabase/client";
+import { moverLeadStatus, type Lead } from "@/hooks/useLeads";
 import {
   CANAL_COLORS,
   COL_STYLES,
@@ -44,6 +43,9 @@ import { cn } from "@/lib/utils";
 type KanbanBoardProps = {
   leads: Lead[];
   isAdmin?: boolean;
+  /** Abre o detalhe deste lead (ex.: logo após criar). */
+  focusLead?: Lead | null;
+  onFocusLeadConsumed?: () => void;
 };
 
 /** Resolve coluna do funil: drop na coluna (status) ou em cima de outro card (lead id). */
@@ -103,22 +105,35 @@ function LeadCard({ lead, onOpen }: { lead: Lead; onOpen: () => void }) {
     : undefined;
 
   return (
-    <button
+    <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
-      type="button"
-      onClick={onOpen}
       className={cn(
-        "w-full rounded-xl border border-border bg-card p-3 text-left shadow-sm transition-all",
-        "hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md",
+        "flex w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-all",
+        "hover:border-primary/20 hover:shadow-md",
         isDragging && "opacity-40",
         lead.status === "perdido" && "opacity-75",
       )}
     >
-      <LeadCardContent lead={lead} />
-    </button>
+      {/* Handle de arrastar — separado do clique que abre o detalhe */}
+      <button
+        type="button"
+        className="flex shrink-0 cursor-grab items-center justify-center border-r border-border/70 px-1.5 text-muted-foreground hover:bg-secondary/60 active:cursor-grabbing"
+        aria-label={`Arrastar ${lead.nome ?? "lead"}`}
+        {...listeners}
+        {...attributes}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="min-w-0 flex-1 p-3 text-left hover:-translate-y-0.5"
+      >
+        <LeadCardContent lead={lead} />
+        <p className="mt-1.5 text-[10px] font-medium text-sky-700/80">Toque para abrir</p>
+      </button>
+    </div>
   );
 }
 
@@ -214,219 +229,6 @@ function MotivoPerdaDialog({
   );
 }
 
-function LeadDetailDialog({ lead, onClose }: { lead: Lead; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [tab, setTab] = useState<"dados" | "conversas">("dados");
-  const [obs, setObs] = useState(lead.observacoes ?? "");
-  const [status, setStatus] = useState(lead.status as PipelineStatus);
-  const [motivo, setMotivo] = useState(lead.motivo_perda ?? "");
-  const [ticket, setTicket] = useState(() => String(parseTicket(lead.observacoes) ?? ""));
-
-  const { data: messages = [], isLoading: loadingMsgs } = useQuery({
-    queryKey: ["lead-messages", lead.id],
-    enabled: tab === "conversas",
-    queryFn: async () => {
-      const { data: convs, error: convError } = await supabase
-        .from("whatsapp_conversations")
-        .select("id")
-        .eq("lead_id", lead.id);
-      if (convError) throw convError;
-      const ids = (convs ?? []).map((c) => c.id);
-      if (ids.length === 0) return [];
-
-      const { data, error } = await supabase
-        .from("whatsapp_messages")
-        .select("*")
-        .in("conversation_id", ids)
-        .order("sent_at", { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const save = useMutation({
-    mutationFn: async () => {
-      if (status === "convertido" && ticket.trim()) {
-        await converterLeadComTicket(lead.id, Number(ticket));
-      } else {
-        await moverLeadStatus(lead.id, status, status === "perdido" ? motivo : null);
-      }
-      const { error } = await supabase
-        .from("leads")
-        .update({ observacoes: obs || null })
-        .eq("id", lead.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Lead atualizado");
-      void qc.invalidateQueries({ queryKey: ["leads-kanban"] });
-      onClose();
-    },
-    onError: (err: Error) => toast.error(err.message || "Erro ao salvar"),
-  });
-
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {lead.nome ?? "Lead"}
-            <span
-              className={cn(
-                "rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-                COL_STYLES[status]?.badge,
-              )}
-            >
-              {STATUS_LABELS[status]}
-            </span>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex gap-2 border-b border-border pb-2">
-          {(["dados", "conversas"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setTab(item)}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-xs font-semibold capitalize",
-                tab === item
-                  ? "bg-sky-100 text-sky-800"
-                  : "text-muted-foreground hover:bg-secondary",
-              )}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-
-        {tab === "dados" ? (
-          <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-2 rounded-lg bg-secondary/40 px-3 py-2.5">
-              <div>
-                <span className="text-xs text-muted-foreground">Canal</span>
-                <p className="mt-0.5 font-medium">{lead.canal ?? "—"}</p>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground">Telefone</span>
-                <p className="mt-0.5 font-medium">{lead.telefone ?? "—"}</p>
-              </div>
-              <div className="col-span-2">
-                <span className="text-xs text-muted-foreground">Email</span>
-                <p className="mt-0.5 font-medium">{lead.email ?? "—"}</p>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Mover para</label>
-              <select
-                value={status}
-                onChange={(e) => {
-                  const next = e.target.value as PipelineStatus;
-                  setStatus(next);
-                  if (next !== "perdido") setMotivo("");
-                }}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                {PIPELINE.map((s) => (
-                  <option key={s} value={s}>
-                    {STATUS_LABELS[s]}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {status === "perdido" ? (
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Motivo</label>
-                <select
-                  value={motivo}
-                  onChange={(e) => setMotivo(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">Selecione…</option>
-                  {Object.entries(MOTIVO_LABELS).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-
-            {status === "convertido" ? (
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Ticket (R$)</label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={ticket}
-                  onChange={(e) => setTicket(e.target.value)}
-                  placeholder="ex: 450"
-                />
-              </div>
-            ) : null}
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Observações</label>
-              <Textarea
-                className="mt-1"
-                value={obs}
-                onChange={(e) => setObs(e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="max-h-72 space-y-2 overflow-y-auto">
-            {loadingMsgs ? (
-              <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
-            ) : messages.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
-                <MessageSquare className="h-5 w-5" />
-                <p className="text-sm">Nenhuma conversa WhatsApp vinculada</p>
-              </div>
-            ) : (
-              messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "rounded-xl px-3 py-2 text-sm",
-                    msg.direction === "outbound"
-                      ? "ml-8 bg-emerald-50 text-emerald-900"
-                      : "mr-8 border border-border bg-card",
-                  )}
-                >
-                  <p>{msg.body}</p>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {new Date(msg.sent_at).toLocaleString("pt-BR")}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Fechar
-          </Button>
-          {tab === "dados" ? (
-            <Button
-              onClick={() => save.mutate()}
-              disabled={save.isPending || (status === "perdido" && !motivo) || false}
-            >
-              {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Salvar
-            </Button>
-          ) : null}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function FunilHeader({ leads }: { leads: Lead[] }) {
   const active = leads.filter((l) => l.status !== "perdido");
   const convertidos = leads.filter((l) => l.status === "convertido");
@@ -442,7 +244,6 @@ export function FunilHeader({ leads }: { leads: Lead[] }) {
   const agendados = leads.filter(
     (l) => l.status === "agendado" || l.status === "atendido" || l.status === "convertido",
   );
-  // heurística: média de horas entre criado e atualizado dos que já saíram de "novo"
   const tempos = leads
     .filter((l) => l.status !== "novo")
     .map((l) => (new Date(l.atualizado_em).getTime() - new Date(l.criado_em).getTime()) / 36e5)
@@ -487,15 +288,34 @@ export function FunilHeader({ leads }: { leads: Lead[] }) {
   );
 }
 
-export function KanbanBoard({ leads }: KanbanBoardProps) {
+export function KanbanBoard({ leads, focusLead, onFocusLeadConsumed }: KanbanBoardProps) {
   const qc = useQueryClient();
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
-  const [selected, setSelected] = useState<Lead | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [fallbackLead, setFallbackLead] = useState<Lead | null>(null);
   const [pendingPerda, setPendingPerda] = useState<{
     leadId: string;
   } | null>(null);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+  );
+
+  useEffect(() => {
+    if (!focusLead) return;
+    setSelectedId(focusLead.id);
+    setFallbackLead(focusLead);
+    onFocusLeadConsumed?.();
+  }, [focusLead, onFocusLeadConsumed]);
+
+  const selected = useMemo(() => {
+    if (!selectedId) return null;
+    return (
+      leads.find((l) => l.id === selectedId) ??
+      (fallbackLead?.id === selectedId ? fallbackLead : null)
+    );
+  }, [leads, selectedId, fallbackLead]);
 
   const grouped = useMemo(() => {
     return PIPELINE.reduce(
@@ -566,7 +386,7 @@ export function KanbanBoard({ leads }: KanbanBoardProps) {
                 key={status}
                 status={status}
                 leads={grouped[status]}
-                onOpen={setSelected}
+                onOpen={(lead) => setSelectedId(lead.id)}
               />
             ))}
           </div>
@@ -592,7 +412,9 @@ export function KanbanBoard({ leads }: KanbanBoardProps) {
         />
       ) : null}
 
-      {selected ? <LeadDetailDialog lead={selected} onClose={() => setSelected(null)} /> : null}
+      {selected ? (
+        <LeadDetailDialog lead={selected} onClose={() => setSelectedId(null)} />
+      ) : null}
     </div>
   );
 }

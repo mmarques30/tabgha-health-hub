@@ -190,6 +190,13 @@ Deno.serve(async (req: Request) => {
         const adId = leadPayload.ad_id ?? value.ad_id ?? null;
         const campaignId = leadPayload.campaign_id ?? value.campaign_id ?? null;
 
+        const { data: already } = await supabase
+          .from("leads")
+          .select("id")
+          .eq("meta_leadgen_id", leadgenId)
+          .maybeSingle();
+        if (already) continue;
+
         const { data: lead, error: insertError } = await supabase
           .from("leads")
           .insert({
@@ -201,6 +208,7 @@ Deno.serve(async (req: Request) => {
             utm_source: "facebook",
             utm_campaign: campaignId,
             status: "novo",
+            meta_leadgen_id: leadgenId,
             observacoes: [
               adId ? `Ad ${adId}` : null,
               formId ? `form ${formId}` : null,

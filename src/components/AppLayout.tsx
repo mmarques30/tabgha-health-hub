@@ -32,11 +32,18 @@ import {
   Package,
 } from "lucide-react";
 
+type NavChild = {
+  to: string;
+  label: string;
+  perm: string;
+};
+
 type NavItem = {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   perm: string;
+  children?: NavChild[];
 };
 
 type NavGroup = {
@@ -53,6 +60,10 @@ const ADMIN_NAV: NavGroup[] = [
         label: "Dashboard",
         icon: LayoutDashboard,
         perm: "admin.dashboard",
+        children: [
+          { to: "/admin/dashboard", label: "Tabgha", perm: "admin.dashboard" },
+          { to: "/admin/dashboard-clientes", label: "Clientes", perm: "admin.dashboard" },
+        ],
       },
       { to: "/admin/roi", label: "ROI da operação", icon: TrendingUp, perm: "admin.roi" },
       { to: "/admin/meta-ads", label: "Marketing Pago", icon: Megaphone, perm: "admin.meta_ads" },
@@ -328,6 +339,9 @@ function SidebarNav({
   onStopSimulation: () => void;
 }) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({
+    "/admin/dashboard": true,
+  });
 
   function toggleGroup(group: string) {
     setOpenGroups((prev) => ({ ...prev, [group]: !prev[group] }));
@@ -335,6 +349,11 @@ function SidebarNav({
 
   function isGroupOpen(key: string): boolean {
     return openGroups[key] !== false;
+  }
+
+  function isSubmenuOpen(key: string, forceOpen?: boolean): boolean {
+    if (forceOpen) return true;
+    return openSubmenus[key] !== false;
   }
 
   return (
@@ -381,7 +400,11 @@ function SidebarNav({
           const key = g.group;
           const isOpen = isGroupOpen(key);
           const hasActive = g.items.some(
-            (i) => pathname === i.to || pathname.startsWith(i.to + "/"),
+            (i) =>
+              pathname === i.to ||
+              pathname.startsWith(i.to + "/") ||
+              (i.children?.some((c) => pathname === c.to || pathname.startsWith(c.to + "/")) ??
+                false),
           );
           const isAdminGroup = key === "Administração";
 
@@ -418,8 +441,15 @@ function SidebarNav({
               {(isOpen || collapsed) && (
                 <div className={collapsed ? "flex flex-col gap-0.5 py-0.5" : ""}>
                   {g.items.map((it) => {
-                    const active = pathname === it.to || pathname.startsWith(it.to + "/");
+                    const childActive =
+                      it.children?.some(
+                        (c) => pathname === c.to || pathname.startsWith(c.to + "/"),
+                      ) ?? false;
+                    const active =
+                      pathname === it.to || pathname.startsWith(it.to + "/") || childActive;
                     const Icon = it.icon;
+                    const hasChildren = Boolean(it.children?.length);
+                    const submenuOpen = isSubmenuOpen(it.to, childActive);
 
                     if (collapsed) {
                       return (
@@ -442,8 +472,75 @@ function SidebarNav({
                           </TooltipTrigger>
                           <TooltipContent side="right" className="text-xs font-medium">
                             {it.label}
+                            {hasChildren ? ` · ${it.children!.map((c) => c.label).join(", ")}` : ""}
                           </TooltipContent>
                         </Tooltip>
+                      );
+                    }
+
+                    if (hasChildren) {
+                      return (
+                        <div key={it.to} className="mb-0.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenSubmenus((prev) => ({
+                                ...prev,
+                                [it.to]: !isSubmenuOpen(it.to, childActive),
+                              }))
+                            }
+                            className={cn(
+                              "mx-2 mb-px flex w-[calc(100%-16px)] items-center gap-2.5 rounded-[7px] border-0 bg-transparent px-2.5 py-1.5 text-left text-[12.5px] transition-all duration-150",
+                              active
+                                ? "bg-sidebar-accent/70 font-semibold text-sidebar-accent-foreground"
+                                : "text-sidebar-foreground/55 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                            )}
+                          >
+                            <Icon
+                              className={cn(
+                                "h-3.5 w-3.5 shrink-0",
+                                active ? "text-sidebar-primary opacity-100" : "opacity-50",
+                              )}
+                            />
+                            <span className="flex-1">{it.label}</span>
+                            <ChevronRight
+                              className={cn(
+                                "h-3 w-3 opacity-55 transition-transform duration-200",
+                                submenuOpen && "rotate-90",
+                              )}
+                            />
+                          </button>
+                          {submenuOpen ? (
+                            <div className="mb-1 ml-4 border-l border-sidebar-border/50 pl-2">
+                              {it.children!.map((child) => {
+                                const childIsActive =
+                                  pathname === child.to ||
+                                  (child.to !== "/admin/dashboard" &&
+                                    pathname.startsWith(child.to + "/"));
+                                // Tabgha = exact /admin/dashboard only
+                                const exactActive =
+                                  child.to === "/admin/dashboard"
+                                    ? pathname === "/admin/dashboard"
+                                    : childIsActive;
+                                return (
+                                  <Link
+                                    key={child.to}
+                                    to={child.to as any}
+                                    onClick={onNavigate}
+                                    className={cn(
+                                      "mx-2 mb-px flex items-center rounded-[7px] px-2.5 py-1.5 text-[12px] transition-all duration-150",
+                                      exactActive
+                                        ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-[inset_3px_0_0_0_var(--color-sidebar-primary)]"
+                                        : "text-sidebar-foreground/50 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                                    )}
+                                  >
+                                    {child.label}
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                        </div>
                       );
                     }
 

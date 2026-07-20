@@ -209,11 +209,14 @@ function ClientesAdminPage() {
   // KPI counts
   const totalAtivos = clientes.filter((c) => c.status === "ativo").length;
   const totalOnboarding = clientes.filter((c) => c.status === "onboarding").length;
+  const totalCarteira = clientes.filter((c) =>
+    ["ativo", "onboarding"].includes(c.status),
+  ).length;
   const totalLeads = clientes.reduce((acc, c) => acc + c.leads_count, 0);
 
   const kpiCards = [
-    { rank: "01", label: "Total de Clientes", value: clientes.length, color: "bg-primary" },
-    { rank: "02", label: "Clientes Ativos", value: totalAtivos, color: "bg-emerald-500" },
+    { rank: "01", label: "Na carteira", value: totalCarteira, color: "bg-primary" },
+    { rank: "02", label: "Ativos", value: totalAtivos, color: "bg-emerald-500" },
     { rank: "03", label: "Em Onboarding", value: totalOnboarding, color: "bg-blue-500" },
     { rank: "04", label: "Total de Leads", value: totalLeads, color: "bg-primary" },
   ];

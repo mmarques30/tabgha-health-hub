@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Save,
   Unplug,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -57,8 +58,7 @@ type MetaExtras = {
 
 const META_APP_ID = import.meta.env.VITE_META_APP_ID as string | undefined;
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) as
-  | string
-  | undefined;
+  string | undefined;
 
 function buildOAuthUrl(clienteId: string) {
   if (!META_APP_ID || !SUPABASE_URL) return null;
@@ -66,7 +66,8 @@ function buildOAuthUrl(clienteId: string) {
   const params = new URLSearchParams({
     client_id: META_APP_ID,
     redirect_uri: redirectUri,
-    scope: "leads_retrieval,ads_read,pages_show_list,business_management",
+    scope:
+      "leads_retrieval,ads_read,pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_ads,business_management",
     response_type: "code",
     state: clienteId,
   });
@@ -80,6 +81,7 @@ function ConfigMetaPage() {
   const [disconnecting, setDisconnecting] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncingLeads, setSyncingLeads] = useState(false);
   const [adAccountId, setAdAccountId] = useState("");
   const [painelAberto, setPainelAberto] = useState(false);
   const [setupAberto, setSetupAberto] = useState(false);
@@ -194,6 +196,61 @@ function ConfigMetaPage() {
       toast.error("Não foi possível salvar o Ad Account ID.");
     } finally {
       setSavingAccount(false);
+    }
+  }
+
+  async function syncLeadsFromForms() {
+    if (!clienteId) return;
+    if (!meta?.page_id || !meta?.access_token) {
+      toast.error("Conecte a página Meta antes de importar leads.");
+      return;
+    }
+    setSyncingLeads(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync_meta_leads", {
+        body: { cliente_id: clienteId, days: 90 },
+      });
+      if (error) throw error;
+      const payload = data as {
+        ok?: boolean;
+        error?: string;
+        resultados?: Array<{
+          inseridos?: number;
+          ignorados?: number;
+          erros?: number;
+          erro?: string;
+          forms?: number;
+          formErrors?: string[];
+        }>;
+      };
+      if (!payload?.ok) throw new Error(payload?.error || "Importação falhou.");
+      const first = payload.resultados?.[0];
+      if (first?.erro) {
+        const needsPerm = /permission|pages_manage_ads|leads_retrieval|#200/i.test(first.erro);
+        toast.error(
+          needsPerm
+            ? "Meta sem permissão para ler formulários. Reconecte o Meta BM (aceite as novas permissões) e tente de novo."
+            : first.erro.slice(0, 180),
+        );
+      } else if ((first?.inseridos ?? 0) === 0) {
+        toast.message("Nenhum lead novo importado", {
+          description:
+            (first?.forms ?? 0) === 0
+              ? "Nenhum formulário Lead Ads encontrado nesta página."
+              : `${first?.ignorados ?? 0} já estavam no CRM ou fora do período (90 dias).`,
+        });
+      } else {
+        toast.success(
+          `${first!.inseridos} lead(s) importados para o funil (${first?.ignorados ?? 0} já existentes).`,
+        );
+      }
+      void queryClient.invalidateQueries({ queryKey: ["leads-kanban"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-clientes"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-tabgha"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível importar leads.");
+    } finally {
+      setSyncingLeads(false);
     }
   }
 
@@ -524,6 +581,19 @@ function ConfigMetaPage() {
                     )}
                     Sincronizar métricas (30d)
                   </Button>
+                  <Button
+                    variant="secondary"
+                    className="rounded-xl"
+                    disabled={syncingLeads}
+                    onClick={() => void syncLeadsFromForms()}
+                  >
+                    {syncingLeads ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Users className="mr-2 h-4 w-4" />
+                    )}
+                    Importar leads dos formulários
+                  </Button>
                   {oauthUrl ? (
                     <Button asChild variant="outline" className="rounded-xl">
                       <a href={oauthUrl}>
@@ -598,7 +668,8 @@ function ConfigMetaPage() {
               <li>App em developers.facebook.com (conta IAplicada)</li>
               <li>
                 Permissões: <code>leads_retrieval</code>, <code>ads_read</code>,{" "}
-                <code>pages_show_list</code>, <code>business_management</code>
+                <code>pages_show_list</code>, <code>pages_manage_ads</code>,{" "}
+                <code>pages_manage_metadata</code>, <code>business_management</code>
               </li>
               <li>
                 Webhooks · Page · <code>leadgen</code> (verify token já validado no app)
@@ -614,9 +685,9 @@ function ConfigMetaPage() {
                 <strong>Sincronizar métricas</strong> (cron diário também roda com 7 dias)
               </li>
               <li>
-                Leads do CRM vêm só pelo webhook <code>leadgen</code> — OAuth sozinho não importa
-                formulários. Se a Page não estiver inscrita no app, ative em Meta Developers →
-                Webhooks ou habilite <code>pages_manage_metadata</code> no caso de uso.
+                Leads novos entram pelo webhook <code>leadgen</code>. Para leads antigos dos
+                formulários, use <strong>Importar leads dos formulários</strong> (requer reconectar
+                com as permissões acima se der erro 200).
               </li>
             </ol>
           </div>
